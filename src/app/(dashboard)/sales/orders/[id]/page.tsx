@@ -1,0 +1,288 @@
+'use client';
+
+import { useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { toast } from 'sonner';
+import { ArrowLeft, Loader2, X, FileText, Truck } from 'lucide-react';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { LoadingSpinner, ErrorState, StatusBadge, ConfirmDialog } from '@/components/feedback';
+import { DataTable, type Column } from '@/components/tables/DataTable';
+import { FormField, TextareaField } from '@/components/forms/FormField';
+import { formatCurrency, formatDate } from '@/lib/formatters';
+import {
+  useGetSalesOrderQuery,
+  useUpdateSalesOrderStatusMutation,
+  useCreateInvoiceMutation,
+  useGetInvoicesQuery,
+} from '@/features/sales/services/salesApi';
+import type { SalesOrderItem, Invoice } from '@/features/sales/types';
+
+// ── Invoice creation dialog ───────────────────────────────────────────────────
+
+const invoiceSchema = z.object({
+  taxPercent: z.coerce.number().min(0).max(100).default(0),
+  dueDate: z.string().optional(),
+  notes: z.string().optional(),
+});
+type InvoiceForm = z.infer<typeof invoiceSchema>;
+
+function CreateInvoiceDialog({ open, orderId, onClose }: { open: boolean; orderId: string; onClose: () => void }) {
+  const [createInvoice, { isLoading }] = useCreateInvoiceMutation();
+  const { data: orderData } = useGetSalesOrderQuery(orderId);
+
+  const { register, handleSubmit, formState: { errors } } = useForm<InvoiceForm>({
+    resolver: zodResolver(invoiceSchema),
+    defaultValues: { taxPercent: orderData?.data?.salesOrder?.taxPercent ?? 0 },
+  });
+
+  async function onSubmit(values: InvoiceForm) {
+    const order = orderData?.data?.salesOrder;
+    if (!order) return;
+    try {
+      await createInvoice({
+        customer: typeof order.customer === 'string' ? order.customer : order.customer._id,
+        salesOrder: orderId,
+        taxPercent: values.taxPercent,
+        dueDate: values.dueDate ? new Date(values.dueDate).toISOString() : undefined,
+        notes: values.notes,
+        items: order.items.map((l) => ({
+          item: typeof l.item === 'string' ? l.item : l.item._id,
+          uom: typeof l.uom === 'string' ? l.uom : l.uom._id,
+          qty: l.qty,
+          unitPrice: l.unitPrice,
+          discount: l.discount,
+          description: l.description,
+        })),
+      }).unwrap();
+      toast.success('Invoice created');
+      onClose();
+    } catch (err: unknown) {
+      const msg = (err as { data?: { message?: string } })?.data?.message ?? 'Failed to create invoice';
+      toast.error(msg);
+    }
+  }
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+      <div className="fixed inset-0 bg-black/40" onClick={onClose} aria-hidden="true" />
+      <div role="dialog" aria-modal="true" className="relative w-full sm:max-w-md bg-white rounded-none sm:rounded-xl shadow-lg z-10 flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <h2 className="text-base font-semibold">Create Invoice</h2>
+          <button onClick={onClose} className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[36px] min-h-[36px] flex items-center justify-center" aria-label="Close"><X size={18} /></button>
+        </div>
+        <form onSubmit={handleSubmit(onSubmit)} noValidate className="px-6 py-4 flex flex-col gap-4">
+          <FormField label="Tax %" type="number" min={0} max={100} step="0.01" error={errors.taxPercent?.message} {...register('taxPercent')} />
+          <FormField label="Due Date" type="date" error={errors.dueDate?.message} {...register('dueDate')} />
+          <TextareaField label="Notes" placeholder="Optional notes…" {...register('notes')} />
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
+            <button type="button" onClick={onClose} disabled={isLoading} className="h-10 px-4 rounded-md border border-border text-sm text-foreground hover:bg-slate-50 disabled:opacity-50 transition-colors">Cancel</button>
+            <button type="submit" disabled={isLoading} className="h-10 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium disabled:opacity-60 transition-colors flex items-center justify-center gap-2">
+              {isLoading && <Loader2 size={14} className="animate-spin" aria-hidden="true" />}
+              Create Invoice
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+
+export default function SalesOrderDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
+  const [confirmStatus, setConfirmStatus] = useState<string | null>(null);
+
+  const { data, isLoading, isError, refetch } = useGetSalesOrderQuery(id);
+  const { data: invoicesData, isLoading: invLoading } = useGetInvoicesQuery({ customer: undefined });
+  const [updateStatus, { isLoading: statusLoading }] = useUpdateSalesOrderStatusMutation();
+
+  if (isLoading) return <LoadingSpinner />;
+  if (isError || !data?.data?.salesOrder) return <ErrorState onRetry={refetch} />;
+
+  const order = data.data.salesOrder;
+  const customer = typeof order.customer === 'string' ? null : order.customer;
+  const orderInvoices = invoicesData?.data?.invoices?.filter((inv) => {
+    const so = typeof inv.salesOrder === 'string' ? inv.salesOrder : inv.salesOrder?._id;
+    return so === id;
+  }) ?? [];
+
+  async function handleStatusUpdate() {
+    if (!confirmStatus) return;
+    try {
+      await updateStatus({ id, status: confirmStatus }).unwrap();
+      toast.success(`Order ${confirmStatus.toLowerCase()}`);
+    } catch {
+      toast.error('Status update failed');
+    } finally {
+      setConfirmStatus(null);
+    }
+  }
+
+  const invoiceColumns: Column<Invoice>[] = [
+    { key: 'invoiceNumber', header: 'Invoice #', priority: 'P1', render: (row) => <span className="font-medium">{row.invoiceNumber}</span> },
+    { key: 'createdAt', header: 'Date', priority: 'P2', render: (row) => formatDate(row.createdAt) },
+    { key: 'totalAmount', header: 'Total', priority: 'P1', render: (row) => formatCurrency(row.totalAmount) },
+    { key: 'dueAmount', header: 'Due', priority: 'P1', render: (row) => <span className={row.dueAmount > 0 ? 'text-amber-600 font-medium' : 'text-emerald-600'}>{formatCurrency(row.dueAmount)}</span> },
+    { key: 'status', header: 'Status', priority: 'P1', render: (row) => <StatusBadge status={row.status} /> },
+    {
+      key: 'actions', header: '', priority: 'P1', className: 'w-[60px] text-right',
+      render: (row) => (
+        <button onClick={() => router.push(`/sales/invoices/${row._id}`)} className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="View invoice" title="View">
+          <FileText size={15} />
+        </button>
+      ),
+    },
+  ];
+
+  const statusLabel: Record<string, string> = {
+    CONFIRMED: 'Confirm Order',
+    DISPATCHED: 'Mark Dispatched',
+    CLOSED: 'Close Order',
+    CANCELLED: 'Cancel Order',
+  };
+
+  return (
+    <>
+      <PageHeader
+        title={order.orderNumber}
+        description={`Customer: ${customer?.name ?? '—'}`}
+        breadcrumbs={[{ label: 'Sales' }, { label: 'Orders', href: '/sales/orders' }, { label: order.orderNumber }]}
+        actions={
+          <div className="flex items-center gap-2 flex-wrap">
+            <button onClick={() => router.back()} className="h-9 px-3 rounded-md border border-border text-sm text-foreground hover:bg-slate-50 flex items-center gap-2 transition-colors">
+              <ArrowLeft size={15} aria-hidden="true" /> Back
+            </button>
+            {order.status === 'DRAFT' && (
+              <button onClick={() => setConfirmStatus('CONFIRMED')} className="h-9 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium flex items-center gap-2 transition-colors">
+                Confirm Order
+              </button>
+            )}
+            {order.status === 'CONFIRMED' && (
+              <>
+                <button onClick={() => setInvoiceOpen(true)} className="h-9 px-4 rounded-md border border-border text-sm text-foreground hover:bg-slate-50 flex items-center gap-2 transition-colors">
+                  <FileText size={15} aria-hidden="true" /> Create Invoice
+                </button>
+                <button onClick={() => setConfirmStatus('DISPATCHED')} className="h-9 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium flex items-center gap-2 transition-colors">
+                  <Truck size={15} aria-hidden="true" /> Dispatch
+                </button>
+              </>
+            )}
+            {order.status === 'DISPATCHED' && (
+              <button onClick={() => setConfirmStatus('CLOSED')} className="h-9 px-4 rounded-md border border-border text-sm text-foreground hover:bg-slate-50 flex items-center gap-2 transition-colors">
+                Close Order
+              </button>
+            )}
+            {(order.status === 'DRAFT' || order.status === 'CONFIRMED') && (
+              <button onClick={() => setConfirmStatus('CANCELLED')} className="h-9 px-3 rounded-md border border-red-200 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors">
+                Cancel
+              </button>
+            )}
+          </div>
+        }
+      />
+
+      {/* Info */}
+      <div className="bg-white rounded-lg border border-border p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+        {[
+          { label: 'Order Number', value: order.orderNumber },
+          { label: 'Customer', value: customer?.name },
+          { label: 'Status', value: <StatusBadge status={order.status} /> },
+          { label: 'Date', value: formatDate(order.createdAt) },
+          { label: 'Delivery Date', value: order.deliveryDate ? formatDate(order.deliveryDate) : '—' },
+          { label: 'Subtotal', value: formatCurrency(order.subtotal) },
+          { label: `Tax (${order.taxPercent}%)`, value: formatCurrency(order.taxAmount) },
+          { label: 'Total Amount', value: <span className="font-semibold text-emerald-600">{formatCurrency(order.totalAmount)}</span> },
+        ].map(({ label, value }) => (
+          <div key={label} className="flex flex-col gap-0.5">
+            <span className="text-xs font-medium text-muted uppercase tracking-wide">{label}</span>
+            <span className="text-sm text-foreground">{value ?? '—'}</span>
+          </div>
+        ))}
+        {order.notes && (
+          <div className="col-span-full flex flex-col gap-0.5">
+            <span className="text-xs font-medium text-muted uppercase tracking-wide">Notes</span>
+            <span className="text-sm text-foreground">{order.notes}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Line items */}
+      <div className="bg-white rounded-lg border border-border mb-6">
+        <div className="px-4 py-3 border-b border-border">
+          <h2 className="text-sm font-semibold">Line Items</h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-[13px]">
+            <thead>
+              <tr className="bg-slate-50 border-b border-border">
+                {['Item', 'Qty', 'Unit Price', 'Discount', 'Total'].map((h) => (
+                  <th key={h} className="px-4 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wide">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {order.items.map((line: SalesOrderItem, i: number) => {
+                const itemName = typeof line.item === 'string' ? line.item : line.item.name;
+                return (
+                  <tr key={i} className="border-b border-border hover:bg-slate-50">
+                    <td className="px-4 py-3 font-medium">{itemName}</td>
+                    <td className="px-4 py-3">{line.qty}</td>
+                    <td className="px-4 py-3">{formatCurrency(line.unitPrice)}</td>
+                    <td className="px-4 py-3">{line.discount}%</td>
+                    <td className="px-4 py-3">{formatCurrency(line.lineTotal)}</td>
+                  </tr>
+                );
+              })}
+              <tr className="bg-slate-50">
+                <td colSpan={4} className="px-4 py-3 text-right text-xs font-medium text-secondary uppercase">Total</td>
+                <td className="px-4 py-3 font-semibold">{formatCurrency(order.totalAmount)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Invoices */}
+      <div className="bg-white rounded-lg border border-border">
+        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+          <h2 className="text-sm font-semibold">Invoices</h2>
+          {order.status === 'CONFIRMED' && (
+            <button onClick={() => setInvoiceOpen(true)} className="h-8 px-3 rounded-md border border-border text-xs text-foreground hover:bg-slate-50 flex items-center gap-1.5 transition-colors">
+              <FileText size={13} aria-hidden="true" /> Create Invoice
+            </button>
+          )}
+        </div>
+        <div className="p-4">
+          <DataTable columns={invoiceColumns} data={orderInvoices} keyField="_id" isLoading={invLoading} emptyMessage="No invoices yet." />
+        </div>
+      </div>
+
+      <CreateInvoiceDialog open={invoiceOpen} orderId={id} onClose={() => setInvoiceOpen(false)} />
+
+      <ConfirmDialog
+        open={!!confirmStatus}
+        title={statusLabel[confirmStatus ?? ''] ?? 'Update Status'}
+        description={
+          confirmStatus === 'DISPATCHED'
+            ? 'This will dispatch the order and deduct stock. This cannot be undone.'
+            : confirmStatus === 'CANCELLED'
+            ? 'This will cancel the order. This cannot be undone.'
+            : `Change order status to ${confirmStatus?.toLowerCase()}.`
+        }
+        confirmLabel={statusLabel[confirmStatus ?? ''] ?? 'Confirm'}
+        variant={confirmStatus === 'CANCELLED' ? 'danger' : 'default'}
+        loading={statusLoading}
+        onConfirm={handleStatusUpdate}
+        onCancel={() => setConfirmStatus(null)}
+      />
+    </>
+  );
+}
