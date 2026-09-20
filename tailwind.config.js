@@ -70,9 +70,14 @@ module.exports = {
           from: { opacity: '0', transform: 'translateY(4px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
+        'orb-pulse': {
+          '0%, 100%': { opacity: '0.18', transform: 'scale(1)' },
+          '50%': { opacity: '0.28', transform: 'scale(1.08)' },
+        },
       },
       animation: {
         'fade-in': 'fade-in 150ms ease-out',
+        'orb-pulse': 'orb-pulse 6s ease-in-out infinite',
       },
     },
   },

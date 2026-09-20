@@ -17,7 +17,7 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, description, breadcrumbs, actions, className }: PageHeaderProps) {
   return (
-    <div className={cn('flex flex-col gap-1 mb-6', className)}>
+    <div className={cn('flex flex-col gap-1 mb-6 page-header', className)}>
       {breadcrumbs && breadcrumbs.length > 0 && (
         <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-xs text-muted">
           {breadcrumbs.map((crumb, i) => (

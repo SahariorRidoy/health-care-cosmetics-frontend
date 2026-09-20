@@ -10,6 +10,7 @@ import { LoadingSpinner, StatusBadge } from '@/components/feedback';
 import { formatCurrency, formatNumber } from '@/lib/formatters';
 import { useGetFinanceSummaryQuery } from '@/features/finance/services/financeApi';
 import { useGetSalesSummaryQuery, useGetProductionSummaryQuery, useGetStockBalanceReportQuery } from '@/features/reports/services/reportsApi';
+import { useGetItemsQuery } from '@/features/inventory/services/inventoryApi';
 
 function KpiCard({
   label, value, sub, icon: Icon, iconClass, href,
@@ -41,11 +42,22 @@ export default function DashboardPage() {
   const { data: salesData, isLoading: salesLoading } = useGetSalesSummaryQuery({});
   const { data: prodData, isLoading: prodLoading } = useGetProductionSummaryQuery({});
   const { data: stockData, isLoading: stockLoading } = useGetStockBalanceReportQuery({ lowStock: true, page: 1 });
+  const { data: rawMatsData } = useGetItemsQuery({ type: 'RAW_MATERIAL,PACKAGING' });
+  const { data: finishedGoodsData } = useGetItemsQuery({ type: 'FINISHED_GOOD' });
 
   const fin = finData?.data;
   const sales = salesData?.data;
   const prod = prodData?.data;
-  const lowStockItems = stockData?.data?.balances ?? [];
+  const lowStockItems = (stockData?.data?.balances ?? []);
+  const lowStockRaw = lowStockItems.filter((b) => {
+    const t = (b.item as { type?: string })?.type;
+    return t === 'RAW_MATERIAL' || t === 'PACKAGING';
+  });
+  const lowStockFinished = lowStockItems.filter((b) => {
+    return (b.item as { type?: string })?.type === 'FINISHED_GOOD';
+  });
+  const totalRawMats = rawMatsData?.data?.items?.length ?? 0;
+  const totalFinishedGoods = finishedGoodsData?.data?.items?.length ?? 0;
 
   const totalRevenue = sales?.orderSummary.reduce((s, r) => s + r.totalAmount, 0) ?? 0;
   const totalOrders = sales?.orderSummary.reduce((s, r) => s + r.count, 0) ?? 0;
@@ -94,6 +106,34 @@ export default function DashboardPage() {
           icon={DollarSign}
           iconClass="bg-blue-50 text-blue-500"
           href="/sales/customers"
+        />
+      </div>
+
+      {/* Raw Materials & Finished Products low-stock summary */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <KpiCard
+          label="Raw Materials Low Stock"
+          value={lowStockRaw.length.toString()}
+          sub={`of ${totalRawMats} raw materials`}
+          icon={Package}
+          iconClass={lowStockRaw.length > 0 ? 'bg-amber-50 text-amber-500' : 'bg-slate-50 text-slate-400'}
+          href="/inventory"
+        />
+        <KpiCard
+          label="Finished Products Low Stock"
+          value={lowStockFinished.length.toString()}
+          sub={`of ${totalFinishedGoods} products`}
+          icon={Package}
+          iconClass={lowStockFinished.length > 0 ? 'bg-amber-50 text-amber-500' : 'bg-slate-50 text-slate-400'}
+          href="/production"
+        />
+        <KpiCard
+          label="Active Work Orders"
+          value={inProgress.toString()}
+          sub="production in progress"
+          icon={Factory}
+          iconClass="bg-blue-50 text-blue-500"
+          href="/production/orders"
         />
       </div>
 

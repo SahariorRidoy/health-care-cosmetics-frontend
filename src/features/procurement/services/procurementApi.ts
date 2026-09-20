@@ -33,11 +33,16 @@ export const procurementApi = api.injectEndpoints({
     }),
     getSupplierDues: build.query<SupplierDuesResponse, string>({
       query: (supplierId) => `/procurement/suppliers/${supplierId}/dues`,
-      providesTags: (_r, _e, id) => [{ type: 'Supplier', id }],
+      providesTags: (_r, _e, id) => [{ type: 'Supplier', id }, 'SupplierPayment'],
     }),
     createSupplierPayment: build.mutation<{ success: boolean }, { supplier: string; purchaseOrder?: string; amount: number; paymentDate: string; method: string; reference?: string; notes?: string }>({
       query: (body) => ({ url: '/procurement/payments', method: 'POST', body }),
-      invalidatesTags: ['SupplierPayment', 'Supplier', 'PurchaseOrder'],
+      invalidatesTags: (_r, _e, { supplier }) => [
+        'SupplierPayment',
+        { type: 'Supplier', id: supplier },
+        'Supplier',
+        'PurchaseOrder',
+      ],
     }),
     getPurchaseOrders: build.query<POsResponse, { page?: number; search?: string; status?: string; supplier?: string }>({
       query: (params) => ({ url: '/purchase-orders', params }),
@@ -55,9 +60,13 @@ export const procurementApi = api.injectEndpoints({
       query: ({ id, status }) => ({ url: `/purchase-orders/${id}/status`, method: 'PATCH', body: { status } }),
       invalidatesTags: (_r, _e, { id }) => ['PurchaseOrder', { type: 'PurchaseOrder', id }],
     }),
-    getGoodsReceipts: build.query<GRsResponse, { page?: number; purchaseOrder?: string }>({
+    getGoodsReceipts: build.query<GRsResponse, { page?: number; purchaseOrder?: string; supplier?: string; item?: string }>({
       query: (params) => ({ url: '/procurement/receipts', params }),
       providesTags: ['GoodsReceipt'],
+    }),
+    getGoodsReceipt: build.query<GRResponse, string>({
+      query: (id) => `/procurement/receipts/${id}`,
+      providesTags: (_r, _e, id) => [{ type: 'GoodsReceipt', id }],
     }),
     createGoodsReceipt: build.mutation<GRResponse, { purchaseOrder: string; warehouse: string; items: { item: string; receivedQty: number; unitPrice: number; uom: string; batchNumber?: string; expiryDate?: string }[]; notes?: string; receivedDate?: string }>({
       query: (body) => ({ url: '/procurement/receipts', method: 'POST', body }),
@@ -80,5 +89,6 @@ export const {
   useCreatePurchaseOrderMutation,
   useUpdatePOStatusMutation,
   useGetGoodsReceiptsQuery,
+  useGetGoodsReceiptQuery,
   useCreateGoodsReceiptMutation,
 } = procurementApi;

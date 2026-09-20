@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { ArrowLeft, Loader2, X, CreditCard, FileDown } from 'lucide-react';
+import { ArrowLeft, Loader2, X, CreditCard, FileDown, Printer } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { LoadingSpinner, ErrorState, StatusBadge } from '@/components/feedback';
 import { DataTable, type Column } from '@/components/tables/DataTable';
@@ -17,6 +17,7 @@ import {
   useGetCustomerPaymentsQuery,
   useCreateCustomerPaymentMutation,
 } from '@/features/sales/services/salesApi';
+import { useAppSelector } from '@/lib/store/hooks';
 import type { InvoiceItem, CustomerPayment } from '@/features/sales/types';
 
 // ── Receipt dialog ────────────────────────────────────────────────────────────
@@ -115,6 +116,8 @@ export default function InvoiceDetailPage() {
   const router = useRouter();
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [paymentPage, setPaymentPage] = useState(1);
+  const [downloading, setDownloading] = useState(false);
+  const token = useAppSelector((s) => s.auth.accessToken);
 
   const { data, isLoading, isError, refetch } = useGetInvoiceQuery(id);
   const invoice = data?.data?.invoice;
@@ -128,11 +131,50 @@ export default function InvoiceDetailPage() {
     { skip: !customerId },
   );
 
-  // Filter payments for this invoice
   const invoicePayments = paymentsData?.data?.payments?.filter((p) => {
     const inv = typeof p.invoice === 'string' ? p.invoice : (p.invoice as { _id: string })?._id;
     return inv === id;
   }) ?? [];
+
+  async function handleDownload() {
+    if (!token) return;
+    setDownloading(true);
+    try {
+      const base = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api/v1';
+      const res = await fetch(`${base}/sales/invoices/${id}/pdf`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed to download');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Invoice-${invoice?.invoiceNumber ?? id}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Failed to download PDF');
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  async function handlePrint() {
+    if (!token) return;
+    try {
+      const base = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api/v1';
+      const res = await fetch(`${base}/sales/invoices/${id}/pdf`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const win = window.open(url);
+      win?.addEventListener('load', () => { win.print(); URL.revokeObjectURL(url); });
+    } catch {
+      toast.error('Failed to load PDF for printing');
+    }
+  }
 
   if (isLoading) return <LoadingSpinner />;
   if (isError || !invoice) return <ErrorState onRetry={refetch} />;
@@ -165,14 +207,20 @@ export default function InvoiceDetailPage() {
                 <CreditCard size={15} aria-hidden="true" /> Record Payment
               </button>
             )}
-            <a
-              href={`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api/v1'}/sales/invoices/${id}/pdf`}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              onClick={handlePrint}
               className="h-9 px-4 rounded-md border border-border text-sm font-medium flex items-center gap-2 hover:bg-slate-50 transition-colors"
             >
-              <FileDown size={15} aria-hidden="true" /> Download PDF
-            </a>
+              <Printer size={15} aria-hidden="true" /> Print
+            </button>
+            <button
+              onClick={handleDownload}
+              disabled={downloading}
+              className="h-9 px-4 rounded-md border border-border text-sm font-medium flex items-center gap-2 hover:bg-slate-50 transition-colors disabled:opacity-60"
+            >
+              {downloading ? <Loader2 size={15} className="animate-spin" /> : <FileDown size={15} aria-hidden="true" />}
+              Download PDF
+            </button>
           </div>
         }
       />

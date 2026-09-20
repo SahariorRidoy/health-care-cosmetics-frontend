@@ -6,9 +6,12 @@ import type {
 
 export const inventoryApi = api.injectEndpoints({
   endpoints: (build) => ({
-    getItems: build.query<ItemsResponse, { page?: number; search?: string; type?: string; isActive?: string }>({
+    getItems: build.query<ItemsResponse, { page?: number; search?: string; type?: string; supplier?: string; isActive?: string }>({
       query: (params) => ({ url: '/items', params }),
       providesTags: ['Item'],
+    }),
+    generateSku: build.query<{ success: boolean; data: { sku: string } }, string>({
+      query: (name) => ({ url: '/items/generate-sku', params: { name } }),
     }),
     getItem: build.query<ItemResponse, string>({
       query: (id) => `/items/${id}`,
@@ -20,7 +23,7 @@ export const inventoryApi = api.injectEndpoints({
     }),
     createItem: build.mutation<ItemResponse, CreateItemPayload>({
       query: (body) => ({ url: '/items', method: 'POST', body }),
-      invalidatesTags: ['Item'],
+      invalidatesTags: ['Item', 'Stock', 'Supplier', 'PurchaseOrder'],
     }),
     updateItem: build.mutation<ItemResponse, { id: string; body: Partial<CreateItemPayload> & { isActive?: boolean } }>({
       query: ({ id, body }) => ({ url: `/items/${id}`, method: 'PATCH', body }),
@@ -62,6 +65,14 @@ export const inventoryApi = api.injectEndpoints({
       query: () => '/warehouses',
       providesTags: ['Warehouse'],
     }),
+    createWarehouse: build.mutation<{ success: boolean; data: { warehouse: import('../types').Warehouse } }, { name: string; code: string; address?: string; isDefault?: boolean }>({
+      query: (body) => ({ url: '/warehouses', method: 'POST', body }),
+      invalidatesTags: ['Warehouse'],
+    }),
+    updateWarehouse: build.mutation<{ success: boolean; data: { warehouse: import('../types').Warehouse } }, { id: string; body: { name?: string; code?: string; address?: string; isDefault?: boolean; isActive?: boolean } }>({
+      query: ({ id, body }) => ({ url: `/warehouses/${id}`, method: 'PATCH', body }),
+      invalidatesTags: ['Warehouse'],
+    }),
   }),
 });
 
@@ -69,6 +80,7 @@ export const {
   useGetItemsQuery,
   useGetItemQuery,
   useGetItemCategoriesQuery,
+  useGenerateSkuQuery,
   useCreateItemMutation,
   useUpdateItemMutation,
   useDeleteItemMutation,
@@ -80,4 +92,6 @@ export const {
   useGetStockMovementsQuery,
   useCreateAdjustmentMutation,
   useGetWarehousesQuery,
+  useCreateWarehouseMutation,
+  useUpdateWarehouseMutation,
 } = inventoryApi;

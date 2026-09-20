@@ -1,16 +1,19 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useAppDispatch } from '@/lib/store/hooks';
+import { useAppDispatch, useAppSelector } from '@/lib/store/hooks';
 import { setCredentials } from '@/lib/store/authSlice';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api/v1';
 
 export function AuthBootstrap() {
   const dispatch = useAppDispatch();
+  const accessToken = useAppSelector((s) => s.auth.accessToken);
 
   useEffect(() => {
-    // Try to restore session via refresh token cookie
+    // If we already have a token from localStorage, skip the refresh call
+    if (accessToken) return;
+
     fetch(`${BASE_URL}/auth/refresh`, { method: 'POST', credentials: 'include' })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
@@ -18,8 +21,8 @@ export function AuthBootstrap() {
           dispatch(setCredentials({ accessToken: data.data.accessToken, user: data.data.user }));
         }
       })
-      .catch(() => {/* no session — stay logged out */});
-  }, [dispatch]);
+      .catch(() => {});
+  }, []);
 
   return null;
 }

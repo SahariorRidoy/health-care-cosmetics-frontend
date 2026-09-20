@@ -74,7 +74,7 @@ export default function StockPage() {
       priority: 'P1',
       render: (row) => {
         const item = typeof row.item === 'string' ? null : row.item as Item;
-        const low = item ? row.quantity <= item.reorderLevel : false;
+        const low = item && item.reorderLevel != null ? row.quantity <= item.reorderLevel : false;
         return (
           <span className={low ? 'text-amber-600 font-medium' : ''}>
             {row.quantity}
@@ -89,7 +89,7 @@ export default function StockPage() {
       priority: 'P2',
       render: (row) => {
         const item = typeof row.item === 'string' ? null : row.item as Item;
-        const low = item ? row.quantity <= item.reorderLevel : false;
+        const low = item && item.reorderLevel != null ? row.quantity <= item.reorderLevel : false;
         return <StatusBadge status={low ? 'WARNING' : 'ACTIVE'} />;
       },
     },
@@ -179,9 +179,9 @@ export default function StockPage() {
         description="Stock balances and movement history"
         breadcrumbs={[{ label: 'Inventory', href: '/inventory' }, { label: 'Stock' }]}
         actions={
-          itemsData?.data?.[0] && (
+          itemsData?.data?.items[0] && (
             <button
-              onClick={() => setAdjustItem(itemsData.data[0])}
+              onClick={() => setAdjustItem(itemsData.data.items[0])}
               className="h-9 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium flex items-center gap-2 transition-colors"
             >
               <SlidersHorizontal size={15} aria-hidden="true" />

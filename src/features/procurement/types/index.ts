@@ -1,8 +1,6 @@
 export interface Supplier {
   _id: string;
   name: string;
-  code: string;
-  category: string;
   contactPerson?: string;
   phone?: string;
   email?: string;
@@ -27,10 +25,11 @@ export interface SupplierPayment {
 }
 
 export interface SupplierDues {
-  supplier: Supplier;
+  supplier: { _id: string; name: string };
   outstandingBalance: number;
   totalOrdered: number;
   totalPaid: number;
+  receipts: GoodsReceipt[];
   recentPayments: SupplierPayment[];
 }
 
@@ -99,7 +98,7 @@ export interface GoodsReceipt {
   grNumber: string;
   purchaseOrder: PurchaseOrder | string;
   supplier: Supplier | string;
-  warehouse: { _id: string; name: string } | string;
+  warehouse: { _id: string; name: string; code: string } | string;
   items: GRItem[];
   totalAmount: number;
   notes?: string;
@@ -131,8 +130,6 @@ export interface GRResponse {
 
 export interface CreateSupplierPayload {
   name: string;
-  code: string;
-  category: string;
   contactPerson?: string;
   phone?: string;
   email?: string;

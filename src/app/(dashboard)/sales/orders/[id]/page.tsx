@@ -6,18 +6,20 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { ArrowLeft, Loader2, X, FileText, Truck } from 'lucide-react';
+import { ArrowLeft, Loader2, X, FileText, Truck, CreditCard, FileDown, Printer } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { LoadingSpinner, ErrorState, StatusBadge, ConfirmDialog } from '@/components/feedback';
 import { DataTable, type Column } from '@/components/tables/DataTable';
-import { FormField, TextareaField } from '@/components/forms/FormField';
+import { FormField, SelectField, TextareaField } from '@/components/forms/FormField';
 import { formatCurrency, formatDate } from '@/lib/formatters';
 import {
   useGetSalesOrderQuery,
   useUpdateSalesOrderStatusMutation,
   useCreateInvoiceMutation,
   useGetInvoicesQuery,
+  useCreateCustomerPaymentMutation,
 } from '@/features/sales/services/salesApi';
+import { useAppSelector } from '@/lib/store/hooks';
 import type { SalesOrderItem, Invoice } from '@/features/sales/types';
 
 // ── Invoice creation dialog ───────────────────────────────────────────────────
@@ -92,16 +94,147 @@ function CreateInvoiceDialog({ open, orderId, onClose }: { open: boolean; orderI
   );
 }
 
+// ── Record payment dialog ─────────────────────────────────────────────────────
+
+const paymentSchema = z.object({
+  amount: z.coerce.number().min(0.01, 'Amount must be > 0'),
+  method: z.string().min(1, 'Payment method required'),
+  paymentDate: z.string().optional(),
+  reference: z.string().optional(),
+  notes: z.string().optional(),
+});
+type PaymentForm = z.infer<typeof paymentSchema>;
+
+const PAYMENT_METHODS = ['CASH', 'BANK_TRANSFER', 'CHEQUE', 'MOBILE_BANKING'];
+
+function RecordPaymentDialog({
+  open, invoice, customerId, onClose,
+}: {
+  open: boolean;
+  invoice: Invoice | null;
+  customerId: string;
+  onClose: () => void;
+}) {
+  const [createPayment, { isLoading }] = useCreateCustomerPaymentMutation();
+
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<PaymentForm>({
+    resolver: zodResolver(paymentSchema),
+    defaultValues: { amount: invoice?.dueAmount ?? 0, method: 'CASH' },
+  });
+
+  async function onSubmit(values: PaymentForm) {
+    if (!invoice) return;
+    try {
+      await createPayment({
+        customer: customerId,
+        invoice: invoice._id,
+        amount: values.amount,
+        method: values.method,
+        paymentDate: values.paymentDate ? new Date(values.paymentDate).toISOString() : undefined,
+        reference: values.reference,
+        notes: values.notes,
+      }).unwrap();
+      toast.success('Payment recorded');
+      reset();
+      onClose();
+    } catch (err: unknown) {
+      const msg = (err as { data?: { message?: string } })?.data?.message ?? 'Failed to record payment';
+      toast.error(msg);
+    }
+  }
+
+  if (!open || !invoice) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+      <div className="fixed inset-0 bg-black/40" onClick={onClose} aria-hidden="true" />
+      <div role="dialog" aria-modal="true" className="relative w-full sm:max-w-md bg-white rounded-none sm:rounded-xl shadow-lg z-10 flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <h2 className="text-base font-semibold">Record Payment — {invoice.invoiceNumber}</h2>
+          <button onClick={onClose} className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[36px] min-h-[36px] flex items-center justify-center" aria-label="Close"><X size={18} /></button>
+        </div>
+        <form onSubmit={handleSubmit(onSubmit)} noValidate className="px-6 py-4 flex flex-col gap-4">
+          <div className="flex gap-4 text-sm bg-slate-50 rounded-md px-4 py-3">
+            <span className="text-secondary">Total: <span className="font-medium text-foreground">{formatCurrency(invoice.totalAmount)}</span></span>
+            <span className="text-secondary">Due: <span className="font-semibold text-amber-600">{formatCurrency(invoice.dueAmount)}</span></span>
+          </div>
+          <FormField label="Amount (৳)" type="number" min={0.01} max={invoice.dueAmount} step="0.01" required error={errors.amount?.message} {...register('amount')} />
+          <SelectField label="Payment Method" required error={errors.method?.message} {...register('method')}>
+            {PAYMENT_METHODS.map((m) => <option key={m} value={m}>{m.replace('_', ' ')}</option>)}
+          </SelectField>
+          <FormField label="Payment Date" type="date" error={errors.paymentDate?.message} {...register('paymentDate')} />
+          <FormField label="Reference" placeholder="Cheque no. / transaction ID…" error={errors.reference?.message} {...register('reference')} />
+          <TextareaField label="Notes" placeholder="Optional notes…" {...register('notes')} />
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
+            <button type="button" onClick={onClose} disabled={isLoading} className="h-10 px-4 rounded-md border border-border text-sm text-foreground hover:bg-slate-50 disabled:opacity-50 transition-colors">Cancel</button>
+            <button type="submit" disabled={isLoading} className="h-10 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium disabled:opacity-60 transition-colors flex items-center justify-center gap-2">
+              {isLoading && <Loader2 size={14} className="animate-spin" aria-hidden="true" />}
+              Record Payment
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function SalesOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [invoiceOpen, setInvoiceOpen] = useState(false);
+  const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
   const [confirmStatus, setConfirmStatus] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const token = useAppSelector((s) => s.auth.accessToken);
+
+  async function handleInvoiceDownload(invoiceId: string, invoiceNumber: string) {
+    if (!token) return;
+    setDownloadingId(invoiceId);
+    try {
+      const base = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api/v1';
+      const res = await fetch(`${base}/sales/invoices/${invoiceId}/pdf`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error();
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `Invoice-${invoiceNumber}.pdf`; a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Failed to download PDF');
+    } finally {
+      setDownloadingId(null);
+    }
+  }
+
+  async function handleInvoicePrint(invoiceId: string) {
+    if (!token) return;
+    try {
+      const base = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api/v1';
+      const res = await fetch(`${base}/sales/invoices/${invoiceId}/pdf`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error();
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const win = window.open(url);
+      win?.addEventListener('load', () => { win.print(); URL.revokeObjectURL(url); });
+    } catch {
+      toast.error('Failed to load PDF for printing');
+    }
+  }
 
   const { data, isLoading, isError, refetch } = useGetSalesOrderQuery(id);
-  const { data: invoicesData, isLoading: invLoading } = useGetInvoicesQuery({ customer: undefined });
+  const customerId = data?.data?.salesOrder
+    ? (typeof data.data.salesOrder.customer === 'string' ? data.data.salesOrder.customer : data.data.salesOrder.customer._id)
+    : undefined;
+  const { data: invoicesData, isLoading: invLoading } = useGetInvoicesQuery(
+    { customer: customerId },
+    { skip: !customerId },
+  );
   const [updateStatus, { isLoading: statusLoading }] = useUpdateSalesOrderStatusMutation();
 
   if (isLoading) return <LoadingSpinner />;
@@ -113,6 +246,7 @@ export default function SalesOrderDetailPage() {
     const so = typeof inv.salesOrder === 'string' ? inv.salesOrder : inv.salesOrder?._id;
     return so === id;
   }) ?? [];
+  const canActOnOrder = order.status === 'DRAFT' || order.status === 'CONFIRMED';
 
   async function handleStatusUpdate() {
     if (!confirmStatus) return;
@@ -133,11 +267,41 @@ export default function SalesOrderDetailPage() {
     { key: 'dueAmount', header: 'Due', priority: 'P1', render: (row) => <span className={row.dueAmount > 0 ? 'text-amber-600 font-medium' : 'text-emerald-600'}>{formatCurrency(row.dueAmount)}</span> },
     { key: 'status', header: 'Status', priority: 'P1', render: (row) => <StatusBadge status={row.status} /> },
     {
-      key: 'actions', header: '', priority: 'P1', className: 'w-[60px] text-right',
+      key: 'actions', header: '', priority: 'P1', className: 'w-[130px] text-right',
       render: (row) => (
-        <button onClick={() => router.push(`/sales/invoices/${row._id}`)} className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="View invoice" title="View">
-          <FileText size={15} />
-        </button>
+        <div className="flex items-center justify-end gap-1">
+          {row.dueAmount > 0 && row.status !== 'CANCELLED' && (
+            <button
+              onClick={() => setPaymentInvoice(row)}
+              className="p-1.5 rounded-md text-emerald-600 hover:bg-emerald-50 min-w-[32px] min-h-[32px] flex items-center justify-center"
+              aria-label="Record payment" title="Record Payment"
+            >
+              <CreditCard size={15} />
+            </button>
+          )}
+          <button
+            onClick={() => handleInvoicePrint(row._id)}
+            className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[32px] min-h-[32px] flex items-center justify-center"
+            aria-label="Print invoice" title="Print"
+          >
+            <Printer size={15} />
+          </button>
+          <button
+            onClick={() => handleInvoiceDownload(row._id, row.invoiceNumber)}
+            disabled={downloadingId === row._id}
+            className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[32px] min-h-[32px] flex items-center justify-center disabled:opacity-50"
+            aria-label="Download invoice" title="Download PDF"
+          >
+            {downloadingId === row._id ? <Loader2 size={15} className="animate-spin" /> : <FileDown size={15} />}
+          </button>
+          <button
+            onClick={() => router.push(`/sales/invoices/${row._id}`)}
+            className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[32px] min-h-[32px] flex items-center justify-center"
+            aria-label="View invoice" title="View"
+          >
+            <FileText size={15} />
+          </button>
+        </div>
       ),
     },
   ];
@@ -180,7 +344,7 @@ export default function SalesOrderDetailPage() {
                 Close Order
               </button>
             )}
-            {(order.status === 'DRAFT' || order.status === 'CONFIRMED') && (
+            {canActOnOrder && (
               <button onClick={() => setConfirmStatus('CANCELLED')} className="h-9 px-3 rounded-md border border-red-200 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors">
                 Cancel
               </button>
@@ -254,7 +418,7 @@ export default function SalesOrderDetailPage() {
       <div className="bg-white rounded-lg border border-border">
         <div className="px-4 py-3 border-b border-border flex items-center justify-between">
           <h2 className="text-sm font-semibold">Invoices</h2>
-          {order.status === 'CONFIRMED' && (
+          {canActOnOrder && (
             <button onClick={() => setInvoiceOpen(true)} className="h-8 px-3 rounded-md border border-border text-xs text-foreground hover:bg-slate-50 flex items-center gap-1.5 transition-colors">
               <FileText size={13} aria-hidden="true" /> Create Invoice
             </button>
@@ -266,6 +430,13 @@ export default function SalesOrderDetailPage() {
       </div>
 
       <CreateInvoiceDialog open={invoiceOpen} orderId={id} onClose={() => setInvoiceOpen(false)} />
+
+      <RecordPaymentDialog
+        open={!!paymentInvoice}
+        invoice={paymentInvoice}
+        customerId={customerId ?? ''}
+        onClose={() => setPaymentInvoice(null)}
+      />
 
       <ConfirmDialog
         open={!!confirmStatus}

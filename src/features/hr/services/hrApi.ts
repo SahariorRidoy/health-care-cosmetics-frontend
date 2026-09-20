@@ -82,6 +82,10 @@ export const hrApi = api.injectEndpoints({
       query: (body) => ({ url: '/hr/attendance', method: 'POST', body }),
       invalidatesTags: ['Attendance'],
     }),
+    bulkUpsertAttendance: build.mutation<{ success: boolean }, { date: string; records: { employee: string; status: string; notes?: string }[] }>({
+      query: (body) => ({ url: '/hr/attendance/bulk', method: 'POST', body }),
+      invalidatesTags: ['Attendance'],
+    }),
     updateAttendance: build.mutation<AttendanceResponse, { id: string; status: string; notes?: string }>({
       query: ({ id, ...body }) => ({ url: `/hr/attendance/${id}`, method: 'PATCH', body }),
       invalidatesTags: ['Attendance'],
@@ -147,6 +151,7 @@ export const {
   useUpdateSalaryStructureMutation,
   useGetAttendanceQuery,
   useUpsertAttendanceMutation,
+  useBulkUpsertAttendanceMutation,
   useUpdateAttendanceMutation,
   useGetLeavesQuery,
   useGetLeaveQuery,

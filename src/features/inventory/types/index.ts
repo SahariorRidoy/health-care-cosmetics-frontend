@@ -8,17 +8,30 @@ export interface UOM {
   isActive: boolean;
 }
 
+export interface Supplier {
+  _id: string;
+  name: string;
+  contactPerson?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  balance: number;
+  isActive: boolean;
+}
+
 export interface Item {
   _id: string;
   name: string;
   sku: string;
   type: ItemType;
-  category: string;
+  category?: string;
   description?: string;
   baseUom: UOM | string;
-  reorderLevel: number;
+  supplier?: Supplier | string;
   currentStock: number;
+  reorderLevel?: number;
   costPrice: number;
+  lastPurchasePrice: number;
   salePrice?: number;
   isActive: boolean;
   createdAt: string;
@@ -27,18 +40,19 @@ export interface Item {
 
 export interface ItemsResponse {
   success: boolean;
-  data: Item[];
+  data: { items: Item[] };
   pagination: { page: number; pages: number; total: number; limit: number };
 }
 
 export interface ItemResponse {
   success: boolean;
-  data: Item;
+  data: { item: Item };
 }
 
 export interface UOMsResponse {
   success: boolean;
-  data: UOM[];
+  data: { uoms: UOM[] };
+  pagination: { page: number; pages: number; total: number; limit: number };
 }
 
 export interface Warehouse {
@@ -89,17 +103,21 @@ export interface StockMovementsResponse {
 
 export interface WarehousesResponse {
   success: boolean;
-  data: Warehouse[];
+  data: { warehouses: Warehouse[] };
 }
 
 export interface CreateItemPayload {
   name: string;
   sku: string;
   type: ItemType;
-  category: string;
   description?: string;
   baseUom: string;
-  reorderLevel: number;
-  costPrice: number;
+  supplier: string;
+  unitPrice: number;
+  quantity: number;
+  warehouse: string;
+  costPrice?: number;
   salePrice?: number;
+  notes?: string;
+  expectedDeliveryDate?: string;
 }

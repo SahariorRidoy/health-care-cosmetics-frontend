@@ -33,6 +33,7 @@ const authSlice = createSlice({
       state.user = null;
       state.accessToken = null;
       state.isAuthenticated = false;
+      if (typeof window !== 'undefined') localStorage.removeItem('auth');
     },
   },
 });

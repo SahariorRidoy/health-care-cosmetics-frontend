@@ -5,7 +5,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Plus, Pencil, Loader2, X, Building2, Lock, Users } from 'lucide-react';
+import Link from 'next/link';
+import { Plus, Pencil, Loader2, X, Building2, Lock, Users, Ruler, Warehouse as WarehouseIcon } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DataTable, type Column } from '@/components/tables/DataTable';
 import { ErrorState, StatusBadge, ConfirmDialog } from '@/components/feedback';
@@ -62,6 +63,11 @@ const TABS = [
   { id: 'users', label: 'User Management', icon: Users },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
+
+const LINK_TABS = [
+  { href: '/settings/uom', label: 'Units of Measure', icon: Ruler },
+  { href: '/settings/warehouses', label: 'Warehouses', icon: WarehouseIcon },
+];
 
 // ── User Dialog ───────────────────────────────────────────────────────────────
 
@@ -392,7 +398,7 @@ function UserManagementTab() {
 
       <DataTable
         columns={columns}
-        data={data?.users ?? []}
+        data={data?.data.users ?? []}
         keyField="_id"
         isLoading={isLoading}
         emptyMessage="No users found."
@@ -456,12 +462,22 @@ export default function SettingsPage() {
             {label}
           </button>
         ))}
+        {LINK_TABS.map(({ href, label, icon: Icon }) => (
+          <Link
+            key={href}
+            href={href}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-secondary hover:text-foreground transition-colors shrink-0"
+          >
+            <Icon size={16} aria-hidden="true" />
+            {label}
+          </Link>
+        ))}
       </div>
 
       {/* Tab content */}
       {activeTab === 'company' && <CompanyInfoTab />}
       {activeTab === 'password' && <ChangePasswordTab />}
-      {activeTab === 'users' && isAdmin && <UserManagementTab />}
+      {activeTab === 'users' && <UserManagementTab />}
     </>
   );
 }

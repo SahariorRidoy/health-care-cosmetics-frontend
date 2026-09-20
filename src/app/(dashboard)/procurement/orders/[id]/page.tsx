@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { ArrowLeft, Loader2, X, Plus, Truck } from 'lucide-react';
+import { ArrowLeft, Loader2, X, Plus, Truck, CreditCard } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { LoadingSpinner, ErrorState, StatusBadge, ConfirmDialog } from '@/components/feedback';
 import { DataTable, type Column } from '@/components/tables/DataTable';
@@ -17,8 +17,10 @@ import {
   useUpdatePOStatusMutation,
   useCreateGoodsReceiptMutation,
   useGetGoodsReceiptsQuery,
+  useGetSupplierDuesQuery,
 } from '@/features/procurement/services/procurementApi';
 import { useGetWarehousesQuery } from '@/features/inventory/services/inventoryApi';
+import { SupplierPaymentDialog } from '@/features/procurement/components/SupplierPaymentDialog';
 import type { POItem, GoodsReceipt } from '@/features/procurement/types';
 
 // ── GR Form ───────────────────────────────────────────────────────────────────
@@ -26,7 +28,7 @@ import type { POItem, GoodsReceipt } from '@/features/procurement/types';
 const grLineSchema = z.object({
   item: z.string(),
   uom: z.string(),
-  receivedQty: z.coerce.number().min(0.001, 'Qty > 0'),
+  receivedQty: z.coerce.number().int('Quantity must be a whole number').min(1, 'Qty must be at least 1'),
   unitPrice: z.coerce.number().min(0),
   batchNumber: z.string().optional(),
   expiryDate: z.string().optional(),
@@ -62,9 +64,6 @@ function GRDialog({ open, poId, poItems, onClose }: {
     },
   });
 
-  const { fields } = useFieldArray({ control: undefined as never, name: 'items' });
-  void fields;
-
   async function onSubmit(values: GRForm) {
     try {
       await createGR({
@@ -90,7 +89,7 @@ function GRDialog({ open, poId, poItems, onClose }: {
   }
 
   if (!open) return null;
-  const warehouses = warehouseData?.data?.filter((w) => w.isActive) ?? [];
+  const warehouses = warehouseData?.data?.warehouses.filter((w) => w.isActive) ?? [];
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
@@ -117,7 +116,7 @@ function GRDialog({ open, poId, poItems, onClose }: {
               return (
                 <div key={i} className="p-3 rounded-lg bg-slate-50 border border-border grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="md:col-span-3 text-sm font-medium text-foreground">{itemName}</div>
-                  <FormField label="Received Qty" type="number" min={0.001} step="0.001" required error={errors.items?.[i]?.receivedQty?.message} {...register(`items.${i}.receivedQty`)} />
+                  <FormField label="Received Qty" type="number" min={1} step="1" required error={errors.items?.[i]?.receivedQty?.message} {...register(`items.${i}.receivedQty`)} />
                   <FormField label="Unit Price (৳)" type="number" min={0} step="0.01" {...register(`items.${i}.unitPrice`)} />
                   <FormField label="Batch Number" placeholder="Optional" {...register(`items.${i}.batchNumber`)} />
                   <FormField label="Expiry Date" type="date" {...register(`items.${i}.expiryDate`)} />
@@ -146,9 +145,14 @@ export default function PODetailPage() {
   const router = useRouter();
   const [grOpen, setGrOpen] = useState(false);
   const [confirmStatus, setConfirmStatus] = useState<'CONFIRMED' | 'CLOSED' | null>(null);
+  const [paymentOpen, setPaymentOpen] = useState(false);
 
-  const { data, isLoading, isError, refetch } = useGetPurchaseOrderQuery(id);
-  const { data: grData, isLoading: grLoading } = useGetGoodsReceiptsQuery({ purchaseOrder: id });
+  const { data, isLoading, isError, refetch } = useGetPurchaseOrderQuery(id, { skip: !id });
+  const { data: grData, isLoading: grLoading } = useGetGoodsReceiptsQuery({ purchaseOrder: id }, { skip: !id });
+  const { data: duesData, isLoading: duesLoading } = useGetSupplierDuesQuery(
+    typeof data?.data?.purchaseOrder?.supplier === 'string' ? data.data.purchaseOrder.supplier : (data?.data?.purchaseOrder?.supplier?._id ?? ''),
+    { skip: !data?.data?.purchaseOrder?.supplier },
+  );
   const [updateStatus, { isLoading: statusLoading }] = useUpdatePOStatusMutation();
 
   if (isLoading) return <LoadingSpinner />;
@@ -170,7 +174,9 @@ export default function PODetailPage() {
   }
 
   const grColumns: Column<GoodsReceipt>[] = [
-    { key: 'grNumber', header: 'GR Number', priority: 'P1', render: (row) => <span className="font-medium">{row.grNumber}</span> },
+    { key: 'grNumber', header: 'GR Number', priority: 'P1', render: (row) => (
+      <button onClick={() => router.push(`/procurement/receipts/${row._id}`)} className="font-medium text-emerald hover:underline">{row.grNumber}</button>
+    )},
     { key: 'receivedDate', header: 'Date', priority: 'P1', render: (row) => formatDate(row.receivedDate) },
     { key: 'totalAmount', header: 'Total', priority: 'P1', render: (row) => formatCurrency(row.totalAmount) },
     { key: 'notes', header: 'Notes', priority: 'P3', render: (row) => row.notes ?? '—' },
@@ -200,6 +206,11 @@ export default function PODetailPage() {
             {po.status === 'RECEIVED' && (
               <button onClick={() => setConfirmStatus('CLOSED')} className="h-9 px-4 rounded-md border border-border text-sm text-foreground hover:bg-slate-50 flex items-center gap-2 transition-colors">
                 Close PO
+              </button>
+            )}
+            {supplier && (duesData?.data?.outstandingBalance ?? 0) > 0 && (
+              <button onClick={() => setPaymentOpen(true)} disabled={duesLoading} className="h-9 px-4 rounded-md bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium flex items-center gap-2 transition-colors disabled:opacity-60">
+                {duesLoading ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <CreditCard size={15} aria-hidden="true" />} Pay Due
               </button>
             )}
           </div>
@@ -281,6 +292,17 @@ export default function PODetailPage() {
       </div>
 
       <GRDialog open={grOpen} poId={id} poItems={po.items} onClose={() => setGrOpen(false)} />
+
+      {supplier && (
+        <SupplierPaymentDialog
+          open={paymentOpen}
+          supplierId={supplier._id}
+          supplierName={supplier.name}
+          outstandingBalance={duesData?.data?.outstandingBalance ?? 0}
+          purchaseOrderId={id}
+          onClose={() => setPaymentOpen(false)}
+        />
+      )}
 
       <ConfirmDialog
         open={!!confirmStatus}

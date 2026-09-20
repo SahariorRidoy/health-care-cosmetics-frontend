@@ -29,7 +29,7 @@ export function SupplierFormDialog({ open, supplier, onClose }: SupplierFormDial
   useEffect(() => {
     if (open) {
       reset(supplier
-        ? { name: supplier.name, code: supplier.code, category: supplier.category,
+        ? { name: supplier.name,
             contactPerson: supplier.contactPerson ?? '', phone: supplier.phone ?? '',
             email: supplier.email ?? '', address: supplier.address ?? '' }
         : {},
@@ -75,8 +75,6 @@ export function SupplierFormDialog({ open, supplier, onClose }: SupplierFormDial
         <form onSubmit={handleSubmit(onSubmit)} noValidate className="overflow-y-auto flex-1">
           <div className="px-6 py-4 grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField label="Supplier Name" required error={errors.name?.message} placeholder="e.g. ABC Chemicals Ltd." {...register('name')} />
-            <FormField label="Code" required error={errors.code?.message} placeholder="e.g. SUP-001" {...register('code')} />
-            <FormField label="Category" required error={errors.category?.message} placeholder="e.g. Raw Materials" {...register('category')} />
             <FormField label="Contact Person" error={errors.contactPerson?.message} placeholder="e.g. Mr. Karim" {...register('contactPerson')} />
             <FormField label="Phone" type="tel" error={errors.phone?.message} placeholder="e.g. 01700000000" {...register('phone')} />
             <FormField label="Email" type="email" error={errors.email?.message} placeholder="e.g. supplier@example.com" {...register('email')} />

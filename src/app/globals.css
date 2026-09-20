@@ -84,3 +84,10 @@
   .text-balance { text-wrap: balance; }
   .scrollbar-stable { scrollbar-gutter: stable; }
 }
+
+@media print {
+  aside, header, nav, .print\:hidden { display: none !important; }
+  body { background: white !important; }
+  main { margin: 0 !important; padding: 0 !important; }
+  .page-header { display: none !important; }
+}

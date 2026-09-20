@@ -1,17 +1,33 @@
 import { z } from 'zod';
 
-export const itemSchema = z.object({
+const baseFields = {
   name: z.string().min(1, 'Name is required'),
   sku: z.string().min(1, 'SKU is required'),
   type: z.enum(['RAW_MATERIAL', 'PACKAGING', 'SEMI_FINISHED', 'FINISHED_GOOD'], {
     errorMap: () => ({ message: 'Select a valid type' }),
   }),
-  category: z.string().min(1, 'Category is required'),
   description: z.string().optional(),
   baseUom: z.string().min(1, 'Base UOM is required'),
-  reorderLevel: z.coerce.number().min(0, 'Must be 0 or more'),
-  costPrice: z.coerce.number().min(0, 'Must be 0 or more'),
-  salePrice: z.coerce.number().min(0).optional().or(z.literal('')).transform((v) => v === '' ? undefined : v as number | undefined),
+  notes: z.string().optional(),
+};
+
+export const createItemSchema = z.object({
+  ...baseFields,
+  supplier: z.string().min(1, 'Supplier is required'),
+  warehouse: z.string().min(1, 'Warehouse is required'),
+  quantity: z.coerce.number().int('Quantity must be a whole number').min(1, 'Quantity must be at least 1'),
+  unitPrice: z.coerce.number().min(0, 'Unit price must be 0 or more'),
+  paidAmount: z.coerce.number().min(0).optional(),
+  paymentMethod: z.string().optional(),
 });
 
-export type ItemFormValues = z.infer<typeof itemSchema>;
+export const editItemSchema = z.object({
+  ...baseFields,
+  supplier: z.string().optional(),
+  adjustQty: z.coerce.number().int('Quantity must be a whole number').refine((v) => v !== 0, 'Cannot be zero').optional(),
+  adjustWarehouse: z.string().optional(),
+  adjustNotes: z.string().optional(),
+});
+
+export const itemSchema = createItemSchema; // kept for any external references
+export type ItemFormValues = z.infer<typeof createItemSchema> & z.infer<typeof editItemSchema>;

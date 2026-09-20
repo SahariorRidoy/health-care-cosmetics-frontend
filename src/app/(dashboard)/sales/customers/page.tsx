@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Search, Eye } from 'lucide-react';
+import { Plus, Search, Eye, Pencil } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DataTable, type Column } from '@/components/tables/DataTable';
 import { EmptyState, ErrorState, StatusBadge } from '@/components/feedback';
@@ -16,6 +16,7 @@ export default function CustomersPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
+  const [editCustomer, setEditCustomer] = useState<Customer | null>(null);
 
   const { data, isLoading, isError, refetch } = useGetCustomersQuery({
     page,
@@ -27,13 +28,7 @@ export default function CustomersPage() {
       key: 'name', header: 'Name', priority: 'P1',
       render: (row) => <span className="font-medium">{row.name}</span>,
     },
-    { key: 'code', header: 'Code', priority: 'P2' },
-    { key: 'category', header: 'Category', priority: 'P2' },
     { key: 'phone', header: 'Phone', priority: 'P3', render: (row) => row.phone ?? '—' },
-    {
-      key: 'creditLimit', header: 'Credit Limit', priority: 'P3',
-      render: (row) => formatCurrency(row.creditLimit),
-    },
     {
       key: 'balance', header: 'Outstanding', priority: 'P2',
       render: (row) => (
@@ -47,16 +42,26 @@ export default function CustomersPage() {
       render: (row) => <StatusBadge status={row.isActive ? 'ACTIVE' : 'INACTIVE'} />,
     },
     {
-      key: 'actions', header: '', priority: 'P1', className: 'w-[60px] text-right',
+      key: 'actions', header: '', priority: 'P1', className: 'w-[100px] text-right',
       render: (row) => (
-        <button
-          onClick={() => router.push(`/sales/customers/${row._id}`)}
-          className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[32px] min-h-[32px] flex items-center justify-center"
-          aria-label="View customer"
-          title="View"
-        >
-          <Eye size={15} />
-        </button>
+        <div className="flex items-center justify-end gap-1">
+          <button
+            onClick={() => setEditCustomer(row)}
+            className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[32px] min-h-[32px] flex items-center justify-center"
+            aria-label="Edit customer"
+            title="Edit"
+          >
+            <Pencil size={15} />
+          </button>
+          <button
+            onClick={() => router.push(`/sales/customers/${row._id}`)}
+            className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[32px] min-h-[32px] flex items-center justify-center"
+            aria-label="View customer"
+            title="View"
+          >
+            <Eye size={15} />
+          </button>
+        </div>
       ),
     },
   ];
@@ -117,6 +122,7 @@ export default function CustomersPage() {
       )}
 
       <CustomerFormDialog open={createOpen} onClose={() => setCreateOpen(false)} />
+      <CustomerFormDialog open={!!editCustomer} customer={editCustomer} onClose={() => setEditCustomer(null)} />
     </>
   );
 }

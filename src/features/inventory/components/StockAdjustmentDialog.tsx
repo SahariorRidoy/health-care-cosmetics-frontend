@@ -50,7 +50,7 @@ export function StockAdjustmentDialog({ open, item, onClose }: StockAdjustmentDi
 
   if (!open || !item) return null;
 
-  const warehouses = warehouseData?.data?.filter((w) => w.isActive) ?? [];
+  const warehouses = warehouseData?.data?.warehouses.filter((w) => w.isActive) ?? [];
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">

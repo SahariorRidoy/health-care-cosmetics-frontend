@@ -2,7 +2,7 @@ import { api } from '@/lib/store/api';
 import type { AuthUser } from '@/lib/store/authSlice';
 
 interface LoginRequest { email: string; password: string; }
-interface AuthResponse { accessToken: string; user: AuthUser; }
+interface AuthResponse { data: { accessToken: string; user: AuthUser } }
 
 export const authApi = api.injectEndpoints({
   endpoints: (build) => ({

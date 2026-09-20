@@ -37,6 +37,8 @@ export interface ProductionOrder {
   plannedQty: number;
   actualOutputQty: number;
   wastageQty: number;
+  totalMaterialCost: number;
+  costPerUnit: number;
   status: ProductionStatus;
   materials: MaterialLine[];
   startDate?: string;

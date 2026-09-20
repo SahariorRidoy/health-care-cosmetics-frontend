@@ -1,13 +1,9 @@
 export interface Customer {
   _id: string;
   name: string;
-  code: string;
-  category: string;
-  contactPerson?: string;
   phone?: string;
   email?: string;
   address?: string;
-  creditLimit: number;
   balance: number;
   isActive: boolean;
   createdAt: string;
@@ -40,7 +36,7 @@ export interface InvoiceSummary {
 }
 
 export interface CustomerDues {
-  customer: { _id: string; name: string; code: string; creditLimit: number };
+  customer: { _id: string; name: string };
   outstandingBalance: number;
   aging: {
     current: number;

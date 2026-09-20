@@ -10,10 +10,10 @@ export default function DashboardGroupLayout({ children }: { children: React.Rea
   const isAuthenticated = useAppSelector((s) => s.auth.isAuthenticated);
 
   useEffect(() => {
-    // Give AuthBootstrap a tick to rehydrate before redirecting
+    // Give AuthBootstrap enough time to rehydrate on cold starts
     const t = setTimeout(() => {
       if (!isAuthenticated) router.replace('/login');
-    }, 300);
+    }, 1500);
     return () => clearTimeout(t);
   }, [isAuthenticated, router]);
 

@@ -43,8 +43,6 @@ export default function SuppliersPage() {
       key: 'name', header: 'Name', priority: 'P1',
       render: (row) => <span className="font-medium text-foreground">{row.name}</span>,
     },
-    { key: 'code', header: 'Code', priority: 'P1' },
-    { key: 'category', header: 'Category', priority: 'P2' },
     { key: 'contactPerson', header: 'Contact', priority: 'P2', render: (row) => row.contactPerson ?? '—' },
     { key: 'phone', header: 'Phone', priority: 'P3', render: (row) => row.phone ?? '—' },
     {
@@ -89,7 +87,7 @@ export default function SuppliersPage() {
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
           <input
             type="search"
-            placeholder="Search name, code, category…"
+            placeholder="Search suppliers…"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             className="h-9 w-full rounded-md border border-border bg-white pl-9 pr-3 text-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-emerald"

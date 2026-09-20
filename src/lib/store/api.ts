@@ -13,6 +13,8 @@ const baseQuery = fetchBaseQuery({
   },
 });
 
+let isRefreshing = false;
+
 const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = async (
   args,
   api,
@@ -20,21 +22,26 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
 ) => {
   let result = await baseQuery(args, api, extraOptions);
 
-  if (result.error?.status === 401) {
-    // Attempt token refresh
-    const refreshResult = await baseQuery(
-      { url: '/auth/refresh', method: 'POST' },
-      api,
-      extraOptions,
-    );
+  if (result.error?.status === 401 && !isRefreshing) {
+    isRefreshing = true;
+    try {
+      const refreshResult = await baseQuery(
+        { url: '/auth/refresh', method: 'POST' },
+        api,
+        extraOptions,
+      );
 
-    if (refreshResult.data) {
-      const { setCredentials } = await import('./authSlice');
-      api.dispatch(setCredentials(refreshResult.data as { accessToken: string; user: unknown }));
-      result = await baseQuery(args, api, extraOptions);
-    } else {
-      const { clearCredentials } = await import('./authSlice');
-      api.dispatch(clearCredentials());
+      if (refreshResult.data) {
+        const newData = (refreshResult.data as { data: { accessToken: string; user: unknown } }).data;
+        const { setCredentials } = await import('./authSlice');
+        api.dispatch(setCredentials({ accessToken: newData.accessToken, user: newData.user }));
+        result = await baseQuery(args, api, extraOptions);
+      } else {
+        const { clearCredentials } = await import('./authSlice');
+        api.dispatch(clearCredentials());
+      }
+    } finally {
+      isRefreshing = false;
     }
   }
 
@@ -45,7 +52,7 @@ export const api = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithReauth,
   tagTypes: [
-    'User', 'UOM', 'Warehouse', 'Item', 'Stock', 'Batch',
+    'User', 'UOM', 'UOMConversion', 'Warehouse', 'Item', 'Stock', 'Batch',
     'Supplier', 'PurchaseOrder', 'GoodsReceipt', 'SupplierPayment',
     'Production', 'BOM',
     'Customer', 'SalesOrder', 'Invoice', 'CustomerPayment',

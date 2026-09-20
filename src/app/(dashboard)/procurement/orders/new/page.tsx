@@ -38,7 +38,7 @@ export default function NewPurchaseOrderPage() {
   const router = useRouter();
   const [createPO, { isLoading }] = useCreatePurchaseOrderMutation();
   const { data: suppliersData } = useGetSuppliersQuery({ page: 1 });
-  const { data: itemsData } = useGetItemsQuery({ page: 1 });
+  const { data: itemsData } = useGetItemsQuery({ page: 1, type: 'RAW_MATERIAL,PACKAGING' });
   const { data: uomData } = useGetUOMsQuery();
 
   const { register, control, handleSubmit, formState: { errors } } = useForm<POForm>({
@@ -66,8 +66,8 @@ export default function NewPurchaseOrderPage() {
   }
 
   const suppliers = suppliersData?.data?.suppliers?.filter((s) => s.isActive) ?? [];
-  const items = itemsData?.data ?? [];
-  const uoms = uomData?.data?.filter((u) => u.isActive) ?? [];
+  const items = itemsData?.data?.items ?? [];
+  const uoms = uomData?.data?.uoms?.filter((u) => u.isActive) ?? [];
 
   return (
     <>

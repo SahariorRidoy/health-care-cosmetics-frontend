@@ -22,8 +22,7 @@ export const salesApi = api.injectEndpoints({
       providesTags: ['Customer'],
     }),
     createCustomer: build.mutation<CustomerResponse, {
-      name: string; code: string; category: string;
-      contactPerson?: string; phone?: string; email?: string; address?: string; creditLimit?: number;
+      name: string; phone?: string; email?: string; address?: string;
     }>({
       query: (body) => ({ url: '/customers', method: 'POST', body }),
       invalidatesTags: ['Customer'],
@@ -64,10 +63,12 @@ export const salesApi = api.injectEndpoints({
     createSalesOrder: build.mutation<SalesOrderResponse, {
       customer: string; warehouse: string;
       items: { item: string; description?: string; qty: number; unitPrice: number; discount: number; uom: string }[];
-      taxPercent: number; notes?: string; deliveryDate?: string;
+      taxPercent: number; notes?: string;
+      status?: 'DRAFT' | 'CONFIRMED' | 'DISPATCHED' | 'CLOSED';
+      payment?: { amount: number; method: string; reference?: string; notes?: string };
     }>({
       query: (body) => ({ url: '/sales/orders', method: 'POST', body }),
-      invalidatesTags: ['SalesOrder'],
+      invalidatesTags: ['SalesOrder', 'Invoice', 'CustomerPayment', 'Stock'],
     }),
     updateSalesOrderStatus: build.mutation<SalesOrderResponse, { id: string; status: string }>({
       query: ({ id, status }) => ({ url: `/sales/orders/${id}/status`, method: 'PATCH', body: { status } }),

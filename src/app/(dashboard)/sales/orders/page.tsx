@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Plus, Search, Eye } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DataTable, type Column } from '@/components/tables/DataTable';
@@ -14,14 +14,17 @@ const STATUS_OPTIONS = ['DRAFT', 'CONFIRMED', 'DISPATCHED', 'CLOSED', 'CANCELLED
 
 export default function SalesOrdersPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const customerFilter = searchParams.get('customer') ?? undefined;
 
   const { data, isLoading, isError, refetch } = useGetSalesOrdersQuery({
     page,
     search: search || undefined,
     status: statusFilter || undefined,
+    customer: customerFilter,
   });
 
   const columns: Column<SalesOrder>[] = [
@@ -61,7 +64,7 @@ export default function SalesOrdersPage() {
     <>
       <PageHeader
         title="Sales Orders"
-        description="Manage customer orders and dispatch"
+        description={customerFilter ? 'Filtered by customer' : 'Manage customer orders and dispatch'}
         breadcrumbs={[{ label: 'Sales' }, { label: 'Orders' }]}
         actions={
           <button
@@ -93,6 +96,14 @@ export default function SalesOrdersPage() {
           <option value="">All Statuses</option>
           {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s.charAt(0) + s.slice(1).toLowerCase()}</option>)}
         </select>
+        {customerFilter && (
+          <button
+            onClick={() => router.push('/sales/orders')}
+            className="h-9 px-3 rounded-md border border-border text-sm text-secondary hover:bg-slate-50 transition-colors"
+          >
+            Clear filter
+          </button>
+        )}
       </div>
 
       {isError ? (

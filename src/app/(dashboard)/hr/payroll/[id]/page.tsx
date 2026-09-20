@@ -36,7 +36,7 @@ export default function PayslipPage() {
         description={payroll.payrollNumber}
         breadcrumbs={[{ label: 'HR' }, { label: 'Payroll', href: '/hr/payroll' }, { label: payroll.payrollNumber }]}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 print:hidden">
             <a
               href={`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api/v1'}/hr/payroll/${id}/pdf`}
               target="_blank"
