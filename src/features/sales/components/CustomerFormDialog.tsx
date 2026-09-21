@@ -47,7 +47,7 @@ export function CustomerFormDialog({ open, customer, onClose }: Props) {
   }, [open, customer, reset]);
 
   async function onSubmit(values: CustomerFormValues) {
-    const payload = { ...values, email: values.email || undefined };
+    const payload = { ...values, email: values.email || undefined, phone: values.phone || undefined, address: values.address || undefined };
     try {
       if (isEdit) {
         await update({ id: customer._id, body: payload }).unwrap();
@@ -56,6 +56,7 @@ export function CustomerFormDialog({ open, customer, onClose }: Props) {
       } else {
         const result = await create(payload).unwrap();
         toast.success('Customer created');
+        reset();
         onClose(result.data.customer);
       }
     } catch (err: unknown) {

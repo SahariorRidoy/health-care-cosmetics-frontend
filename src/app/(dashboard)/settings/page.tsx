@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -57,12 +58,7 @@ type ChangePasswordForm = z.infer<typeof changePasswordSchema>;
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 
-const TABS = [
-  { id: 'company', label: 'Company Info', icon: Building2 },
-  { id: 'password', label: 'Change Password', icon: Lock },
-  { id: 'users', label: 'User Management', icon: Users },
-] as const;
-type TabId = (typeof TABS)[number]['id'];
+type TabId = 'company' | 'users' | 'password';
 
 const LINK_TABS = [
   { href: '/settings/uom', label: 'Units of Measure', icon: Ruler },
@@ -431,11 +427,10 @@ function UserManagementTab() {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<TabId>('company');
+  const searchParams = useSearchParams();
+  const activeTab = (searchParams.get('tab') as TabId | null) ?? 'company';
   const currentUser = useAppSelector((s) => s.auth.user);
   const isAdmin = currentUser?.role === 'admin';
-
-  const visibleTabs = TABS.filter((t) => t.id !== 'users' || isAdmin);
 
   return (
     <>
@@ -447,21 +442,15 @@ export default function SettingsPage() {
 
       {/* Tab bar */}
       <div className="flex gap-1 border-b border-border mb-6 overflow-x-auto scrollbar-stable">
-        {visibleTabs.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => setActiveTab(id)}
-            className={cn(
-              'flex items-center gap-2 px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors shrink-0',
-              activeTab === id
-                ? 'border-emerald text-emerald-700'
-                : 'border-transparent text-secondary hover:text-foreground',
-            )}
-          >
-            <Icon size={16} aria-hidden="true" />
-            {label}
-          </button>
-        ))}
+        <Link
+          href="/settings?tab=company"
+          className={cn(
+            'flex items-center gap-2 px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors shrink-0',
+            activeTab === 'company' ? 'border-emerald text-emerald-700' : 'border-transparent text-secondary hover:text-foreground',
+          )}
+        >
+          <Building2 size={16} aria-hidden="true" /> Company Info
+        </Link>
         {LINK_TABS.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
@@ -472,6 +461,26 @@ export default function SettingsPage() {
             {label}
           </Link>
         ))}
+        {isAdmin && (
+          <Link
+            href="/settings?tab=users"
+            className={cn(
+              'flex items-center gap-2 px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors shrink-0',
+              activeTab === 'users' ? 'border-emerald text-emerald-700' : 'border-transparent text-secondary hover:text-foreground',
+            )}
+          >
+            <Users size={16} aria-hidden="true" /> User Management
+          </Link>
+        )}
+        <Link
+          href="/settings?tab=password"
+          className={cn(
+            'flex items-center gap-2 px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors shrink-0',
+            activeTab === 'password' ? 'border-emerald text-emerald-700' : 'border-transparent text-secondary hover:text-foreground',
+          )}
+        >
+          <Lock size={16} aria-hidden="true" /> Change Password
+        </Link>
       </div>
 
       {/* Tab content */}

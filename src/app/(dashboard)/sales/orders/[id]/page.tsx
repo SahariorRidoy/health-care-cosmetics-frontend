@@ -18,6 +18,7 @@ import {
   useCreateInvoiceMutation,
   useGetInvoicesQuery,
   useCreateCustomerPaymentMutation,
+  useGetCustomerPaymentsQuery,
 } from '@/features/sales/services/salesApi';
 import { useAppSelector } from '@/lib/store/hooks';
 import type { SalesOrderItem, Invoice } from '@/features/sales/types';
@@ -117,10 +118,14 @@ function RecordPaymentDialog({
 }) {
   const [createPayment, { isLoading }] = useCreateCustomerPaymentMutation();
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<PaymentForm>({
+  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<PaymentForm>({
     resolver: zodResolver(paymentSchema),
     defaultValues: { amount: invoice?.dueAmount ?? 0, method: 'CASH' },
   });
+
+  const watchedAmount = watch('amount');
+  const change = Math.max(0, Number(watchedAmount) - (invoice?.dueAmount ?? 0));
+  const due = Math.max(0, (invoice?.dueAmount ?? 0) - Number(watchedAmount));
 
   async function onSubmit(values: PaymentForm) {
     if (!invoice) return;
@@ -158,7 +163,14 @@ function RecordPaymentDialog({
             <span className="text-secondary">Total: <span className="font-medium text-foreground">{formatCurrency(invoice.totalAmount)}</span></span>
             <span className="text-secondary">Due: <span className="font-semibold text-amber-600">{formatCurrency(invoice.dueAmount)}</span></span>
           </div>
-          <FormField label="Amount (৳)" type="number" min={0.01} max={invoice.dueAmount} step="0.01" required error={errors.amount?.message} {...register('amount')} />
+          <FormField label="Amount (৳)" type="number" min={0.01} step="0.01" required error={errors.amount?.message} {...register('amount')} />
+          {Number(watchedAmount) > 0 && (
+            <div className="flex justify-between text-sm px-1">
+              {change > 0
+                ? <><span className="text-muted">Change</span><span className="font-semibold text-blue-600">{formatCurrency(change)}</span></>
+                : <><span className="text-muted">Remaining Due</span><span className="font-semibold text-amber-600">{formatCurrency(due)}</span></>}
+            </div>
+          )}
           <SelectField label="Payment Method" required error={errors.method?.message} {...register('method')}>
             {PAYMENT_METHODS.map((m) => <option key={m} value={m}>{m.replace('_', ' ')}</option>)}
           </SelectField>
@@ -220,8 +232,14 @@ export default function SalesOrderDetailPage() {
       if (!res.ok) throw new Error();
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-      const win = window.open(url);
-      win?.addEventListener('load', () => { win.print(); URL.revokeObjectURL(url); });
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = url;
+      document.body.appendChild(iframe);
+      iframe.onload = () => {
+        iframe.contentWindow?.print();
+        setTimeout(() => { document.body.removeChild(iframe); URL.revokeObjectURL(url); }, 1000);
+      };
     } catch {
       toast.error('Failed to load PDF for printing');
     }
@@ -237,6 +255,11 @@ export default function SalesOrderDetailPage() {
   );
   const [updateStatus, { isLoading: statusLoading }] = useUpdateSalesOrderStatusMutation();
 
+  const { data: paymentsData } = useGetCustomerPaymentsQuery(
+    { customerId: customerId! },
+    { skip: !customerId },
+  );
+
   if (isLoading) return <LoadingSpinner />;
   if (isError || !data?.data?.salesOrder) return <ErrorState onRetry={refetch} />;
 
@@ -247,6 +270,15 @@ export default function SalesOrderDetailPage() {
     return so === id;
   }) ?? [];
   const canActOnOrder = order.status === 'DRAFT' || order.status === 'CONFIRMED';
+  const primaryInvoice = orderInvoices[0] ?? null;
+
+  const orderPayments = paymentsData?.data?.payments?.filter((p) => {
+    const inv = typeof p.invoice === 'string' ? p.invoice : (p.invoice as { _id: string })?._id;
+    return inv === primaryInvoice?._id;
+  }) ?? [];
+  const totalReceived = orderPayments.reduce((s, p) => s + p.amount + (p.changeAmount ?? 0), 0);
+  const totalChange = orderPayments.reduce((s, p) => s + (p.changeAmount ?? 0), 0);
+  const hasPayment = orderPayments.length > 0;
 
   async function handleStatusUpdate() {
     if (!confirmStatus) return;
@@ -264,13 +296,20 @@ export default function SalesOrderDetailPage() {
     { key: 'invoiceNumber', header: 'Invoice #', priority: 'P1', render: (row) => <span className="font-medium">{row.invoiceNumber}</span> },
     { key: 'createdAt', header: 'Date', priority: 'P2', render: (row) => formatDate(row.createdAt) },
     { key: 'totalAmount', header: 'Total', priority: 'P1', render: (row) => formatCurrency(row.totalAmount) },
-    { key: 'dueAmount', header: 'Due', priority: 'P1', render: (row) => <span className={row.dueAmount > 0 ? 'text-amber-600 font-medium' : 'text-emerald-600'}>{formatCurrency(row.dueAmount)}</span> },
+    { key: 'paidAmount', header: 'Paid', priority: 'P1', render: (row) => <span className="text-emerald-600">{formatCurrency(row.paidAmount)}</span> },
+    {
+      key: 'dueAmount', header: 'Due', priority: 'P1',
+      render: (row) => {
+        if (row.dueAmount > 0) return <span className="text-amber-600 font-medium">Due: {formatCurrency(row.dueAmount)}</span>;
+        return <span className="text-emerald-600">Paid</span>;
+      },
+    },
     { key: 'status', header: 'Status', priority: 'P1', render: (row) => <StatusBadge status={row.status} /> },
     {
       key: 'actions', header: '', priority: 'P1', className: 'w-[130px] text-right',
       render: (row) => (
         <div className="flex items-center justify-end gap-1">
-          {row.dueAmount > 0 && row.status !== 'CANCELLED' && (
+          {row.status !== 'PAID' && row.status !== 'CANCELLED' && (
             <button
               onClick={() => setPaymentInvoice(row)}
               className="p-1.5 rounded-md text-emerald-600 hover:bg-emerald-50 min-w-[32px] min-h-[32px] flex items-center justify-center"
@@ -353,23 +392,68 @@ export default function SalesOrderDetailPage() {
         }
       />
 
+      {/* Payment summary banner */}
+
       {/* Info */}
       <div className="bg-white rounded-lg border border-border p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-        {[
-          { label: 'Order Number', value: order.orderNumber },
-          { label: 'Customer', value: customer?.name },
-          { label: 'Status', value: <StatusBadge status={order.status} /> },
-          { label: 'Date', value: formatDate(order.createdAt) },
-          { label: 'Delivery Date', value: order.deliveryDate ? formatDate(order.deliveryDate) : '—' },
-          { label: 'Subtotal', value: formatCurrency(order.subtotal) },
-          { label: `Tax (${order.taxPercent}%)`, value: formatCurrency(order.taxAmount) },
-          { label: 'Total Amount', value: <span className="font-semibold text-emerald-600">{formatCurrency(order.totalAmount)}</span> },
-        ].map(({ label, value }) => (
-          <div key={label} className="flex flex-col gap-0.5">
-            <span className="text-xs font-medium text-muted uppercase tracking-wide">{label}</span>
-            <span className="text-sm text-foreground">{value ?? '—'}</span>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs font-medium text-muted uppercase tracking-wide">Order Number</span>
+          <span className="text-sm text-foreground">{order.orderNumber}</span>
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs font-medium text-muted uppercase tracking-wide">Customer</span>
+          <span className="text-sm text-foreground">{customer?.name ?? '—'}</span>
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs font-medium text-muted uppercase tracking-wide">Date</span>
+          <span className="text-sm text-foreground">{formatDate(order.createdAt)}</span>
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs font-medium text-muted uppercase tracking-wide">Status</span>
+          <span className="text-sm text-foreground"><StatusBadge status={order.status} /></span>
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs font-medium text-muted uppercase tracking-wide">Subtotal</span>
+          <span className="text-sm text-foreground">{formatCurrency(order.subtotal)}</span>
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs font-medium text-muted uppercase tracking-wide">Tax ({order.taxPercent}%)</span>
+          <span className="text-sm text-foreground">{formatCurrency(order.taxAmount)}</span>
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs font-medium text-muted uppercase tracking-wide">Total Amount</span>
+          <span className="text-sm font-semibold text-emerald-600">{formatCurrency(order.totalAmount)}</span>
+        </div>
+        {hasPayment && (
+          <div className="flex flex-col gap-0.5">
+            <span className="text-xs font-medium text-muted uppercase tracking-wide">Amount Received</span>
+            <span className="text-sm font-semibold text-foreground">{formatCurrency(totalReceived)}</span>
           </div>
-        ))}
+        )}
+        {hasPayment && (
+          <div className="flex flex-col gap-0.5">
+            <span className="text-xs font-medium text-muted uppercase tracking-wide">Applied to Invoice</span>
+            <span className="text-sm font-semibold text-emerald-600">{formatCurrency(primaryInvoice?.paidAmount ?? 0)}</span>
+          </div>
+        )}
+        {hasPayment && totalChange > 0 && (
+          <div className="flex flex-col gap-0.5">
+            <span className="text-xs font-medium text-muted uppercase tracking-wide">Change Given</span>
+            <span className="text-sm font-semibold text-blue-600">{formatCurrency(totalChange)}</span>
+          </div>
+        )}
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs font-medium text-muted uppercase tracking-wide">Due Amount</span>
+          <span className="text-sm font-medium">
+            {!primaryInvoice && <span className="text-muted">—</span>}
+            {primaryInvoice && primaryInvoice.dueAmount > 0 && <span className="text-amber-600">{formatCurrency(primaryInvoice.dueAmount)}</span>}
+            {primaryInvoice && primaryInvoice.dueAmount <= 0 && <span className="text-emerald-600">Fully Paid</span>}
+          </span>
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs font-medium text-muted uppercase tracking-wide">Payment Status</span>
+          <span className="text-sm text-foreground">{primaryInvoice ? <StatusBadge status={primaryInvoice.status} /> : <span className="text-muted">—</span>}</span>
+        </div>
         {order.notes && (
           <div className="col-span-full flex flex-col gap-0.5">
             <span className="text-xs font-medium text-muted uppercase tracking-wide">Notes</span>

@@ -186,7 +186,14 @@ export default function InvoiceDetailPage() {
   const paymentColumns: Column<CustomerPayment>[] = [
     { key: 'receiptNumber', header: 'Receipt #', priority: 'P1', render: (row) => <span className="font-medium">{row.receiptNumber}</span> },
     { key: 'paymentDate', header: 'Date', priority: 'P1', render: (row) => formatDate(row.paymentDate) },
-    { key: 'amount', header: 'Amount', priority: 'P1', render: (row) => formatCurrency(row.amount) },
+    { key: 'amount', header: 'Received', priority: 'P1', render: (row) => formatCurrency(row.amount + (row.changeAmount ?? 0)) },
+    { key: 'appliedAmount', header: 'Applied', priority: 'P1', render: (row) => formatCurrency(row.amount) },
+    {
+      key: 'changeAmount', header: 'Change', priority: 'P1',
+      render: (row) => (row.changeAmount ?? 0) > 0
+        ? <span className="text-blue-600 font-medium">{formatCurrency(row.changeAmount!)}</span>
+        : <span className="text-muted">—</span>,
+    },
     { key: 'method', header: 'Method', priority: 'P2' },
     { key: 'reference', header: 'Reference', priority: 'P3', render: (row) => row.reference ?? '—' },
   ];
@@ -239,9 +246,15 @@ export default function InvoiceDetailPage() {
           { label: 'Total Amount', value: <span className="font-semibold">{formatCurrency(invoice.totalAmount)}</span> },
           { label: 'Paid Amount', value: <span className="text-emerald-600 font-medium">{formatCurrency(invoice.paidAmount)}</span> },
           {
-            label: 'Due Amount',
-            value: <span className={invoice.dueAmount > 0 ? 'text-amber-600 font-semibold' : 'text-emerald-600 font-medium'}>{formatCurrency(invoice.dueAmount)}</span>,
+            label: invoice.dueAmount > 0 ? 'Due Amount' : 'Due Amount',
+            value: invoice.dueAmount > 0
+              ? <span className="text-amber-600 font-semibold">{formatCurrency(invoice.dueAmount)}</span>
+              : <span className="text-emerald-600 font-medium">Fully Paid</span>,
           },
+          ...((invoicePayments.some((p) => (p.changeAmount ?? 0) > 0)) ? [{
+            label: 'Change Given',
+            value: <span className="text-blue-600 font-semibold">{formatCurrency(invoicePayments.reduce((s, p) => s + (p.changeAmount ?? 0), 0))}</span>,
+          }] : []),
         ].map(({ label, value }) => (
           <div key={label} className="flex flex-col gap-0.5">
             <span className="text-xs font-medium text-muted uppercase tracking-wide">{label}</span>

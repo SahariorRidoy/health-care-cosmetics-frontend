@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useAppSelector } from '@/lib/store/hooks';
 import { Plus, Pencil, Star } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DataTable, type Column } from '@/components/tables/DataTable';
@@ -15,15 +16,17 @@ import type { Warehouse } from '@/features/inventory/types';
 import { toast } from 'sonner';
 
 const SETTINGS_TABS = [
-  { id: 'company', label: 'Company Info', icon: Building2, href: '/settings' },
-  { id: 'password', label: 'Change Password', icon: Lock, href: '/settings' },
-  { id: 'users', label: 'User Management', icon: Users, href: '/settings' },
+  { id: 'company', label: 'Company Info', icon: Building2, href: '/settings?tab=company' },
   { id: 'uom', label: 'Units of Measure', icon: Ruler, href: '/settings/uom' },
   { id: 'warehouses', label: 'Warehouses', icon: WarehouseIcon, href: '/settings/warehouses' },
+  { id: 'users', label: 'User Management', icon: Users, href: '/settings?tab=users' },
+  { id: 'password', label: 'Change Password', icon: Lock, href: '/settings?tab=password' },
 ];
 
 export default function WarehousesPage() {
   const pathname = usePathname();
+  const currentUser = useAppSelector((s) => s.auth.user);
+  const isAdmin = currentUser?.role === 'admin';
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editWarehouse, setEditWarehouse] = useState<Warehouse | null>(null);
   const [deactivateTarget, setDeactivateTarget] = useState<Warehouse | null>(null);
@@ -98,7 +101,7 @@ export default function WarehousesPage() {
 
       {/* Settings tab bar */}
       <div className="flex gap-1 border-b border-border mb-6 overflow-x-auto">
-        {SETTINGS_TABS.map(({ id, label, icon: Icon, href }) => {
+        {SETTINGS_TABS.filter(({ id }) => id !== 'users' || isAdmin).map(({ id, label, icon: Icon, href }) => {
           const active = pathname === href;
           return (
             <Link key={id} href={href} className={cn('flex items-center gap-2 px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors shrink-0', active ? 'border-emerald text-emerald-700' : 'border-transparent text-secondary hover:text-foreground')}>

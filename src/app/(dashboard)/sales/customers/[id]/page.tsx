@@ -103,12 +103,17 @@ export default function CustomerDetailPage() {
     { key: 'totalAmount', header: 'Total', priority: 'P1', render: (row) => formatCurrency(row.totalAmount) },
     { key: 'paidAmount', header: 'Paid', priority: 'P2', render: (row) => formatCurrency(row.paidAmount) },
     {
-      key: 'dueAmount', header: 'Due', priority: 'P1',
-      render: (row) => (
-        <span className={row.dueAmount > 0 ? 'text-amber-600 font-medium' : 'text-emerald-600'}>
-          {formatCurrency(row.dueAmount)}
-        </span>
-      ),
+      key: 'dueAmount', header: 'Due / Change', priority: 'P1',
+      render: (row) => {
+        if (row.status === 'PAID' && row.paidAmount > row.totalAmount) {
+          return <span className="text-emerald-600 font-medium">Change: {formatCurrency(row.paidAmount - row.totalAmount)}</span>;
+        }
+        return (
+          <span className={row.dueAmount > 0 ? 'text-amber-600 font-medium' : 'text-emerald-600'}>
+            {row.dueAmount > 0 ? `Due: ${formatCurrency(row.dueAmount)}` : 'Paid'}
+          </span>
+        );
+      },
     },
     { key: 'dueDate', header: 'Due Date', priority: 'P3', render: (row) => row.dueDate ? formatDate(row.dueDate) : '—' },
     { key: 'status', header: 'Status', priority: 'P1', render: (row) => <StatusBadge status={row.status} /> },
@@ -148,7 +153,13 @@ export default function CustomerDetailPage() {
   const paymentColumns: Column<CustomerPayment>[] = [
     { key: 'receiptNumber', header: 'Receipt #', priority: 'P1', render: (row) => <span className="font-medium">{row.receiptNumber}</span> },
     { key: 'paymentDate', header: 'Date', priority: 'P1', render: (row) => formatDate(row.paymentDate) },
-    { key: 'amount', header: 'Amount', priority: 'P1', render: (row) => formatCurrency(row.amount) },
+    { key: 'amount', header: 'Paid', priority: 'P1', render: (row) => formatCurrency(row.amount) },
+    {
+      key: 'changeAmount', header: 'Change', priority: 'P2',
+      render: (row) => row.changeAmount && row.changeAmount > 0
+        ? <span className="text-emerald-600 font-medium">{formatCurrency(row.changeAmount)}</span>
+        : <span className="text-muted">—</span>,
+    },
     { key: 'method', header: 'Method', priority: 'P2' },
     { key: 'reference', header: 'Reference', priority: 'P3', render: (row) => row.reference ?? '—' },
     {

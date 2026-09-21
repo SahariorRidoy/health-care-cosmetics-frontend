@@ -111,7 +111,7 @@ export const TextareaField = forwardRef<HTMLTextAreaElement, TextareaFieldProps>
             error && 'border-red-500 focus:ring-red-500',
             className,
           )}
-          rows={3}
+          rows={props.rows ?? 3}
           {...props}
         />
         {error && (

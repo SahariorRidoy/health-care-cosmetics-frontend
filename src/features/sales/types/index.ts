@@ -16,6 +16,7 @@ export interface CustomerPayment {
   customer: Customer | string;
   invoice: { _id: string; invoiceNumber: string; totalAmount: number } | string;
   amount: number;
+  changeAmount?: number;
   paymentDate: string;
   method: string;
   reference?: string;
