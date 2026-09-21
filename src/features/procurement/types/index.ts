@@ -56,6 +56,7 @@ export interface SupplierDuesResponse {
 }
 
 export type POStatus = 'DRAFT' | 'CONFIRMED' | 'RECEIVED' | 'CLOSED';
+export type PaymentStatus = 'PAID' | 'PARTIAL' | 'UNPAID';
 
 export interface POItem {
   item: { _id: string; name: string; sku: string } | string;
@@ -75,6 +76,8 @@ export interface PurchaseOrder {
   items: POItem[];
   subtotal: number;
   totalAmount: number;
+  paidAmount: number;
+  paymentStatus: PaymentStatus;
   notes?: string;
   expectedDeliveryDate?: string;
   isActive: boolean;

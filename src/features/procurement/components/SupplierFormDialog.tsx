@@ -14,9 +14,10 @@ interface SupplierFormDialogProps {
   open: boolean;
   supplier?: Supplier | null;
   onClose: () => void;
+  onCreated?: (supplier: Supplier) => void;
 }
 
-export function SupplierFormDialog({ open, supplier, onClose }: SupplierFormDialogProps) {
+export function SupplierFormDialog({ open, supplier, onClose, onCreated }: SupplierFormDialogProps) {
   const isEdit = !!supplier;
   const [create, { isLoading: creating }] = useCreateSupplierMutation();
   const [update, { isLoading: updating }] = useUpdateSupplierMutation();
@@ -32,7 +33,7 @@ export function SupplierFormDialog({ open, supplier, onClose }: SupplierFormDial
         ? { name: supplier.name,
             contactPerson: supplier.contactPerson ?? '', phone: supplier.phone ?? '',
             email: supplier.email ?? '', address: supplier.address ?? '' }
-        : {},
+        : { name: '', contactPerson: '', phone: '', email: '', address: '' },
       );
     }
   }, [open, supplier, reset]);
@@ -43,11 +44,13 @@ export function SupplierFormDialog({ open, supplier, onClose }: SupplierFormDial
       if (isEdit) {
         await update({ id: supplier._id, body: payload }).unwrap();
         toast.success('Supplier updated');
+        onClose();
       } else {
-        await create(payload).unwrap();
+        const res = await create(payload).unwrap();
         toast.success('Supplier created');
+        onCreated?.(res.data.supplier);
+        onClose();
       }
-      onClose();
     } catch (err: unknown) {
       const msg = (err as { data?: { message?: string } })?.data?.message ?? 'Operation failed';
       toast.error(msg);

@@ -6,8 +6,9 @@ import { ArrowLeft, CreditCard, Printer } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { LoadingSpinner, ErrorState } from '@/components/feedback';
 import { formatCurrency, formatDate } from '@/lib/formatters';
-import { useGetGoodsReceiptQuery, useGetSupplierDuesQuery } from '@/features/procurement/services/procurementApi';
+import { useGetGoodsReceiptQuery, useGetPurchaseOrderQuery, useGetSupplierDuesQuery } from '@/features/procurement/services/procurementApi';
 import { SupplierPaymentDialog } from '@/features/procurement/components/SupplierPaymentDialog';
+import type { PurchaseOrder } from '@/features/procurement/types';
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -29,6 +30,12 @@ export default function GoodsReceiptDetailPage() {
     const s = data?.data?.goodsReceipt?.supplier;
     return s && typeof s !== 'string' ? s._id : typeof s === 'string' ? s : '';
   })();
+  const poId = (() => {
+    const p = data?.data?.goodsReceipt?.purchaseOrder;
+    return p && typeof p !== 'string' ? p._id : typeof p === 'string' ? p : '';
+  })();
+
+  const { data: poData } = useGetPurchaseOrderQuery(poId, { skip: !poId });
   const { data: duesData } = useGetSupplierDuesQuery(supplierId, { skip: !supplierId });
 
   if (isLoading) return <LoadingSpinner />;
@@ -36,9 +43,13 @@ export default function GoodsReceiptDetailPage() {
 
   const gr = data.data.goodsReceipt;
   const supplier = typeof gr.supplier === 'string' ? null : gr.supplier as { _id: string; name: string };
-  const po = typeof gr.purchaseOrder === 'string' ? null : gr.purchaseOrder as { _id: string; poNumber: string };
+  const poRef = typeof gr.purchaseOrder === 'string' ? null : gr.purchaseOrder as PurchaseOrder;
+  const po = poData?.data?.purchaseOrder ?? poRef;
   const warehouse = typeof gr.warehouse === 'string' ? null : gr.warehouse as { _id: string; name: string; code: string };
   const outstandingBalance = duesData?.data?.outstandingBalance ?? 0;
+  const paidAmount = po?.paidAmount ?? 0;
+  const paymentStatus = po?.paymentStatus;
+  const dueAmount = Math.max(0, (po?.totalAmount ?? gr.totalAmount) - paidAmount);
 
   return (
     <>
@@ -58,7 +69,7 @@ export default function GoodsReceiptDetailPage() {
             <button onClick={() => window.print()} className="h-9 px-3 rounded-md border border-border text-sm text-foreground hover:bg-slate-50 flex items-center gap-2 transition-colors print:hidden">
               <Printer size={15} aria-hidden="true" /> Print
             </button>
-            {outstandingBalance > 0 && (
+            {(paymentStatus === 'UNPAID' || paymentStatus === 'PARTIAL') && (
               <button onClick={() => setPaymentOpen(true)} className="h-9 px-4 rounded-md bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium flex items-center gap-2 transition-colors print:hidden">
                 <CreditCard size={15} aria-hidden="true" /> Pay Due
               </button>
@@ -90,7 +101,9 @@ export default function GoodsReceiptDetailPage() {
             { label: 'Warehouse',       value: warehouse ? `${warehouse.name} (${warehouse.code})` : '—' },
             { label: 'Received Date',   value: formatDate(gr.receivedDate) },
             { label: 'Total Amount',    value: formatCurrency(gr.totalAmount) },
-            ...(outstandingBalance > 0 ? [{ label: 'Outstanding Balance', value: formatCurrency(outstandingBalance) }] : []),
+            { label: 'Paid Amount',      value: formatCurrency(paidAmount) },
+            { label: 'Payment Status',   value: paymentStatus ?? '—' },
+            ...(paymentStatus && paymentStatus !== 'PAID' ? [{ label: 'Due Amount', value: formatCurrency(dueAmount) }] : []),
             ...(gr.notes ? [{ label: 'Notes', value: gr.notes }] : []),
           ].map(({ label, value }) => (
             <div key={label}>
@@ -172,9 +185,19 @@ export default function GoodsReceiptDetailPage() {
         <InfoRow label="Warehouse" value={warehouse ? `${warehouse.name} (${warehouse.code})` : '—'} />
         <InfoRow label="Received Date" value={formatDate(gr.receivedDate)} />
         <InfoRow label="Total Amount" value={<span className="font-semibold">{formatCurrency(gr.totalAmount)}</span>} />
-        {outstandingBalance > 0 && (
-          <InfoRow label="Outstanding Balance" value={
-            <span className="text-amber-600 font-semibold">{formatCurrency(outstandingBalance)}</span>
+        <InfoRow label="Paid Amount" value={<span className="font-semibold">{formatCurrency(paidAmount)}</span>} />
+        {paymentStatus && (
+          <InfoRow label="Payment Status" value={
+            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
+              paymentStatus === 'PAID' ? 'bg-emerald-100 text-emerald-700' :
+              paymentStatus === 'PARTIAL' ? 'bg-amber-100 text-amber-700' :
+              'bg-red-100 text-red-700'
+            }`}>{paymentStatus}</span>
+          } />
+        )}
+        {paymentStatus && paymentStatus !== 'PAID' && (
+          <InfoRow label="Due Amount" value={
+            <span className="text-red-600 font-semibold">{formatCurrency(dueAmount)}</span>
           } />
         )}
         {gr.notes && <InfoRow label="Notes" value={gr.notes} />}

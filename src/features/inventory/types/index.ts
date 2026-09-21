@@ -85,8 +85,19 @@ export interface StockMovement {
   quantity: number;
   balanceAfter: number;
   reference?: string;
+  usageQty?: number;
+  usageUom?: { _id: string; symbol: string } | string;
   notes?: string;
   createdAt: string;
+}
+
+export interface PopulatedMovementItem {
+  _id: string;
+  name: string;
+  sku: string;
+  type?: ItemType;
+  costPrice?: number;
+  baseUom?: { _id: string; symbol: string } | string;
 }
 
 export interface StockBalancesResponse {

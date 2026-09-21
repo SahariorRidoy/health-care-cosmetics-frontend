@@ -1,18 +1,22 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
-import { X, Plus, Trash2, Loader2 } from 'lucide-react';
-import { useGetItemsQuery, useGetUOMsQuery, useGetWarehousesQuery, useGenerateSkuQuery } from '@/features/inventory/services/inventoryApi';
+import { X, Plus, Trash2, Loader2, ChevronDown } from 'lucide-react';
+import { useGetItemsQuery, useGetUOMsQuery, useGetWarehousesQuery, useGenerateSkuQuery, useGetStockBalancesQuery } from '@/features/inventory/services/inventoryApi';
+import { useGetUOMConversionsQuery } from '@/features/settings/services/settingsApi';
 import { useCreateProductMutation, useUpdateProductMutation } from '@/features/products/services/productsApi';
 import type { Product } from '@/features/products/types';
+import type { UOMConversion } from '@/features/settings/types';
 import { FormField, SelectField } from '@/components/forms/FormField';
 import { formatCurrency } from '@/lib/formatters';
 
 interface MaterialLine {
   itemId: string;
-  uomSymbol: string;
+  baseUomId: string;
+  baseUomSymbol: string;
   costPrice: number;
+  uomId: string;
   qty: string;
 }
 
@@ -22,51 +26,212 @@ interface Props {
   product?: Product | null;
 }
 
+// ── Custom material select with colored stock + price ────────────────────────
+interface MaterialSelectProps {
+  value: string;
+  items: import('@/features/inventory/types').Item[];
+  stockMap: Map<string, number>;
+  onChange: (id: string) => void;
+}
+
+function MaterialSelect({ value, items, stockMap, onChange }: MaterialSelectProps) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  const selected = items.find((i) => i._id === value);
+  const selectedStock = value ? (stockMap.get(value) ?? 0) : null;
+  const selectedUom = selected ? (typeof selected.baseUom === 'object' ? selected.baseUom.symbol : '') : '';
+
+  return (
+    <div ref={ref} className="relative flex flex-col gap-0.5">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="h-9 w-full rounded-md border border-border bg-white px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald flex items-center justify-between gap-1"
+        aria-label="Select material"
+      >
+        <span className="truncate">{selected ? selected.name : <span className="text-muted">Select material…</span>}</span>
+        <ChevronDown size={14} className="shrink-0 text-secondary" />
+      </button>
+
+      {selectedStock !== null && (
+        <p className={`text-[10px] leading-tight font-medium ${selectedStock <= 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+          Stock: {selectedStock} {selectedUom}
+        </p>
+      )}
+
+      {open && (
+        <div className="absolute top-full left-0 z-50 mt-1 w-max min-w-full rounded-md border border-border bg-white shadow-lg max-h-56 overflow-y-auto">
+          <div
+            className="px-3 py-2 text-sm text-muted hover:bg-slate-50 cursor-pointer"
+            onMouseDown={() => { onChange(''); setOpen(false); }}
+          >
+            Select material…
+          </div>
+          {items.map((item) => {
+            const stock = stockMap.get(item._id) ?? 0;
+            const uomSymbol = typeof item.baseUom === 'object' ? item.baseUom.symbol : '';
+            return (
+              <div
+                key={item._id}
+                onMouseDown={() => { onChange(item._id); setOpen(false); }}
+                className={`px-3 py-2 cursor-pointer hover:bg-slate-50 flex items-center gap-4 ${
+                  item._id === value ? 'bg-emerald-50' : ''
+                }`}
+              >
+                <span className="text-sm text-foreground whitespace-nowrap">{item.name}</span>
+                <span className="ml-auto shrink-0 flex items-center gap-2 text-[11px]">
+                  <span className={stock <= 0 ? 'text-red-500 font-medium' : 'text-blue-600 font-medium'}>
+                    {stock} {uomSymbol}
+                  </span>
+                  <span className="text-amber-600 font-medium">{formatCurrency(item.costPrice)}/{uomSymbol}</span>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function resolveConversionFactor(
+  usageUomId: string,
+  baseUomId: string,
+  conversions: UOMConversion[],
+): number {
+  if (usageUomId === baseUomId) return 1;
+  const direct = conversions.find(
+    (c) => c.fromUOM._id === usageUomId && c.toUOM._id === baseUomId,
+  );
+  if (direct) return direct.factor;
+  const reverse = conversions.find(
+    (c) => c.fromUOM._id === baseUomId && c.toUOM._id === usageUomId,
+  );
+  if (reverse) return 1 / reverse.factor;
+  return NaN;
+}
+
 export function ProductionFormDialog({ open, onClose, product }: Props) {
   const isEdit = !!product;
   const { data: rawData } = useGetItemsQuery({ type: 'RAW_MATERIAL', isActive: 'true' });
   const { data: pkgData } = useGetItemsQuery({ type: 'PACKAGING', isActive: 'true' });
   const { data: uomData } = useGetUOMsQuery();
   const { data: warehouseData } = useGetWarehousesQuery();
+  const { data: convData } = useGetUOMConversionsQuery();
   const [createProduct, { isLoading: creating }] = useCreateProductMutation();
   const [updateProduct, { isLoading: updating }] = useUpdateProductMutation();
   const isLoading = creating || updating;
 
-  const [name, setName] = useState(product?.name ?? '');
-  const [sku, setSku] = useState(product?.sku ?? '');
+  const { data: balancesData } = useGetStockBalancesQuery(
+    { item: product?._id },
+    { skip: !isEdit || !open },
+  );
+
+  // fetch all stock balances to show remaining stock in material dropdown
+  const { data: allBalancesData } = useGetStockBalancesQuery(
+    {},
+    { skip: !open },
+  );
+
+  const stockMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const b of allBalancesData?.data?.balances ?? []) {
+      const itemId = typeof b.item === 'string' ? b.item : b.item._id;
+      map.set(itemId, (map.get(itemId) ?? 0) + b.quantity);
+    }
+    return map;
+  }, [allBalancesData]);
+
+  const [name, setName] = useState('');
+  const [sku, setSku] = useState('');
   const [skuName, setSkuName] = useState('');
   const { data: skuData } = useGenerateSkuQuery(skuName, { skip: isEdit || skuName.trim().length < 2 });
-  const [outputUom, setOutputUom] = useState(
-    product ? (typeof product.baseUom === 'string' ? product.baseUom : (product.baseUom?._id ?? '')) : ''
-  );
+  const [outputUom, setOutputUom] = useState('');
   const [outputQty, setOutputQty] = useState('');
-  const [salePrice, setSalePrice] = useState(product?.salePrice ? String(product.salePrice) : '');
+  const [salePrice, setSalePrice] = useState('');
   const [warehouse, setWarehouse] = useState('');
-  const [materials, setMaterials] = useState<MaterialLine[]>([]);
+  const [materials, setMaterials] = useState<MaterialLine[]>([{ itemId: '', baseUomId: '', baseUomSymbol: '', costPrice: 0, uomId: '', qty: '' }]);
+
+  const materialsFilledRef = useRef(false);
 
   const allItems = useMemo(() => [...(rawData?.data?.items ?? []), ...(pkgData?.data?.items ?? [])], [rawData, pkgData]);
   const uoms = useMemo(() => uomData?.data?.uoms?.filter((u) => u.isActive) ?? [], [uomData]);
+  const conversions = useMemo(() => convData?.data?.conversions ?? [], [convData]);
   const warehouses = warehouseData?.data?.warehouses?.filter((w) => w.isActive) ?? [];
 
-  // Auto-fill SKU from API
   useEffect(() => {
     if (!isEdit && skuData?.data?.sku) setSku(skuData.data.sku);
   }, [skuData, isEdit]);
 
+  // reset form fields when dialog opens/closes or product changes
   useEffect(() => {
-    if (!open) return;
+    if (!open) { materialsFilledRef.current = false; return; }
     setName(product?.name ?? '');
     setSku(product?.sku ?? '');
     setOutputUom(product ? (typeof product.baseUom === 'string' ? product.baseUom : (product.baseUom?._id ?? '')) : '');
     setSalePrice(product?.salePrice ? String(product.salePrice) : '');
-    setOutputQty(product?.currentStock ? String(product.currentStock) : '');
-    setWarehouse('');
-    setMaterials(isEdit ? [] : [{ itemId: '', uomSymbol: '', costPrice: 0, qty: '' }]);
+    setOutputQty(product?.currentStock != null ? String(product.currentStock) : '');
+    materialsFilledRef.current = false;
+    if (!isEdit) {
+      const defaultWh = warehouseData?.data?.warehouses?.find((w) => w.isActive && w.isDefault);
+      setWarehouse(defaultWh?._id ?? '');
+      setMaterials([{ itemId: '', baseUomId: '', baseUomSymbol: '', costPrice: 0, uomId: '', qty: '' }]);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, product?._id]);
 
+  // pre-fill warehouse from first stock balance
+  useEffect(() => {
+    if (!isEdit || !open) return;
+    const balances = balancesData?.data?.balances ?? [];
+    if (balances.length > 0) {
+      const wh = balances[0].warehouse;
+      setWarehouse(typeof wh === 'string' ? wh : wh._id ?? '');
+    }
+  }, [balancesData, isEdit, open]);
+
+  // pre-fill materials from product.materials — only once per open, wait for allItems+uoms to load
+  useEffect(() => {
+    if (!isEdit || !open || materialsFilledRef.current) return;
+    if (!allItems.length || !uoms.length) return;
+    const productMaterials = product?.materials ?? [];
+    if (productMaterials.length === 0) return;
+
+    materialsFilledRef.current = true;
+
+    const lines: MaterialLine[] = productMaterials.map((mat) => {
+      const itemId = typeof mat.item === 'string' ? mat.item : mat.item._id;
+      const uomId = typeof mat.uom === 'string' ? mat.uom : mat.uom._id;
+      const foundItem = allItems.find((i) => i._id === itemId);
+      const baseUomObj = foundItem
+        ? (typeof foundItem.baseUom === 'object' ? foundItem.baseUom : uoms.find((u) => u._id === foundItem.baseUom))
+        : null;
+      const baseUomId = baseUomObj?._id ?? uomId;
+      return {
+        itemId,
+        baseUomId,
+        baseUomSymbol: baseUomObj?.symbol ?? '',
+        costPrice: foundItem?.costPrice ?? 0,
+        uomId,
+        qty: String(mat.qty),
+      };
+    }).filter((l) => l.itemId);
+
+    setMaterials(lines.length > 0 ? lines : [{ itemId: '', baseUomId: '', baseUomSymbol: '', costPrice: 0, uomId: '', qty: '' }]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product?.materials, allItems.length, uoms.length, isEdit, open]);
+
   const addMaterial = useCallback(() => {
-    setMaterials((p) => [...p, { itemId: '', uomSymbol: '', costPrice: 0, qty: '' }]);
+    setMaterials((p) => [...p, { itemId: '', baseUomId: '', baseUomSymbol: '', costPrice: 0, uomId: '', qty: '' }]);
   }, []);
 
   const removeMaterial = useCallback((idx: number) => {
@@ -77,29 +242,60 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
     (idx: number, itemId: string) => {
       const item = allItems.find((i) => i._id === itemId);
       if (!item) return;
-      const uom = typeof item.baseUom === 'object' ? item.baseUom : uoms.find((u) => u._id === item.baseUom);
+      const baseUomObj = typeof item.baseUom === 'object' ? item.baseUom : uoms.find((u) => u._id === item.baseUom);
+      const baseUomId = baseUomObj?._id ?? (typeof item.baseUom === 'string' ? item.baseUom : '');
       setMaterials((p) =>
         p.map((m, i) =>
-          i === idx ? { ...m, itemId, uomSymbol: uom?.symbol ?? '', costPrice: item.costPrice } : m,
+          i === idx
+            ? { ...m, itemId, baseUomId, baseUomSymbol: baseUomObj?.symbol ?? '', costPrice: item.costPrice, uomId: baseUomId }
+            : m,
         ),
       );
     },
     [allItems, uoms],
   );
 
+  const setUom = useCallback((idx: number, uomId: string) => {
+    setMaterials((p) => p.map((m, i) => (i === idx ? { ...m, uomId } : m)));
+  }, []);
+
   const setQty = useCallback((idx: number, qty: string) => {
     setMaterials((p) => p.map((m, i) => (i === idx ? { ...m, qty } : m)));
   }, []);
 
-  const totalCost = materials.reduce((s, m) => s + (parseFloat(m.qty) || 0) * m.costPrice, 0);
+  function lineCostInBaseUom(m: MaterialLine): { cost: number; baseQty: number; hasConversion: boolean } {
+    const qty = parseFloat(m.qty) || 0;
+    if (!qty || !m.itemId) return { cost: 0, baseQty: 0, hasConversion: true };
+    if (m.uomId === m.baseUomId || !m.uomId) {
+      return { cost: qty * m.costPrice, baseQty: qty, hasConversion: true };
+    }
+    const factor = resolveConversionFactor(m.uomId, m.baseUomId, conversions);
+    if (isNaN(factor)) return { cost: 0, baseQty: 0, hasConversion: false };
+    const baseQty = qty * factor;
+    return { cost: baseQty * m.costPrice, baseQty, hasConversion: true };
+  }
+
+  const costLines = materials.map(lineCostInBaseUom);
+  const totalCost = costLines.reduce((s, l) => s + l.cost, 0);
   const outQty = parseFloat(outputQty) || 0;
   const costPerUnit = outQty > 0 ? totalCost / outQty : 0;
   const outputUomSymbol = uoms.find((u) => u._id === outputUom)?.symbol ?? '';
+  const hasMissingConversion = costLines.some((l, i) => materials[i].itemId && materials[i].uomId !== materials[i].baseUomId && !l.hasConversion);
+
+  function compatibleUoms(baseUomId: string) {
+    if (!baseUomId) return uoms;
+    const related = new Set<string>([baseUomId]);
+    conversions.forEach((c) => {
+      if (c.fromUOM._id === baseUomId) related.add(c.toUOM._id);
+      if (c.toUOM._id === baseUomId) related.add(c.fromUOM._id);
+    });
+    return uoms.filter((u) => related.has(u._id));
+  }
 
   function reset() {
     setName(''); setSku(''); setSkuName(''); setOutputUom('');
     setOutputQty(''); setSalePrice(''); setWarehouse('');
-    setMaterials([{ itemId: '', uomSymbol: '', costPrice: 0, qty: '' }]);
+    setMaterials([{ itemId: '', baseUomId: '', baseUomSymbol: '', costPrice: 0, uomId: '', qty: '' }]);
   }
 
   async function handleSave() {
@@ -108,12 +304,21 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
       return;
     }
     if (outQty <= 0) { toast.error('Output qty is required'); return; }
+    if (!(parseFloat(salePrice) > 0)) { toast.error('Sale price is required'); return; }
     if (!warehouse) { toast.error('Select a warehouse'); return; }
-    if (materials.length === 0) { toast.error('Add at least one input material'); return; }
-    if (materials.some((m) => !m.itemId || !(parseFloat(m.qty) > 0))) {
-      toast.error('Each material needs an item and a quantity');
+    if (materials.every((m) => !m.itemId)) { toast.error('Add at least one input material'); return; }
+    if (materials.some((m) => m.itemId && !(parseFloat(m.qty) > 0))) {
+      toast.error('Each material needs a quantity');
       return;
     }
+    if (hasMissingConversion) {
+      toast.error('Some materials have no UOM conversion defined. Add conversions in Settings → UOM.');
+      return;
+    }
+    const filledMaterials = materials
+      .filter((m) => m.itemId && parseFloat(m.qty) > 0)
+      .map((m) => ({ item: m.itemId, qty: parseFloat(m.qty), uom: m.uomId || m.baseUomId, warehouse }));
+
     try {
       const costPrice = costPerUnit > 0 ? costPerUnit : undefined;
       if (isEdit) {
@@ -123,8 +328,11 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
             name: name.trim(),
             sku: sku.trim(),
             baseUom: outputUom,
-            costPrice,
+            costPrice: costPrice ?? product.costPrice,
             salePrice: parseFloat(salePrice) || undefined,
+            quantity: outQty,
+            warehouse,
+            materials: filledMaterials,
           },
         }).unwrap();
         toast.success('Product updated');
@@ -139,6 +347,7 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
           unitPrice: costPerUnit > 0 ? costPerUnit : 0,
           costPrice,
           salePrice: parseFloat(salePrice) || undefined,
+          materials: filledMaterials,
         }).unwrap();
         toast.success('Product created');
       }
@@ -186,16 +395,6 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
                 }}
               />
               <FormField label="SKU" required={isEdit} placeholder={isEdit ? '' : 'Auto-generated'} readOnly={!isEdit} className={!isEdit ? 'bg-slate-50 text-secondary' : ''} value={sku} onChange={(e) => setSku(e.target.value)} />
-              <FormField label="Sale Price (৳)" type="number" min={0} step="0.01" placeholder="Optional" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} />
-              <SelectField label="Output UOM" required value={outputUom} onChange={(e) => setOutputUom(e.target.value)}>
-                <option value="">Select UOM…</option>
-                {uoms.map((u) => <option key={u._id} value={u._id}>{u.name} ({u.symbol})</option>)}
-              </SelectField>
-              <FormField label="Output Qty (units produced)" required type="number" min={0} step="any" placeholder="e.g. 100" value={outputQty} onChange={(e) => setOutputQty(e.target.value)} />
-              <SelectField label="Warehouse" required value={warehouse} onChange={(e) => setWarehouse(e.target.value)}>
-                <option value="">Select warehouse…</option>
-                {warehouses.map((w) => <option key={w._id} value={w._id}>{w.name}</option>)}
-              </SelectField>
             </div>
           </div>
 
@@ -212,90 +411,138 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
               </button>
             </div>
 
-            {materials.length === 0 ? null : (
-              <div className="space-y-2">
-                <div className="hidden sm:grid grid-cols-[1fr_80px_90px_110px_36px] gap-2 px-1">
-                  <span className="text-[11px] font-medium text-secondary">Material</span>
-                  <span className="text-[11px] font-medium text-secondary">UOM</span>
-                  <span className="text-[11px] font-medium text-secondary">Qty</span>
-                  <span className="text-[11px] font-medium text-secondary text-right">Line Cost</span>
-                  <span />
-                </div>
+            <div className="space-y-2">
+              <div className="hidden sm:grid grid-cols-[1fr_120px_90px_110px_36px] gap-2 px-1">
+                <span className="text-[11px] font-medium text-secondary">Material</span>
+                <span className="text-[11px] font-medium text-secondary">Usage UOM</span>
+                <span className="text-[11px] font-medium text-secondary">Qty</span>
+                <span className="text-[11px] font-medium text-secondary text-right">Line Cost</span>
+                <span />
+              </div>
 
-                {materials.map((m, idx) => {
-                  const lineCost = (parseFloat(m.qty) || 0) * m.costPrice;
-                  return (
-                    <div key={idx} className="grid grid-cols-1 sm:grid-cols-[1fr_80px_90px_110px_36px] gap-2 items-center bg-slate-50 rounded-lg p-2">
+              {materials.map((m, idx) => {
+                const { cost: lineCost, hasConversion } = lineCostInBaseUom(m);
+                const compat = compatibleUoms(m.baseUomId);
+                const uomMismatch = m.itemId && m.uomId && m.uomId !== m.baseUomId && !hasConversion;
+                return (
+                  <div key={idx} className="grid grid-cols-1 sm:grid-cols-[1fr_120px_90px_110px_36px] gap-2 items-start bg-slate-50 rounded-lg p-2">
+                    <MaterialSelect
+                      value={m.itemId}
+                      items={allItems}
+                      stockMap={stockMap}
+                      onChange={(id) => pickItem(idx, id)}
+                    />
+
+                    <div className="flex flex-col gap-0.5">
                       <select
-                        value={m.itemId}
-                        onChange={(e) => pickItem(idx, e.target.value)}
-                        className="h-9 w-full rounded-md border border-border bg-white px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald"
-                        aria-label="Select material"
+                        value={m.uomId}
+                        onChange={(e) => setUom(idx, e.target.value)}
+                        disabled={!m.itemId}
+                        className="h-9 w-full rounded-md border border-border bg-white px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald disabled:bg-slate-100 disabled:text-muted"
+                        aria-label="Usage UOM"
                       >
-                        <option value="">Select material…</option>
-                        {allItems.map((item) => (
-                          <option key={item._id} value={item._id}>
-                            {item.name} ({formatCurrency(item.costPrice)}/{typeof item.baseUom === 'object' ? item.baseUom.symbol : ''})
+                        <option value="">UOM…</option>
+                        {compat.map((u) => (
+                          <option key={u._id} value={u._id}>
+                            {u.symbol}{u._id === m.baseUomId ? ' (base)' : ''}
                           </option>
                         ))}
                       </select>
-
-                      <div className="h-9 flex items-center px-2 rounded-md border border-border bg-white text-sm text-secondary">
-                        {m.uomSymbol || <span className="text-muted">—</span>}
-                      </div>
-
-                      <input
-                        type="number"
-                        min={0}
-                        step="any"
-                        placeholder="Qty"
-                        value={m.qty}
-                        onChange={(e) => setQty(idx, e.target.value)}
-                        className="h-9 w-full rounded-md border border-border bg-white px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald"
-                        aria-label="Quantity"
-                      />
-
-                      <div className="h-9 flex items-center justify-end px-2 rounded-md border border-border bg-white text-sm font-medium text-foreground">
-                        {lineCost > 0 ? formatCurrency(lineCost) : <span className="text-muted">—</span>}
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => removeMaterial(idx)}
-                        className="h-9 w-9 flex items-center justify-center rounded-md text-secondary hover:bg-red-50 hover:text-red-500 transition-colors"
-                        aria-label="Remove"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      {uomMismatch && (
+                        <p className="text-[10px] text-red-500 leading-tight">No conversion</p>
+                      )}
                     </div>
-                  );
-                })}
-              </div>
+
+                    <input
+                      type="number"
+                      min={0}
+                      step="any"
+                      placeholder="Qty"
+                      value={m.qty}
+                      onChange={(e) => setQty(idx, e.target.value)}
+                      className="h-9 w-full rounded-md border border-border bg-white px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald"
+                      aria-label="Quantity"
+                    />
+
+                    <div className="h-9 flex items-center justify-end px-2 rounded-md border border-border bg-white text-sm font-medium text-foreground">
+                      {uomMismatch
+                        ? <span className="text-red-400 text-xs">No conv.</span>
+                        : lineCost > 0 ? formatCurrency(lineCost) : <span className="text-muted">—</span>
+                      }
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => removeMaterial(idx)}
+                      className="h-9 w-9 flex items-center justify-center rounded-md text-secondary hover:bg-red-50 hover:text-red-500 transition-colors"
+                      aria-label="Remove"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            {hasMissingConversion && (
+              <p className="mt-2 text-xs text-red-500">
+                ⚠ Some materials have no UOM conversion. Go to Settings → UOM → Conversions to add them.
+              </p>
             )}
           </div>
 
+          {/* Output */}
+          <div>
+            <p className="text-[11px] font-semibold text-secondary uppercase tracking-wide mb-3">Output</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <SelectField label="Output UOM" required value={outputUom} onChange={(e) => setOutputUom(e.target.value)}>
+                <option value="">Select UOM…</option>
+                {uoms.map((u) => <option key={u._id} value={u._id}>{u.name} ({u.symbol})</option>)}
+              </SelectField>
+              <FormField label="Output Qty (units produced)" required type="number" min={0} step="any" placeholder="e.g. 100" value={outputQty} onChange={(e) => setOutputQty(e.target.value)} />
+              <SelectField label="Warehouse" required value={warehouse} onChange={(e) => setWarehouse(e.target.value)}>
+                <option value="">Select warehouse…</option>
+                {warehouses.map((w) => <option key={w._id} value={w._id}>{w.name}</option>)}
+              </SelectField>
+            </div>
+          </div>
+
           {/* Cost summary */}
-          {materials.length > 0 && (
-            <div className="rounded-lg border border-border bg-slate-50 px-4 py-3 space-y-1.5">
-              <p className="text-[11px] font-semibold text-secondary uppercase tracking-wide mb-2">Cost Summary</p>
-              <div className="flex justify-between text-sm">
-                <span className="text-secondary">Total Raw Material Cost</span>
-                <span className="font-medium text-foreground">{formatCurrency(totalCost)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-secondary">Output Qty</span>
-                <span className="font-medium text-foreground">
-                  {outQty > 0 ? `${outQty} ${outputUomSymbol}` : '—'}
-                </span>
-              </div>
-              <div className="border-t border-border pt-2 flex justify-between">
-                <span className="text-sm font-semibold text-foreground">Production Cost / {outputUomSymbol || 'unit'}</span>
-                <span className="text-base font-bold text-emerald">
-                  {costPerUnit > 0 ? formatCurrency(costPerUnit) : '—'}
-                </span>
+          <div className="rounded-lg border border-border bg-slate-50 px-4 py-3 space-y-1.5">
+            <div className="flex justify-end">
+              <div className="flex flex-col space-y-1.5 w-full max-w-sm">
+                <p className="text-[11px] font-semibold text-secondary uppercase tracking-wide mb-2">Cost Summary</p>
+                <div className="flex justify-between text-sm">
+                  <span className="text-secondary">Total Raw Material Cost</span>
+                  <span className="font-medium text-foreground">{formatCurrency(totalCost)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-secondary">Output Qty</span>
+                  <span className="font-medium text-foreground">
+                    {outQty > 0 ? `${outQty} ${outputUomSymbol}` : '—'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center border-t border-border pt-2">
+                  <span className="text-sm font-semibold text-foreground">Production Cost / {outputUomSymbol || 'unit'}</span>
+                  <span className="text-base font-bold text-emerald">
+                    {costPerUnit > 0 ? formatCurrency(costPerUnit) : '—'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center border-t border-border pt-2">
+                  <span className="text-sm font-semibold text-violet-600">Sale Price (৳)</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    placeholder="e.g. 150"
+                    value={salePrice}
+                    onChange={(e) => setSalePrice(e.target.value)}
+                    className="w-28 h-8 rounded-md border border-green-300 bg-violet-green px-2 text-sm font-semibold text-green-700 placeholder:text-violet-300 focus:outline-none focus:ring-2 focus:ring-green-400"
+                  />
+                </div>
               </div>
             </div>
-          )}
+          </div>
         </div>
 
         {/* Footer */}

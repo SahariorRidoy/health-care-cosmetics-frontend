@@ -42,6 +42,7 @@ export const procurementApi = api.injectEndpoints({
         { type: 'Supplier', id: supplier },
         'Supplier',
         'PurchaseOrder',
+        'GoodsReceipt',
       ],
     }),
     getPurchaseOrders: build.query<POsResponse, { page?: number; search?: string; status?: string; supplier?: string }>({
@@ -52,13 +53,33 @@ export const procurementApi = api.injectEndpoints({
       query: (id) => `/purchase-orders/${id}`,
       providesTags: (_r, _e, id) => [{ type: 'PurchaseOrder', id }],
     }),
-    createPurchaseOrder: build.mutation<POResponse, { supplier: string; items: { item: string; orderedQty: number; unitPrice: number; uom: string; description?: string }[]; notes?: string; expectedDeliveryDate?: string }>({
+    createPurchaseOrder: build.mutation<POResponse, { supplier: string; items: { item: string; orderedQty: number; unitPrice: number; uom: string; description?: string }[]; paidAmount?: number; notes?: string; expectedDeliveryDate?: string }>({
       query: (body) => ({ url: '/purchase-orders', method: 'POST', body }),
       invalidatesTags: ['PurchaseOrder'],
+    }),
+    updatePOPayment: build.mutation<POResponse, { id: string; paidAmount: number }>({
+      query: ({ id, paidAmount }) => ({ url: `/purchase-orders/${id}/payment`, method: 'PATCH', body: { paidAmount } }),
+      invalidatesTags: (result, _e, { id }) => {
+        const supplierId = result?.data?.purchaseOrder
+          ? (typeof result.data.purchaseOrder.supplier === 'string' ? result.data.purchaseOrder.supplier : result.data.purchaseOrder.supplier?._id)
+          : undefined;
+        return [
+          'PurchaseOrder',
+          { type: 'PurchaseOrder' as const, id },
+          'Supplier',
+          'SupplierPayment',
+          'GoodsReceipt',
+          ...(supplierId ? [{ type: 'Supplier' as const, id: supplierId }] : []),
+        ];
+      },
     }),
     updatePOStatus: build.mutation<POResponse, { id: string; status: 'CONFIRMED' | 'CLOSED' }>({
       query: ({ id, status }) => ({ url: `/purchase-orders/${id}/status`, method: 'PATCH', body: { status } }),
       invalidatesTags: (_r, _e, { id }) => ['PurchaseOrder', { type: 'PurchaseOrder', id }],
+    }),
+    deletePurchaseOrder: build.mutation<{ success: boolean; message: string }, string>({
+      query: (id) => ({ url: `/purchase-orders/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['PurchaseOrder'],
     }),
     getGoodsReceipts: build.query<GRsResponse, { page?: number; purchaseOrder?: string; supplier?: string; item?: string }>({
       query: (params) => ({ url: '/procurement/receipts', params }),
@@ -71,6 +92,10 @@ export const procurementApi = api.injectEndpoints({
     createGoodsReceipt: build.mutation<GRResponse, { purchaseOrder: string; warehouse: string; items: { item: string; receivedQty: number; unitPrice: number; uom: string; batchNumber?: string; expiryDate?: string }[]; notes?: string; receivedDate?: string }>({
       query: (body) => ({ url: '/procurement/receipts', method: 'POST', body }),
       invalidatesTags: ['GoodsReceipt', 'PurchaseOrder', 'Stock'],
+    }),
+    deleteGoodsReceipt: build.mutation<{ success: boolean; message: string }, string>({
+      query: (id) => ({ url: `/procurement/receipts/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['GoodsReceipt', 'PurchaseOrder'],
     }),
   }),
 });
@@ -87,8 +112,11 @@ export const {
   useGetPurchaseOrdersQuery,
   useGetPurchaseOrderQuery,
   useCreatePurchaseOrderMutation,
+  useUpdatePOPaymentMutation,
   useUpdatePOStatusMutation,
+  useDeletePurchaseOrderMutation,
   useGetGoodsReceiptsQuery,
   useGetGoodsReceiptQuery,
   useCreateGoodsReceiptMutation,
+  useDeleteGoodsReceiptMutation,
 } = procurementApi;

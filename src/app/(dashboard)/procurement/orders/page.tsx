@@ -2,12 +2,12 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Search, Eye } from 'lucide-react';
+import { Search, Eye, Trash2 } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DataTable, type Column } from '@/components/tables/DataTable';
-import { EmptyState, ErrorState, StatusBadge } from '@/components/feedback';
+import { EmptyState, ErrorState, StatusBadge, ConfirmDialog } from '@/components/feedback';
 import { formatCurrency, formatDate } from '@/lib/formatters';
-import { useGetPurchaseOrdersQuery } from '@/features/procurement/services/procurementApi';
+import { useGetPurchaseOrdersQuery, useDeletePurchaseOrderMutation } from '@/features/procurement/services/procurementApi';
 import type { PurchaseOrder, Supplier } from '@/features/procurement/types';
 
 export default function PurchaseOrdersPage() {
@@ -15,12 +15,24 @@ export default function PurchaseOrdersPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const { data, isLoading, isError, refetch } = useGetPurchaseOrdersQuery({
     page,
     search: search || undefined,
     status: statusFilter || undefined,
   });
+  const [deletePO, { isLoading: deleteLoading }] = useDeletePurchaseOrderMutation();
+
+  async function handleDelete() {
+    if (!deleteId) return;
+    try {
+      await deletePO(deleteId).unwrap();
+      setDeleteId(null);
+    } catch {
+      // error handled by RTK
+    }
+  }
 
   const columns: Column<PurchaseOrder>[] = [
     {
@@ -36,23 +48,30 @@ export default function PurchaseOrdersPage() {
     },
     { key: 'createdAt', header: 'Date', priority: 'P2', render: (row) => formatDate(row.createdAt) },
     {
-      key: 'expectedDeliveryDate', header: 'Expected', priority: 'P3',
-      render: (row) => row.expectedDeliveryDate ? formatDate(row.expectedDeliveryDate) : '—',
-    },
-    {
       key: 'totalAmount', header: 'Total', priority: 'P2',
       render: (row) => formatCurrency(row.totalAmount),
+    },
+    {
+      key: 'paymentStatus', header: 'Payment', priority: 'P2',
+      render: (row) => <StatusBadge status={row.paymentStatus ?? 'UNPAID'} />,
     },
     {
       key: 'status', header: 'Status', priority: 'P1',
       render: (row) => <StatusBadge status={row.status} />,
     },
     {
-      key: 'actions', header: '', priority: 'P1', className: 'w-[60px] text-right',
+      key: 'actions', header: '', priority: 'P1', className: 'w-[90px] text-right',
       render: (row) => (
-        <button onClick={() => router.push(`/procurement/orders/${row._id}`)} className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="View" title="View">
-          <Eye size={15} />
-        </button>
+        <div className="flex items-center justify-end gap-1">
+          <button onClick={() => router.push(`/procurement/orders/${row._id}`)} className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="View" title="View">
+            <Eye size={15} />
+          </button>
+          {(
+            <button onClick={() => setDeleteId(row._id)} className="p-1.5 rounded-md text-secondary hover:bg-red-50 hover:text-red-500 min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="Delete" title="Delete">
+              <Trash2 size={15} />
+            </button>
+          )}
+        </div>
       ),
     },
   ];
@@ -63,11 +82,6 @@ export default function PurchaseOrdersPage() {
         title="Purchase Orders"
         description="Manage purchase orders and goods receipts"
         breadcrumbs={[{ label: 'Procurement' }, { label: 'Orders' }]}
-        actions={
-          <button onClick={() => router.push('/procurement/orders/new')} className="h-9 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium flex items-center gap-2 transition-colors">
-            <Plus size={16} aria-hidden="true" /> New PO
-          </button>
-        }
       />
 
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
@@ -87,12 +101,21 @@ export default function PurchaseOrdersPage() {
       {isError ? (
         <ErrorState onRetry={refetch} />
       ) : data?.data?.purchaseOrders?.length === 0 && !isLoading ? (
-        <EmptyState title="No purchase orders" description="Create your first purchase order."
-          action={<button onClick={() => router.push('/procurement/orders/new')} className="h-9 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium flex items-center gap-2 transition-colors"><Plus size={16} aria-hidden="true" />New PO</button>}
-        />
+        <EmptyState title="No purchase orders" description="Purchase orders will appear here once created from materials." />
       ) : (
         <DataTable columns={columns} data={data?.data?.purchaseOrders ?? []} keyField="_id" isLoading={isLoading} pagination={data?.pagination} onPageChange={setPage} />
       )}
+
+      <ConfirmDialog
+        open={!!deleteId}
+        title="Delete Purchase Order"
+        description="This will permanently delete the purchase order. Only DRAFT orders can be deleted."
+        confirmLabel="Delete"
+        variant="danger"
+        loading={deleteLoading}
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteId(null)}
+      />
     </>
   );
 }

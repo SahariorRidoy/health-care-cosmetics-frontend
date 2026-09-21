@@ -89,7 +89,7 @@ export default function ItemDetailPage() {
       <PageHeader
         title={item.name}
         description={`SKU: ${item.sku}`}
-        breadcrumbs={[{ label: 'Raw Materials', href: '/inventory' }, { label: item.name }]}
+        breadcrumbs={[{ label: 'Materials', href: '/materials' }, { label: item.name }]}
         actions={
           <div className="flex items-center gap-2">
             <button onClick={() => router.back()} className="h-9 px-3 rounded-md border border-border text-sm text-foreground hover:bg-slate-50 flex items-center gap-2 transition-colors">
@@ -122,7 +122,6 @@ export default function ItemDetailPage() {
         <InfoRow label="Created" value={formatDate(item.createdAt)} />
       </div>
 
-      {/* Purchase history */}
       <div className="bg-white rounded-lg border border-border">
         <div className="px-4 py-3 border-b border-border">
           <h2 className="text-sm font-semibold text-foreground">Purchase History</h2>

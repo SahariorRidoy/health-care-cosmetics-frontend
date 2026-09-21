@@ -8,11 +8,24 @@ import { LoadingSpinner, ErrorState, StatusBadge } from '@/components/feedback';
 import { formatCurrency, formatDate } from '@/lib/formatters';
 import { useGetProductQuery } from '@/features/products/services/productsApi';
 import { useGetStockBalancesQuery, useGetStockMovementsQuery } from '@/features/inventory/services/inventoryApi';
+import { useGetUOMConversionsQuery } from '@/features/settings/services/settingsApi';
 import { ProductionFormDialog } from '@/features/production/components/ProductionFormDialog';
 import type { StockBalance, StockMovement } from '@/features/inventory/types';
+import type { ProductMaterial } from '@/features/products/types';
+import type { UOMConversion } from '@/features/settings/types';
+
+function resolveConversionFactor(usageUomId: string, baseUomId: string, conversions: UOMConversion[]): number {
+  if (!usageUomId || !baseUomId || usageUomId === baseUomId) return 1;
+  const direct = conversions.find((c) => c.fromUOM._id === usageUomId && c.toUOM._id === baseUomId);
+  if (direct) return direct.factor;
+  const reverse = conversions.find((c) => c.fromUOM._id === baseUomId && c.toUOM._id === usageUomId);
+  if (reverse) return 1 / reverse.factor;
+  return 1;
+}
 
 const MOVEMENT_TYPE_LABELS: Record<string, string> = {
   PRODUCTION_OUTPUT: 'Production Output',
+  PRODUCTION_ISSUE: 'Material Consumed',
   SALES_DISPATCH: 'Sales Dispatch',
   ADJUSTMENT: 'Adjustment',
 };
@@ -25,14 +38,27 @@ export default function ProductionDetailPage() {
   const { data, isLoading, isError, refetch } = useGetProductQuery(id);
   const { data: stockData } = useGetStockBalancesQuery({ item: id });
   const { data: movementsData } = useGetStockMovementsQuery({ item: id });
+  const { data: convData } = useGetUOMConversionsQuery();
 
   if (isLoading) return <LoadingSpinner />;
   if (isError || !data?.data?.item) return <ErrorState onRetry={refetch} />;
 
   const product = data.data.item;
-  const uomSymbol = product.baseUom && typeof product.baseUom === 'object' ? product.baseUom.symbol : '';
+  const uomSymbol = typeof product.baseUom === 'object' ? product.baseUom.symbol : '';
   const balances = (stockData?.data?.balances ?? []) as StockBalance[];
   const movements = (movementsData?.data?.movements ?? []) as StockMovement[];
+  const inputMaterials = product.materials ?? [];
+  const conversions = convData?.data?.conversions ?? [];
+
+  function getLineCost(m: ProductMaterial): number {
+    const itemObj = typeof m.item === 'object' ? m.item : null;
+    if (!itemObj) return 0;
+    const costPrice = itemObj.costPrice ?? 0;
+    const usageUomId = typeof m.uom === 'object' ? m.uom._id : m.uom;
+    const baseUomId = typeof itemObj.baseUom === 'object' ? itemObj.baseUom._id : (itemObj.baseUom ?? usageUomId);
+    const factor = resolveConversionFactor(usageUomId, baseUomId, conversions);
+    return m.qty * factor * costPrice;
+  }
 
   return (
     <>
@@ -101,6 +127,53 @@ export default function ProductionDetailPage() {
               </div>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Input Materials (BOM recipe on the product) */}
+      <div className="bg-white rounded-lg border border-border mb-4">
+        <div className="px-4 py-3 border-b border-border">
+          <h2 className="text-sm font-semibold text-foreground">Input Materials</h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[520px] text-[13px]">
+            <thead>
+              <tr className="bg-slate-50 border-b border-border">
+                {['Material', 'Qty / UOM', 'Unit Cost', 'Line Cost'].map((h) => (
+                  <th key={h} className="px-4 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wide whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {inputMaterials.length === 0 ? (
+                <tr><td colSpan={4} className="px-4 py-8 text-center text-muted text-sm">No input materials defined.</td></tr>
+              ) : (
+                <>
+                  {inputMaterials.map((m: ProductMaterial, i: number) => {
+                    const itemObj = typeof m.item === 'object' ? m.item : null;
+                    const name = itemObj?.name ?? (typeof m.item === 'string' ? m.item : '—');
+                    const uomLabel = typeof m.uom === 'object' ? m.uom.symbol : m.uom;
+                    const unitCost = itemObj?.costPrice ?? 0;
+                    const lineCost = getLineCost(m);
+                    return (
+                      <tr key={i} className="border-b border-border hover:bg-slate-50">
+                        <td className="px-4 py-3 font-medium text-foreground">{name}</td>
+                        <td className="px-4 py-3 text-foreground">{m.qty} {uomLabel ?? '—'}</td>
+                        <td className="px-4 py-3 text-secondary">{unitCost > 0 ? formatCurrency(unitCost) : '—'}</td>
+                        <td className="px-4 py-3 font-medium text-foreground">{lineCost > 0 ? formatCurrency(lineCost) : '—'}</td>
+                      </tr>
+                    );
+                  })}
+                  <tr className="bg-slate-50 border-t-2 border-border">
+                    <td colSpan={3} className="px-4 py-3 text-sm font-semibold text-foreground">Total Production Cost</td>
+                    <td className="px-4 py-3 text-base font-bold text-emerald-600">
+                      {formatCurrency(inputMaterials.reduce((sum, m: ProductMaterial) => sum + getLineCost(m), 0))}
+                    </td>
+                  </tr>
+                </>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 

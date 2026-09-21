@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  LayoutDashboard, Package, Truck, Factory, TrendingUp,
+  LayoutDashboard, Package, Factory, TrendingUp,
   DollarSign, Users, BarChart2, Settings, X, ChevronLeft, ChevronRight,
   ChevronDown, UserCircle, ClipboardList, FileText, ShoppingCart,
   Warehouse, ReceiptText, Building2, Plus,
@@ -19,17 +19,13 @@ type NavItem =
 const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   {
-    href: '/procurement', label: 'Suppliers', icon: Truck,
+    href: '/materials', label: 'Materials', icon: Package,
     children: [
       { href: '/procurement/suppliers', label: 'Suppliers List', icon: Building2 },
+      { href: '/materials', label: 'Materials List', icon: Package },
       { href: '/procurement/orders', label: 'Purchase Orders', icon: ShoppingCart },
-    ],
-  },
-  {
-    href: '/inventory', label: 'Raw Materials', icon: Package,
-    children: [
-      { href: '/inventory', label: 'Material List', icon: Package },
-      { href: '/inventory/stock', label: 'Material Stock', icon: Warehouse },
+      { href: '/procurement/receipts', label: 'Goods Receipts', icon: ReceiptText },
+      { href: '/materials/stock', label: 'Materials Stock', icon: Warehouse },
     ],
   },
   { href: '/production', label: 'Production', icon: Factory },

@@ -82,7 +82,7 @@ export default function ItemsPage() {
       key: 'actions', header: '', priority: 'P1', className: 'w-[100px] text-right',
       render: (row) => (
         <div className="flex items-center justify-end gap-1">
-          <button onClick={() => router.push(`/inventory/${row._id}`)} className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="View" title="View"><Eye size={15} /></button>
+          <button onClick={() => router.push(`/materials/${row._id}`)} className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="View" title="View"><Eye size={15} /></button>
           <button onClick={() => openEdit(row)} className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="Edit" title="Edit"><Pencil size={15} /></button>
           <button onClick={() => setDeleteId(row._id)} className="p-1.5 rounded-md text-secondary hover:bg-red-50 hover:text-red-500 min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="Delete" title="Delete"><Trash2 size={15} /></button>
         </div>
@@ -93,9 +93,9 @@ export default function ItemsPage() {
   return (
     <>
       <PageHeader
-        title="Raw Materials"
+        title="Materials"
         description="Manage raw materials and packaging stock"
-        breadcrumbs={[{ label: 'Raw Materials' }]}
+        breadcrumbs={[{ label: 'Materials' }]}
         actions={
           <button onClick={openCreate} className="h-9 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium flex items-center gap-2 transition-colors">
             <Plus size={16} aria-hidden="true" /> New Purchase
@@ -130,7 +130,7 @@ export default function ItemsPage() {
         <ErrorState onRetry={refetch} />
       ) : data?.data.items.length === 0 && !isLoading ? (
         <EmptyState
-          title="No raw materials found"
+          title="No materials found"
           description="Record your first purchase to get started."
           action={
             <button onClick={openCreate} className="h-9 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium flex items-center gap-2 transition-colors">

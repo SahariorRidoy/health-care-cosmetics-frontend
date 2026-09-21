@@ -15,9 +15,9 @@ export const productsApi = api.injectEndpoints({
     }),
     createProduct: build.mutation<ProductResponse, Omit<CreateProductPayload, 'type'>>({
       query: (body) => ({ url: '/items', method: 'POST', body: { ...body, type: 'FINISHED_GOOD' } }),
-      invalidatesTags: ['Item'],
+      invalidatesTags: ['Item', 'Stock'],
     }),
-    updateProduct: build.mutation<ProductResponse, { id: string; body: Partial<CreateProductPayload> & { isActive?: boolean } }>({
+    updateProduct: build.mutation<ProductResponse, { id: string; body: Partial<CreateProductPayload> & { isActive?: boolean; quantity?: number; warehouse?: string; materials?: { item: string; qty: number; uom: string; warehouse: string }[] } }>({
       query: ({ id, body }) => ({ url: `/items/${id}`, method: 'PATCH', body }),
       invalidatesTags: (_r, _e, { id }) => ['Item', { type: 'Item', id }],
     }),

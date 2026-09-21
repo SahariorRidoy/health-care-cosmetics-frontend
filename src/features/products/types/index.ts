@@ -1,5 +1,11 @@
 import type { UOM } from '@/features/inventory/types';
 
+export interface ProductMaterial {
+  item: { _id: string; name: string; costPrice?: number; baseUom?: string | { _id: string; symbol: string } } | string;
+  qty: number;
+  uom: { _id: string; name: string; symbol: string } | string;
+}
+
 export interface Product {
   _id: string;
   name: string;
@@ -11,6 +17,7 @@ export interface Product {
   currentStock: number;
   costPrice: number;
   salePrice?: number;
+  materials: ProductMaterial[];
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -39,4 +46,5 @@ export interface CreateProductPayload {
   unitPrice?: number;
   costPrice?: number;
   salePrice?: number;
+  materials?: { item: string; qty: number; uom: string; warehouse: string }[];
 }

@@ -53,7 +53,7 @@ export const inventoryApi = api.injectEndpoints({
       query: (params) => ({ url: '/stock/balance', params }),
       providesTags: ['Stock'],
     }),
-    getStockMovements: build.query<StockMovementsResponse, { page?: number; item?: string; warehouse?: string }>({
+    getStockMovements: build.query<StockMovementsResponse, { page?: number; limit?: number; item?: string; warehouse?: string; type?: string; reference?: string; activeOnly?: boolean }>({
       query: (params) => ({ url: '/stock/movements', params }),
       providesTags: ['Stock'],
     }),

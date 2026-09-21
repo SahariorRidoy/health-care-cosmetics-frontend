@@ -224,8 +224,10 @@ export default function PODetailPage() {
           { label: 'Supplier', value: supplier?.name },
           { label: 'Status', value: <StatusBadge status={po.status} /> },
           { label: 'Date', value: formatDate(po.createdAt) },
-          { label: 'Expected Delivery', value: po.expectedDeliveryDate ? formatDate(po.expectedDeliveryDate) : '—' },
           { label: 'Total Amount', value: formatCurrency(po.totalAmount) },
+          { label: 'Paid Amount', value: formatCurrency(po.paidAmount ?? 0) },
+          { label: 'Due Amount', value: formatCurrency(Math.max(0, po.totalAmount - (po.paidAmount ?? 0))) },
+          { label: 'Payment Status', value: <StatusBadge status={po.paymentStatus ?? 'UNPAID'} /> },
         ].map(({ label, value }) => (
           <div key={label} className="flex flex-col gap-0.5">
             <span className="text-xs font-medium text-muted uppercase tracking-wide">{label}</span>

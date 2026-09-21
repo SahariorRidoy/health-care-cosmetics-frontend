@@ -48,7 +48,8 @@ export default function ProductionPage() {
       key: 'currentStock', header: 'Stock', priority: 'P2',
       render: (row) => {
         const low = row.currentStock <= row.reorderLevel;
-        return <span className={low ? 'text-amber-600 font-medium' : ''}>{row.currentStock}</span>;
+        const uom = typeof row.baseUom === 'object' ? (row.baseUom as { symbol: string }).symbol : '';
+        return <span className={low ? 'text-amber-600 font-medium' : ''}>{row.currentStock}{uom ? ` ${uom}` : ''}</span>;
       },
     },
     {

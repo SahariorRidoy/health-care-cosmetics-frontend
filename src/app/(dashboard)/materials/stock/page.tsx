@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { SlidersHorizontal } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DataTable, type Column } from '@/components/tables/DataTable';
 import { ErrorState, StatusBadge } from '@/components/feedback';
@@ -9,9 +9,8 @@ import { formatDate } from '@/lib/formatters';
 import {
   useGetStockBalancesQuery,
   useGetStockMovementsQuery,
-  useGetItemsQuery,
+  useDeleteItemMutation,
 } from '@/features/inventory/services/inventoryApi';
-import { StockAdjustmentDialog } from '@/features/inventory/components/StockAdjustmentDialog';
 import type { StockBalance, StockMovement, Item, Warehouse } from '@/features/inventory/types';
 
 const MOVEMENT_LABELS: Record<string, string> = {
@@ -29,16 +28,20 @@ export default function StockPage() {
   const [balancePage, setBalancePage] = useState(1);
   const [movementPage, setMovementPage] = useState(1);
   const [lowStockOnly, setLowStockOnly] = useState(false);
-  const [adjustItem, setAdjustItem] = useState<Item | null>(null);
-  const [tab, setTab] = useState<'balance' | 'movements'>('balance');
+  const [tab, setTab] = useState<'balance' | 'movements'>('movements');
+  const [movementTab, setMovementTab] = useState<'all' | 'materials' | 'production'>('all');
 
   const { data: balanceData, isLoading: balanceLoading, isError: balanceError, refetch: refetchBalance } =
     useGetStockBalancesQuery({ page: balancePage, lowStock: lowStockOnly || undefined });
 
   const { data: movementData, isLoading: movementLoading, isError: movementError } =
-    useGetStockMovementsQuery({ page: movementPage });
+    useGetStockMovementsQuery({ page: movementPage, limit: 15, activeOnly: true });
 
-  const { data: itemsData } = useGetItemsQuery({ page: 1 });
+  const [deleteItem] = useDeleteItemMutation();
+  async function handleDelete(item: Item) {
+    if (!confirm(`Delete "${item.name}"? This cannot be undone.`)) return;
+    await deleteItem(item._id);
+  }
 
   const balanceColumns: Column<StockBalance>[] = [
     {
@@ -103,22 +106,43 @@ export default function StockPage() {
       key: 'actions',
       header: '',
       priority: 'P1',
-      className: 'w-[120px] text-right',
+      className: 'w-[180px] text-right',
       render: (row) => {
         const item = typeof row.item === 'string' ? null : row.item as Item;
+        const isMaterial = item ? item.type === 'RAW_MATERIAL' || item.type === 'PACKAGING' || item.type === 'SEMI_FINISHED' : false;
         return (
-          <button
-            onClick={() => item && setAdjustItem(item)}
-            disabled={!item}
-            className="h-8 px-3 rounded-md border border-border text-xs text-foreground hover:bg-slate-50 disabled:opacity-40 transition-colors flex items-center gap-1.5"
-          >
-            <SlidersHorizontal size={13} aria-hidden="true" />
-            Adjust
-          </button>
+          <div className="flex items-center justify-end gap-2">
+            {!isMaterial && item && (
+              <button
+                onClick={() => handleDelete(item)}
+                className="h-8 px-3 rounded-md border border-red-200 text-xs text-red-600 hover:bg-red-50 transition-colors flex items-center gap-1.5"
+              >
+                <Trash2 size={13} aria-hidden="true" />
+                Delete
+              </button>
+            )}
+          </div>
         );
       },
     },
   ];
+
+  const MATERIAL_TYPES = new Set(['RAW_MATERIAL', 'PACKAGING', 'SEMI_FINISHED']);
+  const PRODUCTION_TYPES = new Set(['FINISHED_GOOD']);
+
+  const allMovements = movementData?.data?.movements ?? [];
+  const filteredMovements =
+    movementTab === 'materials'
+      ? allMovements.filter((m) => {
+          const item = typeof m.item === 'string' ? null : (m.item as Item);
+          return item ? MATERIAL_TYPES.has(item.type) : false;
+        })
+      : movementTab === 'production'
+      ? allMovements.filter((m) => {
+          const item = typeof m.item === 'string' ? null : (m.item as Item);
+          return item ? PRODUCTION_TYPES.has(item.type) : false;
+        })
+      : allMovements;
 
   const movementColumns: Column<StockMovement>[] = [
     {
@@ -133,7 +157,18 @@ export default function StockPage() {
       priority: 'P1',
       render: (row) => {
         const item = typeof row.item === 'string' ? null : row.item as Item;
-        return <span className="font-medium">{item?.name ?? '—'}</span>;
+        const isMaterial = item ? MATERIAL_TYPES.has(item.type) : false;
+        const isProduction = item ? PRODUCTION_TYPES.has(item.type) : false;
+        return (
+          <div className="flex items-center gap-2">
+            <span
+              className={`inline-block w-2 h-2 rounded-full shrink-0 ${
+                isMaterial ? 'bg-blue-400' : isProduction ? 'bg-emerald-500' : 'bg-slate-300'
+              }`}
+            />
+            <span className="font-medium">{item?.name ?? '—'}</span>
+          </div>
+        );
       },
     },
     {
@@ -177,23 +212,12 @@ export default function StockPage() {
       <PageHeader
         title="Stock"
         description="Stock balances and movement history"
-        breadcrumbs={[{ label: 'Inventory', href: '/inventory' }, { label: 'Stock' }]}
-        actions={
-          itemsData?.data?.items[0] && (
-            <button
-              onClick={() => setAdjustItem(itemsData.data.items[0])}
-              className="h-9 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium flex items-center gap-2 transition-colors"
-            >
-              <SlidersHorizontal size={15} aria-hidden="true" />
-              New Adjustment
-            </button>
-          )
-        }
+        breadcrumbs={[{ label: 'Materials', href: '/materials' }, { label: 'Stock' }]}
+
       />
 
-      {/* Tabs */}
       <div className="flex gap-1 mb-4 border-b border-border overflow-x-auto">
-        {(['balance', 'movements'] as const).map((t) => (
+        {(['movements', 'balance'] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -239,27 +263,45 @@ export default function StockPage() {
 
       {tab === 'movements' && (
         <>
+          <div className="flex gap-1 mb-4 border-b border-border">
+            {([
+              { key: 'all', label: 'All' },
+              { key: 'materials', label: '🔵 Materials' },
+              { key: 'production', label: '🟢 Production Items' },
+            ] as const).map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setMovementTab(key)}
+                className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors shrink-0 whitespace-nowrap ${
+                  movementTab === key
+                    ? 'border-emerald text-emerald-600'
+                    : 'border-transparent text-secondary hover:text-foreground'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-4 mb-3 text-xs text-secondary">
+            <span className="flex items-center gap-1.5"><span className="inline-block w-2 h-2 rounded-full bg-blue-400" /> Materials (Raw / Packaging / Semi-Finished)</span>
+            <span className="flex items-center gap-1.5"><span className="inline-block w-2 h-2 rounded-full bg-emerald-500" /> Production Items (Finished Goods)</span>
+          </div>
           {movementError ? (
             <ErrorState />
           ) : (
             <DataTable
               columns={movementColumns}
-              data={movementData?.data?.movements ?? []}
+              data={filteredMovements}
               keyField="_id"
               isLoading={movementLoading}
-              pagination={movementData?.pagination}
-              onPageChange={setMovementPage}
+              pagination={movementTab === 'all' ? movementData?.pagination : undefined}
+              onPageChange={movementTab === 'all' ? setMovementPage : undefined}
               emptyMessage="No stock movements found."
             />
           )}
         </>
       )}
 
-      <StockAdjustmentDialog
-        open={!!adjustItem}
-        item={adjustItem}
-        onClose={() => setAdjustItem(null)}
-      />
     </>
   );
 }
