@@ -169,8 +169,14 @@ export default function InvoiceDetailPage() {
       if (!res.ok) throw new Error('Failed');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-      const win = window.open(url);
-      win?.addEventListener('load', () => { win.print(); URL.revokeObjectURL(url); });
+      const iframe = document.createElement('iframe');
+      iframe.style.cssText = 'position:fixed;width:0;height:0;border:0;opacity:0';
+      iframe.src = url;
+      document.body.appendChild(iframe);
+      iframe.onload = () => {
+        iframe.contentWindow?.print();
+        setTimeout(() => { document.body.removeChild(iframe); URL.revokeObjectURL(url); }, 1000);
+      };
     } catch {
       toast.error('Failed to load PDF for printing');
     }

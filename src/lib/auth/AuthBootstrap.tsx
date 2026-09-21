@@ -22,7 +22,7 @@ export function AuthBootstrap() {
         }
       })
       .catch(() => {});
-  }, []);
+  }, [accessToken, dispatch]);
 
   return null;
 }

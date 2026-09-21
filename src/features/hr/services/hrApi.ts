@@ -53,6 +53,14 @@ export const hrApi = api.injectEndpoints({
       query: (id) => ({ url: `/hr/employees/${id}`, method: 'DELETE' }),
       invalidatesTags: ['Employee'],
     }),
+    uploadEmployeeDocuments: build.mutation<EmployeeResponse, { id: string; formData: FormData }>({
+      query: ({ id, formData }) => ({
+        url: `/hr/employees/${id}/documents`,
+        method: 'POST',
+        body: formData,
+      }),
+      invalidatesTags: (_r, _e, { id }) => [{ type: 'Employee', id }],
+    }),
 
     // Salary Structures
     getSalaryStructures: build.query<SalaryStructuresResponse, string>({
@@ -146,6 +154,7 @@ export const {
   useCreateEmployeeMutation,
   useUpdateEmployeeMutation,
   useDeleteEmployeeMutation,
+  useUploadEmployeeDocumentsMutation,
   useGetSalaryStructuresQuery,
   useCreateSalaryStructureMutation,
   useUpdateSalaryStructureMutation,

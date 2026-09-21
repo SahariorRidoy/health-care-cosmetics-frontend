@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import { Pencil, Plus } from 'lucide-react';
+import { Pencil, Plus, Upload, FileText, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { ErrorState } from '@/components/feedback';
 import { StatusBadge } from '@/components/feedback';
@@ -10,6 +11,7 @@ import { formatCurrency, formatDate } from '@/lib/formatters';
 import {
   useGetEmployeeQuery,
   useGetSalaryStructuresQuery,
+  useUploadEmployeeDocumentsMutation,
 } from '@/features/hr/services/hrApi';
 import { EmployeeFormDialog } from '@/features/hr/components/EmployeeFormDialog';
 import { SalaryStructureDialog } from '@/features/hr/components/SalaryStructureDialog';
@@ -19,12 +21,28 @@ export default function EmployeeDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [editOpen, setEditOpen] = useState(false);
   const [salaryOpen, setSalaryOpen] = useState(false);
+  const cvRef = useRef<HTMLInputElement>(null);
+  const nidRef = useRef<HTMLInputElement>(null);
 
   const { data, isLoading, isError, refetch } = useGetEmployeeQuery(id);
   const { data: salaryData } = useGetSalaryStructuresQuery(id);
+  const [uploadDocs, { isLoading: uploading }] = useUploadEmployeeDocumentsMutation();
 
   const employee = data?.data?.employee as Employee | undefined;
   const salaryStructures = salaryData?.data?.salaryStructures ?? [];
+
+  async function handleUpload(field: 'cv' | 'nid', file: File) {
+    const formData = new FormData();
+    formData.append(field, file);
+    try {
+      await uploadDocs({ id, formData }).unwrap();
+      toast.success(`${field.toUpperCase()} uploaded`);
+    } catch {
+      toast.error(`Failed to upload ${field.toUpperCase()}`);
+    }
+  }
+
+  const base = process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') ?? 'http://localhost:5000';
 
   if (isLoading) {
     return (
@@ -124,6 +142,59 @@ export default function EmployeeDetailPage() {
               ))}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Documents */}
+      <div className="bg-white rounded-xl border border-border p-6 mt-6">
+        <h3 className="text-sm font-semibold text-foreground mb-4">Documents</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {(['cv', 'nid'] as const).map((field) => {
+            const filePath = field === 'cv' ? employee.cvPath : employee.nidPath;
+            const label = field === 'cv' ? 'CV / Resume' : 'NID';
+            const ref = field === 'cv' ? cvRef : nidRef;
+            return (
+              <div key={field} className="border border-border rounded-lg p-4 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">{label}</span>
+                  {filePath && (
+                    <a
+                      href={`${base}/uploads/employees/${filePath}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-emerald hover:underline flex items-center gap-1"
+                    >
+                      <FileText size={13} /> View
+                    </a>
+                  )}
+                </div>
+                {filePath ? (
+                  <p className="text-xs text-muted truncate">{filePath}</p>
+                ) : (
+                  <p className="text-xs text-muted">No file uploaded</p>
+                )}
+                <input
+                  ref={ref}
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleUpload(field, file);
+                    e.target.value = '';
+                  }}
+                />
+                <button
+                  onClick={() => ref.current?.click()}
+                  disabled={uploading}
+                  className="h-8 px-3 rounded-md border border-border text-xs font-medium flex items-center gap-1.5 hover:bg-slate-50 disabled:opacity-60 transition-colors"
+                >
+                  {uploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+                  {filePath ? 'Replace' : 'Upload'}
+                </button>
+              </div>
+            );
+          })}
         </div>
       </div>
 

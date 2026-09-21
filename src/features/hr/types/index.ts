@@ -25,6 +25,8 @@ export interface Employee {
   joiningDate: string;
   status: EmployeeStatus;
   currentSalary: number;
+  cvPath?: string;
+  nidPath?: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
