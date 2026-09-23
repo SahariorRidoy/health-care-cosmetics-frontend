@@ -32,7 +32,6 @@ const orderSchema = z.object({
   warehouse: z.string().min(1, 'Warehouse is required'),
   taxPercent: z.coerce.number().min(0).max(100).default(0),
   notes: z.string().optional(),
-  status: z.enum(['DRAFT', 'CONFIRMED', 'DISPATCHED', 'CLOSED']).default('CONFIRMED'),
   items: z.array(lineSchema).min(1, 'Add at least one item'),
   payNow: z.boolean().default(false),
   paymentAmount: z.coerce.number().min(0).default(0),
@@ -47,13 +46,6 @@ function LineTotal({ qty, price, discount }: { qty: number; price: number; disco
   return <span className="text-sm text-secondary">{formatCurrency(line)}</span>;
 }
 
-const STATUS_OPTIONS = [
-  { value: 'DRAFT', label: 'Draft' },
-  { value: 'CONFIRMED', label: 'Confirmed' },
-  { value: 'DISPATCHED', label: 'Dispatched' },
-  { value: 'CLOSED', label: 'Closed' },
-];
-
 export default function NewSalesOrderPage() {
   const router = useRouter();
   const [createOrder, { isLoading }] = useCreateSalesOrderMutation();
@@ -66,7 +58,7 @@ export default function NewSalesOrderPage() {
   const { register, control, handleSubmit, setValue, formState: { errors } } = useForm<OrderForm>({
     resolver: zodResolver(orderSchema),
     defaultValues: {
-      taxPercent: 0, status: 'CONFIRMED', payNow: false,
+      taxPercent: 0, payNow: false,
       paymentMethod: 'CASH', paymentAmount: 0,
       items: [{ item: '', uom: '', qty: 1, unitPrice: 0, discount: 0 }],
     },
@@ -105,7 +97,6 @@ export default function NewSalesOrderPage() {
         warehouse: values.warehouse,
         taxPercent: values.taxPercent,
         notes: values.notes,
-        status: values.status,
         items: values.items.map((l) => ({
           item: l.item, uom: l.uom, qty: l.qty,
           unitPrice: l.unitPrice, discount: l.discount, description: l.description,
@@ -227,21 +218,6 @@ export default function NewSalesOrderPage() {
                   <Plus size={16} />
                 </button>
               </div>
-
-              <Controller
-                control={control}
-                name="status"
-                render={({ field }) => (
-                  <div className="flex items-end gap-2">
-                    <div className="flex-1">
-                      <SelectField label="Status" error={errors.status?.message} {...field}>
-                        {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-                      </SelectField>
-                    </div>
-                    <div className="w-10 shrink-0" />
-                  </div>
-                )}
-              />
 
               <div className="flex items-end gap-2">
                 <div className="flex-1">

@@ -2,98 +2,25 @@
 
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { toast } from 'sonner';
-import { ArrowLeft, Loader2, X, FileText, Truck, CreditCard, FileDown, Printer } from 'lucide-react';
+import { ArrowLeft, Loader2, X, CreditCard, FileDown, Printer, FileText } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { LoadingSpinner, ErrorState, StatusBadge, ConfirmDialog } from '@/components/feedback';
 import { DataTable, type Column } from '@/components/tables/DataTable';
 import { FormField, SelectField, TextareaField } from '@/components/forms/FormField';
 import { formatCurrency, formatDate } from '@/lib/formatters';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import {
   useGetSalesOrderQuery,
-  useUpdateSalesOrderStatusMutation,
-  useCreateInvoiceMutation,
+  useCancelSalesOrderMutation,
   useGetInvoicesQuery,
   useCreateCustomerPaymentMutation,
   useGetCustomerPaymentsQuery,
 } from '@/features/sales/services/salesApi';
 import { useAppSelector } from '@/lib/store/hooks';
 import type { SalesOrderItem, Invoice } from '@/features/sales/types';
-
-// ── Invoice creation dialog ───────────────────────────────────────────────────
-
-const invoiceSchema = z.object({
-  taxPercent: z.coerce.number().min(0).max(100).default(0),
-  dueDate: z.string().optional(),
-  notes: z.string().optional(),
-});
-type InvoiceForm = z.infer<typeof invoiceSchema>;
-
-function CreateInvoiceDialog({ open, orderId, onClose }: { open: boolean; orderId: string; onClose: () => void }) {
-  const [createInvoice, { isLoading }] = useCreateInvoiceMutation();
-  const { data: orderData } = useGetSalesOrderQuery(orderId);
-
-  const { register, handleSubmit, formState: { errors } } = useForm<InvoiceForm>({
-    resolver: zodResolver(invoiceSchema),
-    defaultValues: { taxPercent: orderData?.data?.salesOrder?.taxPercent ?? 0 },
-  });
-
-  async function onSubmit(values: InvoiceForm) {
-    const order = orderData?.data?.salesOrder;
-    if (!order) return;
-    try {
-      await createInvoice({
-        customer: typeof order.customer === 'string' ? order.customer : order.customer._id,
-        salesOrder: orderId,
-        taxPercent: values.taxPercent,
-        dueDate: values.dueDate ? new Date(values.dueDate).toISOString() : undefined,
-        notes: values.notes,
-        items: order.items.map((l) => ({
-          item: typeof l.item === 'string' ? l.item : l.item._id,
-          uom: typeof l.uom === 'string' ? l.uom : l.uom._id,
-          qty: l.qty,
-          unitPrice: l.unitPrice,
-          discount: l.discount,
-          description: l.description,
-        })),
-      }).unwrap();
-      toast.success('Invoice created');
-      onClose();
-    } catch (err: unknown) {
-      const msg = (err as { data?: { message?: string } })?.data?.message ?? 'Failed to create invoice';
-      toast.error(msg);
-    }
-  }
-
-  if (!open) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
-      <div className="fixed inset-0 bg-black/40" onClick={onClose} aria-hidden="true" />
-      <div role="dialog" aria-modal="true" className="relative w-full sm:max-w-md bg-white rounded-none sm:rounded-xl shadow-lg z-10 flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="text-base font-semibold">Create Invoice</h2>
-          <button onClick={onClose} className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[36px] min-h-[36px] flex items-center justify-center" aria-label="Close"><X size={18} /></button>
-        </div>
-        <form onSubmit={handleSubmit(onSubmit)} noValidate className="px-6 py-4 flex flex-col gap-4">
-          <FormField label="Tax %" type="number" min={0} max={100} step="0.01" error={errors.taxPercent?.message} {...register('taxPercent')} />
-          <FormField label="Due Date" type="date" error={errors.dueDate?.message} {...register('dueDate')} />
-          <TextareaField label="Notes" placeholder="Optional notes…" {...register('notes')} />
-          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
-            <button type="button" onClick={onClose} disabled={isLoading} className="h-10 px-4 rounded-md border border-border text-sm text-foreground hover:bg-slate-50 disabled:opacity-50 transition-colors">Cancel</button>
-            <button type="submit" disabled={isLoading} className="h-10 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium disabled:opacity-60 transition-colors flex items-center justify-center gap-2">
-              {isLoading && <Loader2 size={14} className="animate-spin" aria-hidden="true" />}
-              Create Invoice
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
 
 // ── Record payment dialog ─────────────────────────────────────────────────────
 
@@ -195,9 +122,8 @@ function RecordPaymentDialog({
 export default function SalesOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
-  const [confirmStatus, setConfirmStatus] = useState<string | null>(null);
+  const [confirmCancel, setConfirmCancel] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const token = useAppSelector((s) => s.auth.accessToken);
 
@@ -253,9 +179,9 @@ export default function SalesOrderDetailPage() {
     { customer: customerId },
     { skip: !customerId },
   );
-  const [updateStatus, { isLoading: statusLoading }] = useUpdateSalesOrderStatusMutation();
+  const [cancelOrder, { isLoading: cancelling }] = useCancelSalesOrderMutation();
 
-  const { data: paymentsData } = useGetCustomerPaymentsQuery(
+  useGetCustomerPaymentsQuery(
     { customerId: customerId! },
     { skip: !customerId },
   );
@@ -269,26 +195,16 @@ export default function SalesOrderDetailPage() {
     const so = typeof inv.salesOrder === 'string' ? inv.salesOrder : inv.salesOrder?._id;
     return so === id;
   }) ?? [];
-  const canActOnOrder = order.status === 'DRAFT' || order.status === 'CONFIRMED';
   const primaryInvoice = orderInvoices[0] ?? null;
 
-  const orderPayments = paymentsData?.data?.payments?.filter((p) => {
-    const inv = typeof p.invoice === 'string' ? p.invoice : (p.invoice as { _id: string })?._id;
-    return inv === primaryInvoice?._id;
-  }) ?? [];
-  const totalReceived = orderPayments.reduce((s, p) => s + p.amount + (p.changeAmount ?? 0), 0);
-  const totalChange = orderPayments.reduce((s, p) => s + (p.changeAmount ?? 0), 0);
-  const hasPayment = orderPayments.length > 0;
-
-  async function handleStatusUpdate() {
-    if (!confirmStatus) return;
+  async function handleCancel() {
     try {
-      await updateStatus({ id, status: confirmStatus }).unwrap();
-      toast.success(`Order ${confirmStatus.toLowerCase()}`);
+      await cancelOrder(id).unwrap();
+      toast.success('Order cancelled');
     } catch {
-      toast.error('Status update failed');
+      toast.error('Failed to cancel order');
     } finally {
-      setConfirmStatus(null);
+      setConfirmCancel(false);
     }
   }
 
@@ -309,7 +225,7 @@ export default function SalesOrderDetailPage() {
       key: 'actions', header: '', priority: 'P1', className: 'w-[130px] text-right',
       render: (row) => (
         <div className="flex items-center justify-end gap-1">
-          {row.status !== 'PAID' && row.status !== 'CANCELLED' && (
+          {row.dueAmount > 0 && row.status !== 'CANCELLED' && (
             <button
               onClick={() => setPaymentInvoice(row)}
               className="p-1.5 rounded-md text-emerald-600 hover:bg-emerald-50 min-w-[32px] min-h-[32px] flex items-center justify-center"
@@ -345,13 +261,6 @@ export default function SalesOrderDetailPage() {
     },
   ];
 
-  const statusLabel: Record<string, string> = {
-    CONFIRMED: 'Confirm Order',
-    DISPATCHED: 'Mark Dispatched',
-    CLOSED: 'Close Order',
-    CANCELLED: 'Cancel Order',
-  };
-
   return (
     <>
       <PageHeader
@@ -363,29 +272,9 @@ export default function SalesOrderDetailPage() {
             <button onClick={() => router.back()} className="h-9 px-3 rounded-md border border-border text-sm text-foreground hover:bg-slate-50 flex items-center gap-2 transition-colors">
               <ArrowLeft size={15} aria-hidden="true" /> Back
             </button>
-            {order.status === 'DRAFT' && (
-              <button onClick={() => setConfirmStatus('CONFIRMED')} className="h-9 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium flex items-center gap-2 transition-colors">
-                Confirm Order
-              </button>
-            )}
-            {order.status === 'CONFIRMED' && (
-              <>
-                <button onClick={() => setInvoiceOpen(true)} className="h-9 px-4 rounded-md border border-border text-sm text-foreground hover:bg-slate-50 flex items-center gap-2 transition-colors">
-                  <FileText size={15} aria-hidden="true" /> Create Invoice
-                </button>
-                <button onClick={() => setConfirmStatus('DISPATCHED')} className="h-9 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium flex items-center gap-2 transition-colors">
-                  <Truck size={15} aria-hidden="true" /> Dispatch
-                </button>
-              </>
-            )}
-            {order.status === 'DISPATCHED' && (
-              <button onClick={() => setConfirmStatus('CLOSED')} className="h-9 px-4 rounded-md border border-border text-sm text-foreground hover:bg-slate-50 flex items-center gap-2 transition-colors">
-                Close Order
-              </button>
-            )}
-            {canActOnOrder && (
-              <button onClick={() => setConfirmStatus('CANCELLED')} className="h-9 px-3 rounded-md border border-red-200 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors">
-                Cancel
+            {order.status === 'ACTIVE' && (
+              <button onClick={() => setConfirmCancel(true)} className="h-9 px-3 rounded-md border border-red-200 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors">
+                Cancel Order
               </button>
             )}
           </div>
@@ -424,24 +313,10 @@ export default function SalesOrderDetailPage() {
           <span className="text-xs font-medium text-muted uppercase tracking-wide">Total Amount</span>
           <span className="text-sm font-semibold text-emerald-600">{formatCurrency(order.totalAmount)}</span>
         </div>
-        {hasPayment && (
-          <div className="flex flex-col gap-0.5">
-            <span className="text-xs font-medium text-muted uppercase tracking-wide">Amount Received</span>
-            <span className="text-sm font-semibold text-foreground">{formatCurrency(totalReceived)}</span>
-          </div>
-        )}
-        {hasPayment && (
-          <div className="flex flex-col gap-0.5">
-            <span className="text-xs font-medium text-muted uppercase tracking-wide">Applied to Invoice</span>
-            <span className="text-sm font-semibold text-emerald-600">{formatCurrency(primaryInvoice?.paidAmount ?? 0)}</span>
-          </div>
-        )}
-        {hasPayment && totalChange > 0 && (
-          <div className="flex flex-col gap-0.5">
-            <span className="text-xs font-medium text-muted uppercase tracking-wide">Change Given</span>
-            <span className="text-sm font-semibold text-blue-600">{formatCurrency(totalChange)}</span>
-          </div>
-        )}
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs font-medium text-muted uppercase tracking-wide">Paid</span>
+          <span className="text-sm font-semibold text-emerald-600">{formatCurrency(primaryInvoice?.paidAmount ?? 0)}</span>
+        </div>
         <div className="flex flex-col gap-0.5">
           <span className="text-xs font-medium text-muted uppercase tracking-wide">Due Amount</span>
           <span className="text-sm font-medium">
@@ -500,20 +375,13 @@ export default function SalesOrderDetailPage() {
 
       {/* Invoices */}
       <div className="bg-white rounded-lg border border-border">
-        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+        <div className="px-4 py-3 border-b border-border">
           <h2 className="text-sm font-semibold">Invoices</h2>
-          {canActOnOrder && (
-            <button onClick={() => setInvoiceOpen(true)} className="h-8 px-3 rounded-md border border-border text-xs text-foreground hover:bg-slate-50 flex items-center gap-1.5 transition-colors">
-              <FileText size={13} aria-hidden="true" /> Create Invoice
-            </button>
-          )}
         </div>
         <div className="p-4">
           <DataTable columns={invoiceColumns} data={orderInvoices} keyField="_id" isLoading={invLoading} emptyMessage="No invoices yet." />
         </div>
       </div>
-
-      <CreateInvoiceDialog open={invoiceOpen} orderId={id} onClose={() => setInvoiceOpen(false)} />
 
       <RecordPaymentDialog
         open={!!paymentInvoice}
@@ -523,20 +391,14 @@ export default function SalesOrderDetailPage() {
       />
 
       <ConfirmDialog
-        open={!!confirmStatus}
-        title={statusLabel[confirmStatus ?? ''] ?? 'Update Status'}
-        description={
-          confirmStatus === 'DISPATCHED'
-            ? 'This will dispatch the order and deduct stock. This cannot be undone.'
-            : confirmStatus === 'CANCELLED'
-            ? 'This will cancel the order. This cannot be undone.'
-            : `Change order status to ${confirmStatus?.toLowerCase()}.`
-        }
-        confirmLabel={statusLabel[confirmStatus ?? ''] ?? 'Confirm'}
-        variant={confirmStatus === 'CANCELLED' ? 'danger' : 'default'}
-        loading={statusLoading}
-        onConfirm={handleStatusUpdate}
-        onCancel={() => setConfirmStatus(null)}
+        open={confirmCancel}
+        title="Cancel Order"
+        description="This will cancel the order. This cannot be undone."
+        confirmLabel="Cancel Order"
+        variant="danger"
+        loading={cancelling}
+        onConfirm={handleCancel}
+        onCancel={() => setConfirmCancel(false)}
       />
     </>
   );

@@ -77,19 +77,20 @@ export function ItemFormDialog({ open, item, onClose }: ItemFormDialogProps) {
           notes: '',
           quantity: item.currentStock ?? 1,
           unitPrice: item.costPrice ?? 0,
+          reorderLevel: item.reorderLevel ?? 0,
           paidAmount: linkedPO?.paidAmount ?? 0,
           paymentMethod: 'Cash',
-          warehouse: '',
+          warehouse: warehouseData?.data?.warehouses?.find((w) => w.isActive && w.isDefault)?._id ?? '',
         }
-      : { type: 'RAW_MATERIAL', unitPrice: 0, quantity: 1, paidAmount: 0 },
+      : { type: 'RAW_MATERIAL', unitPrice: 0, quantity: 1, paidAmount: 0, warehouse: warehouseData?.data?.warehouses?.find((w) => w.isActive && w.isDefault)?._id ?? '' },
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, item, grData, poData]);
+  }, [open, item, grData, poData, warehouseData]);
 
   async function onSubmit(values: ItemFormValues) {
     try {
       if (isEdit) {
-        await updateItem({ id: item._id, body: { name: values.name, sku: values.sku, type: values.type, description: values.description, baseUom: values.baseUom, supplier: values.supplier, costPrice: values.unitPrice, quantity: values.quantity, warehouse: values.warehouse } }).unwrap();
+        await updateItem({ id: item._id, body: { name: values.name, sku: values.sku, type: values.type, description: values.description, baseUom: values.baseUom, supplier: values.supplier, costPrice: values.unitPrice, quantity: values.quantity, warehouse: values.warehouse, reorderLevel: values.reorderLevel } }).unwrap();
         if (linkedPO?._id) {
           const newPaid = Number(values.paidAmount) || 0;
           await updatePOPayment({ id: linkedPO._id, paidAmount: newPaid }).unwrap();
@@ -120,16 +121,7 @@ export function ItemFormDialog({ open, item, onClose }: ItemFormDialogProps) {
     }
   }
 
-  // Auto-select default warehouse
-  useEffect(() => {
-    if (open && warehouseData) {
-      const defaultWh = warehouseData.data?.warehouses?.find((w) => w.isActive && w.isDefault);
-      if (defaultWh) setValue('warehouse', defaultWh._id);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [warehouseData, open]);
-
-  // Auto-select supplier once cache refreshes after creation
+// Auto-select supplier once cache refreshes after creation
   useEffect(() => {
     if (pendingSupplierId && supplierData) {
       const exists = supplierData.data?.suppliers?.find((s) => s._id === pendingSupplierId);
@@ -188,7 +180,7 @@ export function ItemFormDialog({ open, item, onClose }: ItemFormDialogProps) {
                   },
                 })}
               />
-              <FormField label="SKU" required={isEdit} placeholder={isEdit ? '' : 'Auto-generated'} readOnly={!isEdit} error={errors.sku?.message} className={!isEdit ? 'bg-slate-50 text-secondary' : ''} {...register('sku')} />
+              <FormField label="SKU" required={isEdit} placeholder={isEdit ? '' : 'Auto-generated'} error={errors.sku?.message} {...register('sku')} />
               <SelectField label="Type" required error={errors.type?.message} {...register('type')}>
                 <option value="">Select type…</option>
                 {ITEM_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
@@ -234,8 +226,9 @@ export function ItemFormDialog({ open, item, onClose }: ItemFormDialogProps) {
                     <option value="">Select warehouse…</option>
                     {warehouses.map((w) => <option key={w._id} value={w._id}>{w.name}</option>)}
                   </SelectField>
-                  <FormField label="Quantity" type="number" min={1} step="1" required error={errors.quantity?.message} {...register('quantity')} />
+                  <FormField label="Quantity" type="number" min={0.001} step="0.001" required error={errors.quantity?.message} {...register('quantity')} />
                   <FormField label="Unit Price (৳)" type="number" min={0} step="0.01" required error={errors.unitPrice?.message} {...register('unitPrice')} />
+                  <FormField label="Low Stock Qty" type="number" min={0} step="1" hint="Alert when stock falls at or below this qty" error={errors.reorderLevel?.message} {...register('reorderLevel')} />
 
                   {/* Live total */}
                   {totalPrice > 0 && (

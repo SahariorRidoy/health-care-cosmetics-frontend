@@ -15,8 +15,9 @@ export const createItemSchema = z.object({
   ...baseFields,
   supplier: z.string().min(1, 'Supplier is required'),
   warehouse: z.string().min(1, 'Warehouse is required'),
-  quantity: z.coerce.number().int('Quantity must be a whole number').min(1, 'Quantity must be at least 1'),
+  quantity: z.coerce.number().min(0.001, 'Quantity must be greater than 0'),
   unitPrice: z.coerce.number().min(0, 'Unit price must be 0 or more'),
+  reorderLevel: z.coerce.number().int().min(0).optional(),
   paidAmount: z.coerce.number().min(0).optional(),
   paymentMethod: z.string().optional(),
 });
@@ -25,8 +26,9 @@ export const editItemSchema = z.object({
   ...baseFields,
   supplier: z.string().optional(),
   warehouse: z.string().min(1, 'Warehouse is required'),
-  quantity: z.coerce.number().int('Quantity must be a whole number').min(1, 'Quantity must be at least 1'),
+  quantity: z.coerce.number().min(0.001, 'Quantity must be greater than 0'),
   unitPrice: z.coerce.number().min(0, 'Unit price must be 0 or more'),
+  reorderLevel: z.coerce.number().int().min(0).optional(),
   paidAmount: z.coerce.number().min(0).optional(),
   paymentMethod: z.string().optional(),
 });

@@ -129,6 +129,7 @@ export interface CreateItemPayload {
   warehouse: string;
   costPrice?: number;
   salePrice?: number;
+  reorderLevel?: number;
   notes?: string;
   expectedDeliveryDate?: string;
 }

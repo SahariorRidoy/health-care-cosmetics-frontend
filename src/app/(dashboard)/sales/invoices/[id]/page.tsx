@@ -136,6 +136,43 @@ export default function InvoiceDetailPage() {
     return inv === id;
   }) ?? [];
 
+  async function handleReceiptPrint(paymentId: string) {
+    if (!token) return;
+    try {
+      const base = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api/v1';
+      const res = await fetch(`${base}/sales/payments/${paymentId}/pdf`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error();
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const iframe = document.createElement('iframe');
+      iframe.style.cssText = 'position:fixed;width:0;height:0;border:0;opacity:0';
+      iframe.src = url;
+      document.body.appendChild(iframe);
+      iframe.onload = () => {
+        iframe.contentWindow?.print();
+        setTimeout(() => { document.body.removeChild(iframe); URL.revokeObjectURL(url); }, 1000);
+      };
+    } catch {
+      toast.error('Failed to print receipt');
+    }
+  }
+
+  async function handleReceiptDownload(paymentId: string, receiptNumber: string) {
+    if (!token) return;
+    try {
+      const base = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api/v1';
+      const res = await fetch(`${base}/sales/payments/${paymentId}/pdf`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error();
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `Receipt-${receiptNumber}.pdf`; a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Failed to download receipt');
+    }
+  }
+
   async function handleDownload() {
     if (!token) return;
     setDownloading(true);
@@ -190,7 +227,17 @@ export default function InvoiceDetailPage() {
   const canPay = invoice.status !== 'PAID' && invoice.status !== 'CANCELLED' && invoice.dueAmount > 0;
 
   const paymentColumns: Column<CustomerPayment>[] = [
-    { key: 'receiptNumber', header: 'Receipt #', priority: 'P1', render: (row) => <span className="font-medium">{row.receiptNumber}</span> },
+    {
+      key: 'receiptNumber', header: 'Receipt #', priority: 'P1',
+      render: (row) => (
+        <span
+          className="font-medium text-emerald-600 cursor-pointer hover:underline"
+          onClick={() => router.push(`/sales/invoices/${id}/receipts/${row._id}`)}
+        >
+          {row.receiptNumber}
+        </span>
+      ),
+    },
     { key: 'paymentDate', header: 'Date', priority: 'P1', render: (row) => formatDate(row.paymentDate) },
     { key: 'amount', header: 'Received', priority: 'P1', render: (row) => formatCurrency(row.amount + (row.changeAmount ?? 0)) },
     { key: 'appliedAmount', header: 'Applied', priority: 'P1', render: (row) => formatCurrency(row.amount) },
@@ -202,6 +249,27 @@ export default function InvoiceDetailPage() {
     },
     { key: 'method', header: 'Method', priority: 'P2' },
     { key: 'reference', header: 'Reference', priority: 'P3', render: (row) => row.reference ?? '—' },
+    {
+      key: 'actions', header: '', priority: 'P1', className: 'w-[80px] text-right',
+      render: (row) => (
+        <div className="flex items-center justify-end gap-1">
+          <button
+            onClick={() => handleReceiptPrint(row._id)}
+            className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[32px] min-h-[32px] flex items-center justify-center"
+            title="Print Receipt" aria-label="Print Receipt"
+          >
+            <Printer size={15} />
+          </button>
+          <button
+            onClick={() => handleReceiptDownload(row._id, row.receiptNumber)}
+            className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[32px] min-h-[32px] flex items-center justify-center"
+            title="Download Receipt" aria-label="Download Receipt"
+          >
+            <FileDown size={15} />
+          </button>
+        </div>
+      ),
+    },
   ];
 
   return (
@@ -246,7 +314,6 @@ export default function InvoiceDetailPage() {
           { label: 'Sales Order', value: salesOrder?.orderNumber ?? '—' },
           { label: 'Status', value: <StatusBadge status={invoice.status} /> },
           { label: 'Date', value: formatDate(invoice.createdAt) },
-          { label: 'Due Date', value: invoice.dueDate ? formatDate(invoice.dueDate) : '—' },
           { label: 'Subtotal', value: formatCurrency(invoice.subtotal) },
           { label: `Tax (${invoice.taxPercent}%)`, value: formatCurrency(invoice.taxAmount) },
           { label: 'Total Amount', value: <span className="font-semibold">{formatCurrency(invoice.totalAmount)}</span> },

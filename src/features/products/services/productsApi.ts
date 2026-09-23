@@ -3,12 +3,10 @@ import type { ProductsResponse, ProductResponse, CreateProductPayload } from '..
 
 export const productsApi = api.injectEndpoints({
   endpoints: (build) => ({
-    getProducts: build.query<ProductsResponse, { page?: number; search?: string }>(
-      {
-        query: (params) => ({ url: '/items', params: { ...params, type: 'FINISHED_GOOD' } }),
-        providesTags: ['Item'],
-      },
-    ),
+    getProducts: build.query<ProductsResponse, { page?: number; search?: string; isActive?: string }>({
+      query: (params) => ({ url: '/items', params: { ...params, type: 'FINISHED_GOOD' } }),
+      providesTags: ['Item'],
+    }),
     getProduct: build.query<ProductResponse, string>({
       query: (id) => `/items/${id}`,
       providesTags: (_r, _e, id) => [{ type: 'Item', id }],

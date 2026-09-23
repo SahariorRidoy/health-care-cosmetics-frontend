@@ -4,6 +4,7 @@ import type {
   SalesOrdersResponse, SalesOrderResponse,
   InvoicesResponse, InvoiceResponse,
   CustomerPaymentResponse,
+  AllPaymentsResponse,
 } from '../types';
 
 export const salesApi = api.injectEndpoints({
@@ -43,12 +44,26 @@ export const salesApi = api.injectEndpoints({
       query: ({ customerId, ...params }) => ({ url: `/sales/customers/${customerId}/payments`, params }),
       providesTags: ['CustomerPayment'],
     }),
+    getAllPayments: build.query<AllPaymentsResponse, { page?: number; search?: string; method?: string; dateFrom?: string; dateTo?: string }>({
+      query: (params) => ({ url: '/sales/payments', params }),
+      providesTags: ['CustomerPayment'],
+    }),
+    getCustomerPayment: build.query<CustomerPaymentResponse, string>({
+      query: (id) => `/sales/payments/${id}`,
+      providesTags: (_r, _e, id) => [{ type: 'CustomerPayment', id }],
+    }),
     createCustomerPayment: build.mutation<CustomerPaymentResponse, {
       customer: string; invoice: string; amount: number;
       paymentDate?: string; method: string; reference?: string; notes?: string;
     }>({
       query: (body) => ({ url: '/sales/payments', method: 'POST', body }),
-      invalidatesTags: ['CustomerPayment', 'Customer', 'Invoice'],
+      invalidatesTags: (_r, _e, arg) => [
+        'CustomerPayment',
+        'Customer',
+        'Invoice',
+        'SalesOrder',
+        { type: 'Invoice', id: arg.invoice },
+      ],
     }),
 
     // Sales Orders
@@ -64,15 +79,14 @@ export const salesApi = api.injectEndpoints({
       customer: string; warehouse: string;
       items: { item: string; description?: string; qty: number; unitPrice: number; discount: number; uom: string }[];
       taxPercent: number; notes?: string;
-      status?: 'DRAFT' | 'CONFIRMED' | 'DISPATCHED' | 'CLOSED';
       payment?: { amount: number; method: string; reference?: string; notes?: string };
     }>({
       query: (body) => ({ url: '/sales/orders', method: 'POST', body }),
       invalidatesTags: ['SalesOrder', 'Invoice', 'CustomerPayment', 'Stock'],
     }),
-    updateSalesOrderStatus: build.mutation<SalesOrderResponse, { id: string; status: string }>({
-      query: ({ id, status }) => ({ url: `/sales/orders/${id}/status`, method: 'PATCH', body: { status } }),
-      invalidatesTags: (_r, _e, { id }) => ['SalesOrder', { type: 'SalesOrder', id }, 'Stock'],
+    cancelSalesOrder: build.mutation<SalesOrderResponse, string>({
+      query: (id) => ({ url: `/sales/orders/${id}/cancel`, method: 'PATCH' }),
+      invalidatesTags: (_r, _e, id) => ['SalesOrder', { type: 'SalesOrder', id }],
     }),
     deleteSalesOrder: build.mutation<{ success: boolean; message: string }, string>({
       query: (id) => ({ url: `/sales/orders/${id}`, method: 'DELETE' }),
@@ -80,13 +94,21 @@ export const salesApi = api.injectEndpoints({
     }),
 
     // Invoices
-    getInvoices: build.query<InvoicesResponse, { page?: number; customer?: string; status?: string }>({
+    getInvoices: build.query<InvoicesResponse, { page?: number; customer?: string; status?: string; search?: string; dateFrom?: string; dateTo?: string }>({
       query: (params) => ({ url: '/sales/invoices', params }),
       providesTags: ['Invoice'],
     }),
     getInvoice: build.query<InvoiceResponse, string>({
       query: (id) => `/sales/invoices/${id}`,
       providesTags: (_r, _e, id) => [{ type: 'Invoice', id }],
+    }),
+    deleteInvoice: build.mutation<{ success: boolean; message: string }, string>({
+      query: (id) => ({ url: `/sales/invoices/${id}`, method: 'DELETE' }),
+      invalidatesTags: (_r, _e, id) => ['Invoice', { type: 'Invoice', id }, 'SalesOrder', 'Customer'],
+    }),
+    deletePayment: build.mutation<{ success: boolean; message: string }, string>({
+      query: (id) => ({ url: `/sales/payments/${id}`, method: 'DELETE' }),
+      invalidatesTags: (_r, _e, id) => ['CustomerPayment', { type: 'CustomerPayment', id }, 'Invoice', 'Customer'],
     }),
     createInvoice: build.mutation<InvoiceResponse, {
       customer: string; salesOrder?: string;
@@ -108,13 +130,17 @@ export const {
   useDeleteCustomerMutation,
   useGetCustomerDuesQuery,
   useGetCustomerPaymentsQuery,
+  useGetAllPaymentsQuery,
+  useGetCustomerPaymentQuery,
   useCreateCustomerPaymentMutation,
   useGetSalesOrdersQuery,
   useGetSalesOrderQuery,
   useCreateSalesOrderMutation,
-  useUpdateSalesOrderStatusMutation,
+  useCancelSalesOrderMutation,
   useDeleteSalesOrderMutation,
   useGetInvoicesQuery,
   useGetInvoiceQuery,
+  useDeleteInvoiceMutation,
   useCreateInvoiceMutation,
+  useDeletePaymentMutation,
 } = salesApi;

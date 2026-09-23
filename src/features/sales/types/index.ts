@@ -50,7 +50,7 @@ export interface CustomerDues {
   payments: CustomerPayment[];
 }
 
-export type SalesOrderStatus = 'DRAFT' | 'CONFIRMED' | 'DISPATCHED' | 'CLOSED' | 'CANCELLED';
+export type SalesOrderStatus = 'ACTIVE' | 'CANCELLED';
 export type InvoiceStatus = 'UNPAID' | 'PARTIAL' | 'PAID' | 'CANCELLED';
 
 export interface SalesOrderItem {
@@ -74,6 +74,9 @@ export interface SalesOrder {
   taxPercent: number;
   taxAmount: number;
   totalAmount: number;
+  paidAmount: number;
+  dueAmount: number;
+  invoiceId?: string | null;
   status: SalesOrderStatus;
   notes?: string;
   deliveryDate?: string;
@@ -149,6 +152,11 @@ export interface InvoicesResponse {
 export interface InvoiceResponse {
   success: boolean;
   data: { invoice: Invoice };
+}
+export interface AllPaymentsResponse {
+  success: boolean;
+  data: { payments: CustomerPayment[] };
+  pagination: { page: number; pages: number; total: number; limit: number };
 }
 export interface CustomerPaymentResponse {
   success: boolean;

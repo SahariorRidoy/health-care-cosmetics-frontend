@@ -158,6 +158,7 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
   const [outputUom, setOutputUom] = useState('');
   const [outputQty, setOutputQty] = useState('');
   const [salePrice, setSalePrice] = useState('');
+  const [reorderLevel, setReorderLevel] = useState('');
   const [warehouse, setWarehouse] = useState('');
   const [materials, setMaterials] = useState<MaterialLine[]>([{ itemId: '', baseUomId: '', baseUomSymbol: '', costPrice: 0, uomId: '', qty: '' }]);
 
@@ -180,6 +181,7 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
     setOutputUom(product ? (typeof product.baseUom === 'string' ? product.baseUom : (product.baseUom?._id ?? '')) : '');
     setSalePrice(product?.salePrice ? String(product.salePrice) : '');
     setOutputQty(product?.currentStock != null ? String(product.currentStock) : '');
+    setReorderLevel(product?.reorderLevel != null ? String(product.reorderLevel) : '');
     materialsFilledRef.current = false;
     if (!isEdit) {
       const defaultWh = warehouseData?.data?.warehouses?.find((w) => w.isActive && w.isDefault);
@@ -294,7 +296,7 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
 
   function reset() {
     setName(''); setSku(''); setSkuName(''); setOutputUom('');
-    setOutputQty(''); setSalePrice(''); setWarehouse('');
+    setOutputQty(''); setSalePrice(''); setReorderLevel(''); setWarehouse('');
     setMaterials([{ itemId: '', baseUomId: '', baseUomSymbol: '', costPrice: 0, uomId: '', qty: '' }]);
   }
 
@@ -330,6 +332,7 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
             baseUom: outputUom,
             costPrice: costPrice ?? product.costPrice,
             salePrice: parseFloat(salePrice) || undefined,
+            reorderLevel: parseInt(reorderLevel) >= 0 ? parseInt(reorderLevel) : undefined,
             quantity: outQty,
             warehouse,
             materials: filledMaterials,
@@ -341,7 +344,7 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
           name: name.trim(),
           sku: sku.trim(),
           baseUom: outputUom,
-          reorderLevel: 0,
+          reorderLevel: parseInt(reorderLevel) >= 0 ? parseInt(reorderLevel) : 0,
           warehouse,
           quantity: outQty,
           unitPrice: costPerUnit > 0 ? costPerUnit : 0,
@@ -394,12 +397,12 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
                   }
                 }}
               />
-              <FormField label="SKU" required={isEdit} placeholder={isEdit ? '' : 'Auto-generated'} readOnly={!isEdit} className={!isEdit ? 'bg-slate-50 text-secondary' : ''} value={sku} onChange={(e) => setSku(e.target.value)} />
+              <FormField label="SKU" required={isEdit} placeholder={isEdit ? '' : 'Auto-generated'} value={sku} onChange={(e) => setSku(e.target.value)} />
             </div>
           </div>
 
           {/* Input materials */}
-          <div>
+          <div className="bg-slate-50 rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
               <p className="text-[11px] font-semibold text-secondary uppercase tracking-wide">Input Materials</p>
               <button
@@ -425,7 +428,7 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
                 const compat = compatibleUoms(m.baseUomId);
                 const uomMismatch = m.itemId && m.uomId && m.uomId !== m.baseUomId && !hasConversion;
                 return (
-                  <div key={idx} className="grid grid-cols-1 sm:grid-cols-[1fr_120px_90px_110px_36px] gap-2 items-start bg-slate-50 rounded-lg p-2">
+                  <div key={idx} className="grid grid-cols-1 sm:grid-cols-[1fr_120px_90px_110px_36px] gap-2 items-start bg-white rounded-lg p-2">
                     <MaterialSelect
                       value={m.itemId}
                       items={allItems}
@@ -494,7 +497,7 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
           {/* Output */}
           <div>
             <p className="text-[11px] font-semibold text-secondary uppercase tracking-wide mb-3">Output</p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <SelectField label="Output UOM" required value={outputUom} onChange={(e) => setOutputUom(e.target.value)}>
                 <option value="">Select UOM…</option>
                 {uoms.map((u) => <option key={u._id} value={u._id}>{u.name} ({u.symbol})</option>)}
@@ -504,6 +507,7 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
                 <option value="">Select warehouse…</option>
                 {warehouses.map((w) => <option key={w._id} value={w._id}>{w.name}</option>)}
               </SelectField>
+              <FormField label="Low Stock Qty" type="number" min={0} step="1" placeholder="e.g. 10" value={reorderLevel} onChange={(e) => setReorderLevel(e.target.value)} />
             </div>
           </div>
 

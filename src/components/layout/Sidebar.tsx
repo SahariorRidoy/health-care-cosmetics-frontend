@@ -22,19 +22,29 @@ const NAV_ITEMS: NavItem[] = [
     href: '/materials', label: 'Materials', icon: Package,
     children: [
       { href: '/procurement/suppliers', label: 'Suppliers List', icon: Building2 },
+      { href: '/materials/purchase-orders/new', label: 'Create Purchase', icon: Plus },
       { href: '/materials', label: 'Materials List', icon: Package },
       { href: '/procurement/orders', label: 'Purchase Orders', icon: ShoppingCart },
       { href: '/procurement/receipts', label: 'Goods Receipts', icon: ReceiptText },
       { href: '/materials/stock', label: 'Materials Stock', icon: Warehouse },
     ],
   },
-  { href: '/production', label: 'Production', icon: Factory },
+  {
+    href: '/production', label: 'Production', icon: Factory,
+    children: [
+      { href: '/production/new', label: 'Create Production', icon: Plus },
+      { href: '/production', label: 'Warehouse Production', icon: ClipboardList },
+      { href: '/factory-production', label: 'Factory Batches', icon: Warehouse },
+      { href: '/factory-production/factories', label: 'Factory Ledger', icon: Factory },
+    ],
+  },
   {
     href: '/sales', label: 'Sales', icon: TrendingUp,
     children: [
       { href: '/sales/orders/new', label: 'Create Sale', icon: Plus },
       { href: '/sales/orders', label: 'Orders', icon: ClipboardList },
       { href: '/sales/invoices', label: 'Invoices', icon: FileText },
+      { href: '/sales/receipts', label: 'Receipts', icon: ReceiptText },
       { href: '/sales/customers', label: 'Customers', icon: UserCircle },
     ],
   },
@@ -177,7 +187,14 @@ export function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose }: Si
                 <ul className="mt-0.5 ml-4 pl-3 border-l border-navy-700 space-y-0.5">
                   {item.children.map((child) => {
                     const ChildIcon = child.icon;
-                    const childActive = pathname === child.href || (child.href !== '/sales/orders/new' && pathname.startsWith(child.href + '/'));
+                    const childActive = pathname === child.href || (
+                          child.href !== '/sales/orders/new' &&
+                          child.href !== '/materials' &&
+                          child.href !== '/production' &&
+                          child.href !== '/factory-production' &&
+                          child.href !== '/factory-production/factories' &&
+                          pathname.startsWith(child.href + '/')
+                        );
                     return (
                       <li key={child.href}>
                         <Link

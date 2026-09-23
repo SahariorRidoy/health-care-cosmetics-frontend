@@ -54,7 +54,7 @@ export const api = createApi({
   tagTypes: [
     'User', 'UOM', 'UOMConversion', 'Warehouse', 'Item', 'Stock', 'Batch',
     'Supplier', 'PurchaseOrder', 'GoodsReceipt', 'SupplierPayment',
-    'Production',
+    'Production', 'FactoryOrder', 'FactoryBatch',
     'Customer', 'SalesOrder', 'Invoice', 'CustomerPayment',
     'Expense', 'ExpenseCategory',
     'Department', 'Employee', 'Attendance', 'Leave', 'Payroll',

@@ -13,7 +13,7 @@ export const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
     const fieldId = id ?? label.toLowerCase().replace(/\s+/g, '-');
     return (
       <div className="flex flex-col gap-1">
-        <label htmlFor={fieldId} className="text-xs font-medium text-foreground">
+        <label htmlFor={fieldId} className="text-sm font-bold text-foreground">
           {label}
           {required && <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>}
         </label>
@@ -56,7 +56,7 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(
     const fieldId = id ?? label.toLowerCase().replace(/\s+/g, '-');
     return (
       <div className="flex flex-col gap-1">
-        <label htmlFor={fieldId} className="text-xs font-medium text-foreground">
+        <label htmlFor={fieldId} className="text-sm font-bold text-foreground">
           {label}
           {required && <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>}
         </label>
@@ -95,7 +95,7 @@ export const TextareaField = forwardRef<HTMLTextAreaElement, TextareaFieldProps>
     const fieldId = id ?? label.toLowerCase().replace(/\s+/g, '-');
     return (
       <div className="flex flex-col gap-1">
-        <label htmlFor={fieldId} className="text-xs font-medium text-foreground">
+        <label htmlFor={fieldId} className="text-sm font-bold text-foreground">
           {label}
           {required && <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>}
         </label>

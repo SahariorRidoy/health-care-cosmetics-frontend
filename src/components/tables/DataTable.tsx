@@ -6,7 +6,7 @@ import { cn } from '@/lib/formatters';
 export interface Column<T> {
   key: string;
   header: string;
-  render?: (row: T) => React.ReactNode;
+  render?: (row: T, index?: number) => React.ReactNode;
   sortable?: boolean;
   /** P1 = always, P2 = md+, P3 = lg+ */
   priority?: 'P1' | 'P2' | 'P3';
@@ -31,6 +31,8 @@ interface DataTableProps<T> {
   sortDir?: 'asc' | 'desc';
   onSort?: (key: string) => void;
   emptyMessage?: string;
+  tableHeadAction?: React.ReactNode;
+  rowClassName?: (row: T) => string;
 }
 
 const PRIORITY_CLASS: Record<string, string> = {
@@ -41,10 +43,16 @@ const PRIORITY_CLASS: Record<string, string> = {
 
 export function DataTable<T>({
   columns, data, keyField, isLoading, pagination,
-  onPageChange, sortKey, sortDir, onSort, emptyMessage = 'No records found.',
+  onPageChange, sortKey, sortDir, onSort, emptyMessage = 'No records found.', tableHeadAction, rowClassName,
 }: DataTableProps<T>) {
   return (
     <div className="flex flex-col gap-0 min-w-0">
+      {tableHeadAction && (
+        <div className="flex items-center justify-between mb-2">
+          <span />
+          {tableHeadAction}
+        </div>
+      )}
       <div className="overflow-x-auto rounded-lg border border-border">
         <table className="w-full min-w-[640px] text-[13px]">
           <thead>
@@ -56,21 +64,22 @@ export function DataTable<T>({
                     'px-4 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wide whitespace-nowrap',
                     PRIORITY_CLASS[col.priority ?? 'P1'],
                     col.className,
+                    onSort && col.key !== 'actions' && col.key !== 'sl' ? 'cursor-pointer select-none hover:bg-slate-100 transition-colors' : '',
                   )}
+                  onClick={() => onSort && col.key !== 'actions' && col.key !== 'sl' ? onSort(col.key) : undefined}
                 >
-                  {col.sortable ? (
-                    <button
-                      onClick={() => onSort?.(col.key)}
-                      className="flex items-center gap-1 hover:text-foreground transition-colors"
-                    >
-                      {col.header}
-                      {sortKey === col.key ? (
-                        sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
-                      ) : (
-                        <ChevronsUpDown size={14} className="opacity-40" />
-                      )}
-                    </button>
-                  ) : col.header}
+                  <div className="flex items-center justify-between gap-2">
+                    <span>{col.header}</span>
+                    {onSort && col.key !== 'actions' && col.key !== 'sl' && (
+                      <span className="shrink-0">
+                        {sortKey === col.key ? (
+                          sortDir === 'asc' ? <ChevronUp size={13} className="text-foreground" /> : <ChevronDown size={13} className="text-foreground" />
+                        ) : (
+                          <ChevronsUpDown size={13} className="opacity-30" />
+                        )}
+                      </span>
+                    )}
+                  </div>
                 </th>
               ))}
             </tr>
@@ -93,10 +102,13 @@ export function DataTable<T>({
                 </td>
               </tr>
             ) : (
-              data.map((row) => (
+              data.map((row, rowIndex) => (
                 <tr
                   key={String(row[keyField])}
-                  className="border-b border-border hover:bg-slate-50 transition-colors"
+                  className={cn(
+                    'border-b border-border hover:bg-slate-50 transition-colors',
+                    rowClassName?.(row),
+                  )}
                 >
                   {columns.map((col) => (
                     <td
@@ -108,7 +120,7 @@ export function DataTable<T>({
                       )}
                     >
                       {col.render
-                        ? col.render(row)
+                        ? col.render(row, rowIndex)
                         : String((row as Record<string, unknown>)[col.key] ?? '—')}
                     </td>
                   ))}

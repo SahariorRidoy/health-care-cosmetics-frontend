@@ -6,7 +6,7 @@ import type {
 
 export const inventoryApi = api.injectEndpoints({
   endpoints: (build) => ({
-    getItems: build.query<ItemsResponse, { page?: number; search?: string; type?: string; supplier?: string; isActive?: string }>({
+    getItems: build.query<ItemsResponse, { page?: number; search?: string; type?: string; supplier?: string; isActive?: string; sortBy?: string; sortDir?: 'asc' | 'desc' }>({
       query: (params) => ({ url: '/items', params }),
       providesTags: ['Item'],
     }),
@@ -28,6 +28,18 @@ export const inventoryApi = api.injectEndpoints({
     updateItem: build.mutation<ItemResponse, { id: string; body: Partial<CreateItemPayload> & { isActive?: boolean } }>({
       query: ({ id, body }) => ({ url: `/items/${id}`, method: 'PATCH', body }),
       invalidatesTags: (_r, _e, { id }) => ['Item', { type: 'Item', id }],
+      async onQueryStarted({ id, body }, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          const patch = { ...(data?.data?.item ?? {}), ...body };
+          dispatch(
+            inventoryApi.util.updateQueryData('getItems', { page: 1 }, (draft) => {
+              const idx = draft.data.items.findIndex((it) => it._id === id);
+              if (idx !== -1) Object.assign(draft.data.items[idx], patch);
+            }),
+          );
+        } catch { /* invalidatesTags handles refetch */ }
+      },
     }),
     deleteItem: build.mutation<{ success: boolean; message: string }, string>({
       query: (id) => ({ url: `/items/${id}`, method: 'DELETE' }),
@@ -49,7 +61,7 @@ export const inventoryApi = api.injectEndpoints({
       query: (id) => ({ url: `/uom/${id}`, method: 'DELETE' }),
       invalidatesTags: ['UOM'],
     }),
-    getStockBalances: build.query<StockBalancesResponse, { page?: number; item?: string; warehouse?: string; lowStock?: boolean }>({
+    getStockBalances: build.query<StockBalancesResponse, { page?: number; item?: string; warehouse?: string; lowStock?: boolean; search?: string }>({
       query: (params) => ({ url: '/stock/balance', params }),
       providesTags: ['Stock'],
     }),

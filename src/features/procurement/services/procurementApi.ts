@@ -81,7 +81,7 @@ export const procurementApi = api.injectEndpoints({
       query: (id) => ({ url: `/purchase-orders/${id}`, method: 'DELETE' }),
       invalidatesTags: ['PurchaseOrder'],
     }),
-    getGoodsReceipts: build.query<GRsResponse, { page?: number; purchaseOrder?: string; supplier?: string; item?: string }>({
+    getGoodsReceipts: build.query<GRsResponse, { page?: number; search?: string; purchaseOrder?: string; supplier?: string; item?: string }>({
       query: (params) => ({ url: '/procurement/receipts', params }),
       providesTags: ['GoodsReceipt'],
     }),

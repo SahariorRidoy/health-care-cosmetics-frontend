@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Search, Pencil, Trash2, Eye } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Eye, CreditCard } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DataTable, type Column } from '@/components/tables/DataTable';
@@ -10,6 +10,7 @@ import { EmptyState, ErrorState, StatusBadge, ConfirmDialog } from '@/components
 import { formatCurrency } from '@/lib/formatters';
 import { useGetSuppliersQuery, useDeleteSupplierMutation } from '@/features/procurement/services/procurementApi';
 import { SupplierFormDialog } from '@/features/procurement/components/SupplierFormDialog';
+import { SupplierPaymentDialog } from '@/features/procurement/components/SupplierPaymentDialog';
 import type { Supplier } from '@/features/procurement/types';
 
 export default function SuppliersPage() {
@@ -19,6 +20,7 @@ export default function SuppliersPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editSupplier, setEditSupplier] = useState<Supplier | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [paySupplier, setPaySupplier] = useState<Supplier | null>(null);
 
   const { data, isLoading, isError, refetch } = useGetSuppliersQuery({ page, search: search || undefined });
   const [deleteSupplier, { isLoading: deleting }] = useDeleteSupplierMutation();
@@ -41,7 +43,7 @@ export default function SuppliersPage() {
   const columns: Column<Supplier>[] = [
     {
       key: 'name', header: 'Name', priority: 'P1',
-      render: (row) => <span className="font-medium text-foreground">{row.name}</span>,
+      render: (row) => <span className="font-bold text-foreground">{row.name}</span>,
     },
     { key: 'contactPerson', header: 'Contact', priority: 'P2', render: (row) => row.contactPerson ?? '—' },
     { key: 'phone', header: 'Phone', priority: 'P3', render: (row) => row.phone ?? '—' },
@@ -61,6 +63,9 @@ export default function SuppliersPage() {
       key: 'actions', header: '', priority: 'P1', className: 'w-[100px] text-right',
       render: (row) => (
         <div className="flex items-center justify-end gap-1">
+              {row.balance > 0 && (
+              <button onClick={() => setPaySupplier(row)} className="p-1.5 rounded-md bg-emerald-50 text-emerald-600 hover:bg-emerald-100 min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="Pay Due" title="Pay Due"><CreditCard size={15} /></button>
+              )}
           <button onClick={() => router.push(`/procurement/suppliers/${row._id}`)} className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="View" title="View"><Eye size={15} /></button>
           <button onClick={() => openEdit(row)} className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="Edit" title="Edit"><Pencil size={15} /></button>
           <button onClick={() => setDeleteId(row._id)} className="p-1.5 rounded-md text-secondary hover:bg-red-50 hover:text-red-500 min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="Delete" title="Delete"><Trash2 size={15} /></button>
@@ -102,10 +107,34 @@ export default function SuppliersPage() {
           action={<button onClick={openCreate} className="h-9 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium flex items-center gap-2 transition-colors"><Plus size={16} aria-hidden="true" />New Supplier</button>}
         />
       ) : (
-        <DataTable columns={columns} data={data?.data?.suppliers ?? []} keyField="_id" isLoading={isLoading} pagination={data?.pagination} onPageChange={setPage} />
+        <DataTable
+          columns={columns}
+          data={data?.data?.suppliers ?? []}
+          keyField="_id"
+          isLoading={isLoading}
+          pagination={data?.pagination}
+          onPageChange={setPage}
+          tableHeadAction={
+            <div className="flex items-center gap-2 text-xs text-secondary">
+              <span>Total Outstanding:</span>
+              <span className="font-semibold text-amber-600">
+                {formatCurrency((data?.data?.suppliers ?? []).reduce((sum, s) => sum + (s.balance ?? 0), 0))}
+              </span>
+            </div>
+          }
+        />
       )}
 
       <SupplierFormDialog open={dialogOpen} supplier={editSupplier} onClose={() => setDialogOpen(false)} />
+      {paySupplier && paySupplier._id && (
+        <SupplierPaymentDialog
+          open={!!paySupplier}
+          supplierId={paySupplier._id}
+          supplierName={paySupplier.name}
+          outstandingBalance={paySupplier.balance}
+          onClose={() => setPaySupplier(null)}
+        />
+      )}
       <ConfirmDialog open={!!deleteId} title="Deactivate Supplier" description="This will deactivate the supplier. Existing records will not be affected." confirmLabel="Deactivate" variant="danger" loading={deleting} onConfirm={handleDelete} onCancel={() => setDeleteId(null)} />
     </>
   );

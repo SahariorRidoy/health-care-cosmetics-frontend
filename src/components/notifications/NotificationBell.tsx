@@ -153,7 +153,7 @@ export function NotificationBell() {
           {notifications.length > 0 && (
             <div className="flex border-t border-border divide-x divide-border">
               <Link
-                href="/inventory/stock"
+                href="/materials/stock"
                 onClick={() => setOpen(false)}
                 className="flex-1 py-2.5 text-center text-xs text-secondary hover:text-foreground hover:bg-slate-50 transition-colors"
               >
