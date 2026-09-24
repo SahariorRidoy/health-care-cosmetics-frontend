@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Pencil, ArrowLeft } from 'lucide-react';
+import { Pencil, ArrowLeft, AlertTriangle } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { LoadingSpinner, ErrorState, StatusBadge } from '@/components/feedback';
 import { DataTable, type Column } from '@/components/tables/DataTable';
@@ -44,6 +44,7 @@ export default function ItemDetailPage() {
   const item = data.data.item;
   const uom = typeof item.baseUom === 'string' ? null : (item.baseUom as UOM);
   const supplier = typeof item.supplier === 'string' ? null : (item.supplier as Supplier | undefined);
+  const isLowStock = (item.reorderLevel ?? 0) > 0 && item.currentStock <= item.reorderLevel!;
 
   const grColumns: Column<GoodsReceipt>[] = [
     {
@@ -72,6 +73,16 @@ export default function ItemDetailPage() {
     { key: 'receivedDate', header: 'Date', priority: 'P1', render: (row) => formatDate(row.receivedDate) },
     { key: 'totalAmount', header: 'Amount', priority: 'P1', render: (row) => formatCurrency(row.totalAmount) },
     {
+      key: 'due', header: 'Due', priority: 'P1',
+      render: (row) => {
+        const po = typeof row.purchaseOrder === 'object' && row.purchaseOrder ? row.purchaseOrder as import('@/features/procurement/types').PurchaseOrder : null;
+        if (!po) return '—';
+        const due = po.totalAmount - po.paidAmount;
+        if (due <= 0) return <span className="text-emerald-600 font-medium">Paid</span>;
+        return <span className="text-red-600 font-semibold">{formatCurrency(due)}</span>;
+      },
+    },
+    {
       key: 'supplier', header: 'Supplier', priority: 'P2',
       render: (row) => {
         const s = row.supplier as { _id: string; name: string } | string | undefined;
@@ -88,7 +99,16 @@ export default function ItemDetailPage() {
     <>
       <PageHeader
         title={item.name}
-        description={`SKU: ${item.sku}`}
+        description={
+          <span className="flex items-center gap-2">
+            <span>SKU: {item.sku}</span>
+            {isLowStock && (
+              <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
+                <AlertTriangle size={11} /> Low Stock
+              </span>
+            )}
+          </span>
+        }
         breadcrumbs={[{ label: 'Materials', href: '/materials' }, { label: item.name }]}
         actions={
           <div className="flex items-center gap-2">
@@ -103,7 +123,7 @@ export default function ItemDetailPage() {
       />
 
       <div className="bg-white rounded-lg border border-border p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-        <InfoRow label="Name" value={item.name} />
+        <InfoRow label="Name" value={<span className="text-lg font-bold text-foreground">{item.name}</span>} />
         <InfoRow label="SKU" value={item.sku} />
         <InfoRow label="Type" value={ITEM_TYPE_LABELS[item.type] ?? item.type} />
         <InfoRow label="Base UOM" value={uom ? `${uom.name} (${uom.symbol})` : (item.baseUom as string)} />
@@ -115,7 +135,15 @@ export default function ItemDetailPage() {
           ) : '—'
         } />
         <InfoRow label="Status" value={<StatusBadge status={item.isActive ? 'ACTIVE' : 'INACTIVE'} />} />
-        <InfoRow label="Current Stock" value={`${item.currentStock} ${uom?.symbol ?? ''}`} />
+        <InfoRow label="Current Stock" value={
+          <span className={`inline-flex items-center gap-1.5 font-semibold ${
+            isLowStock ? 'text-red-600' : 'text-foreground'
+          }`}>
+            {isLowStock && <AlertTriangle size={13} className="shrink-0" />}
+            {item.currentStock} {uom?.symbol ?? ''}
+          </span>
+        } />
+        <InfoRow label="Low Stock Qty" value={item.reorderLevel ? `${item.reorderLevel} ${uom?.symbol ?? ''}` : '—'} />
         <InfoRow label="Cost Price" value={formatCurrency(item.costPrice)} />
         <InfoRow label="Last Purchase Price" value={item.lastPurchasePrice > 0 ? formatCurrency(item.lastPurchasePrice) : '—'} />
         <InfoRow label="Description" value={item.description || '—'} />

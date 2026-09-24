@@ -10,13 +10,14 @@ import { formatCurrency, formatDate } from '@/lib/formatters';
 import { FactoryBatchFormDialog } from '@/features/factory-production/components/FactoryBatchFormDialog';
 import { AddReceiptDialog } from '@/features/factory-production/components/AddReceiptDialog';
 import { ReturnMaterialDialog } from '@/features/factory-production/components/ReturnMaterialDialog';
+import { RestockMaterialDialog } from '@/features/factory-production/components/RestockMaterialDialog';
 import {
   useGetFactoryBatchQuery,
   useDispatchFactoryBatchMutation,
   useCancelFactoryBatchMutation,
   useUpdateFactoryBatchStatusMutation,
 } from '@/features/factory-production/services/factoryProductionApi';
-import type { FactoryBatch, FactoryDispatchMaterial, FactoryReceipt, FactoryMaterialReturn, FactoryReceiptProduct, FactoryReceiptMaterialUsed } from '@/features/factory-production/types';
+import type { FactoryBatch, FactoryDispatchMaterial, FactoryReceipt, FactoryMaterialReturn, FactoryRestockEntry, FactoryReceiptProduct, FactoryReceiptMaterialUsed } from '@/features/factory-production/types';
 
 const STATUS_STEPS = ['DRAFT', 'DISPATCHED', 'IN_PRODUCTION', 'PARTIALLY_RECEIVED', 'COMPLETED'] as const;
 
@@ -95,6 +96,7 @@ export default function FactoryBatchDetailPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
+  const [restockOpen, setRestockOpen] = useState(false);
   const [confirmDispatch, setConfirmDispatch] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [confirmInProduction, setConfirmInProduction] = useState(false);
@@ -116,6 +118,7 @@ export default function FactoryBatchDetailPage() {
   const canMarkInProduction = batch.status === 'DISPATCHED';
   const canAddReceipt = ['DISPATCHED', 'IN_PRODUCTION', 'PARTIALLY_RECEIVED'].includes(batch.status);
   const canReturn = ['DISPATCHED', 'IN_PRODUCTION', 'PARTIALLY_RECEIVED', 'COMPLETED'].includes(batch.status);
+  const canRestock = ['DISPATCHED', 'IN_PRODUCTION', 'PARTIALLY_RECEIVED'].includes(batch.status);
   const canCancel = ['DRAFT', 'DISPATCHED'].includes(batch.status) && batch.receipts.length === 0;
 
   async function handleDispatch() {
@@ -187,6 +190,11 @@ export default function FactoryBatchDetailPage() {
             {canReturn && (
               <button onClick={() => setReturnOpen(true)} className="h-9 px-3 rounded-md border border-border text-sm text-foreground hover:bg-slate-50 flex items-center gap-2 transition-colors">
                 <RotateCcw size={14} /> Return Material
+              </button>
+            )}
+            {canRestock && (
+              <button onClick={() => setRestockOpen(true)} className="h-9 px-4 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium flex items-center gap-2 transition-colors">
+                <Truck size={15} /> Send More Materials
               </button>
             )}
             {canCancel && (
@@ -385,10 +393,50 @@ export default function FactoryBatchDetailPage() {
         </div>
       )}
 
+      {/* 7. Restock History */}
+      {batch.restockHistory?.length > 0 && (
+        <div className="bg-white rounded-lg border border-border mb-4">
+          <div className="px-4 py-3 border-b border-border">
+            <h2 className="text-sm font-semibold text-foreground">Restock History ({batch.restockHistory.length})</h2>
+          </div>
+          <div className="divide-y divide-border">
+            {batch.restockHistory.map((entry: FactoryRestockEntry) => {
+              const by = typeof entry.createdBy === 'object' ? entry.createdBy.name : '';
+              return (
+                <div key={entry._id} className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-semibold text-blue-600">{formatDate(entry.restockDate)}</span>
+                      {by && <span className="text-xs text-secondary">by {by}</span>}
+                    </div>
+                    {entry.notes && <span className="text-xs text-secondary italic">{entry.notes}</span>}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {entry.materials.map((mat, mi) => {
+                      const matItem = mat.item as { _id: string; name: string } | string;
+                      const matUom = mat.uom as { _id: string; symbol: string } | string;
+                      const matName = typeof matItem === 'string' ? matItem : matItem.name;
+                      const matUomSym = typeof matUom === 'string' ? '' : matUom.symbol;
+                      return (
+                        <span key={mi} className="px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-xs font-medium text-blue-700">
+                          {matName}: +{mat.qty} {matUomSym}
+                          {mat.unitCost > 0 && <span className="ml-1 text-blue-500">@ {formatCurrency(mat.unitCost)}</span>}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Dialogs */}
       <FactoryBatchFormDialog open={editOpen} onClose={() => setEditOpen(false)} batch={batch} />
       <AddReceiptDialog open={receiptOpen} onClose={() => setReceiptOpen(false)} batch={batch} />
       <ReturnMaterialDialog open={returnOpen} onClose={() => setReturnOpen(false)} batch={batch} />
+      <RestockMaterialDialog open={restockOpen} onClose={() => setRestockOpen(false)} batch={batch} />
 
       <ConfirmDialog
         open={confirmDispatch}

@@ -1,6 +1,7 @@
 'use client';
 
-import { Menu, LogOut, User } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Menu, LogOut, User, FlaskConical } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/lib/store/hooks';
 import { clearCredentials } from '@/lib/store/authSlice';
@@ -9,6 +10,21 @@ import { NotificationBell } from '@/components/notifications/NotificationBell';
 
 interface HeaderProps {
   onMenuClick: () => void;
+}
+
+function DateTime() {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  return (
+    <span className="text-base font-semibold text-muted">
+      {now.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+      {' · '}
+      {now.toLocaleTimeString()}
+    </span>
+  );
 }
 
 export function Header({ onMenuClick }: HeaderProps) {
@@ -24,7 +40,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   }
 
   return (
-    <header className="sticky top-0 z-40 h-14 bg-white border-b border-border flex items-center px-4 gap-4">
+    <header className="sticky top-0 z-40 h-16 bg-white border-b border-border flex items-center px-4 gap-4">
       {/* Hamburger — mobile only */}
       <button
         onClick={onMenuClick}
@@ -34,7 +50,15 @@ export function Header({ onMenuClick }: HeaderProps) {
         <Menu size={20} />
       </button>
 
-      <div className="flex-1" />
+      <div className="flex-1 flex items-center justify-center gap-4">
+        <div className="flex items-center gap-2">
+          <FlaskConical size={26} className="text-emerald" />
+          <span className="text-2xl font-black text-emerald tracking-tight">Health Care Cosmetics</span>
+          <span className="text-xs font-bold text-white bg-emerald px-1.5 py-0.5 rounded">ERP</span>
+        </div>
+        <div className="w-px h-6 bg-border" />
+        <DateTime />
+      </div>
 
       <NotificationBell />
 

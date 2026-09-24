@@ -6,7 +6,7 @@ import { Plus, Search, Pencil, Trash2, Eye, CreditCard } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DataTable, type Column } from '@/components/tables/DataTable';
-import { EmptyState, ErrorState, StatusBadge, ConfirmDialog } from '@/components/feedback';
+import { EmptyState, ErrorState, ConfirmDialog } from '@/components/feedback';
 import { formatCurrency } from '@/lib/formatters';
 import { useGetSuppliersQuery, useDeleteSupplierMutation } from '@/features/procurement/services/procurementApi';
 import { SupplierFormDialog } from '@/features/procurement/components/SupplierFormDialog';
@@ -22,7 +22,7 @@ export default function SuppliersPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [paySupplier, setPaySupplier] = useState<Supplier | null>(null);
 
-  const { data, isLoading, isError, refetch } = useGetSuppliersQuery({ page, search: search || undefined });
+  const { data, isLoading, isError, refetch } = useGetSuppliersQuery({ page, limit: 10, search: search || undefined });
   const [deleteSupplier, { isLoading: deleting }] = useDeleteSupplierMutation();
 
   function openCreate() { setEditSupplier(null); setDialogOpen(true); }
@@ -42,33 +42,44 @@ export default function SuppliersPage() {
 
   const columns: Column<Supplier>[] = [
     {
-      key: 'name', header: 'Name', priority: 'P1',
-      render: (row) => <span className="font-bold text-foreground">{row.name}</span>,
+      key: 'sl', header: 'SL No.', priority: 'P1', className: 'w-16 text-center',
+      render: (_row, index) => <span className="font-semibold text-secondary">{(page - 1) * (data?.pagination?.limit ?? 10) + (index ?? 0) + 1}</span>,
     },
-    { key: 'contactPerson', header: 'Contact', priority: 'P2', render: (row) => row.contactPerson ?? '—' },
+    {
+      key: 'name', header: 'Supplier Name', priority: 'P1',
+      render: (row) => (
+        <button
+          onClick={() => router.push(`/procurement/suppliers/${row._id}`)}
+          className="text-md font-bold text-emerald-800 hover:text-emerald-700 hover:underline text-left"
+        >
+          {row.name}
+        </button>
+      ),
+    },
+    { key: 'contactPerson', header: 'Contact Person', priority: 'P2', render: (row) => row.contactPerson ?? '—' },
     { key: 'phone', header: 'Phone', priority: 'P3', render: (row) => row.phone ?? '—' },
     {
-      key: 'balance', header: 'Balance', priority: 'P2',
+      key: 'balance', header: 'Due Balance', priority: 'P2',
       render: (row) => (
         <span className={row.balance > 0 ? 'text-amber-600 font-medium' : ''}>
           {formatCurrency(row.balance)}
         </span>
       ),
     },
+    // {
+    //   key: 'isActive', header: 'Status', priority: 'P2',
+    //   render: (row) => <StatusBadge status={row.isActive ? 'ACTIVE' : 'INACTIVE'} />,
+    // },
     {
-      key: 'isActive', header: 'Status', priority: 'P2',
-      render: (row) => <StatusBadge status={row.isActive ? 'ACTIVE' : 'INACTIVE'} />,
-    },
-    {
-      key: 'actions', header: '', priority: 'P1', className: 'w-[100px] text-right',
+        key: 'actions', header: 'Actions', priority: 'P1', className: 'w-[170px] text-center',
       render: (row) => (
         <div className="flex items-center justify-end gap-1">
               {row.balance > 0 && (
-              <button onClick={() => setPaySupplier(row)} className="p-1.5 rounded-md bg-emerald-50 text-emerald-600 hover:bg-emerald-100 min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="Pay Due" title="Pay Due"><CreditCard size={15} /></button>
+          <button onClick={() => setPaySupplier(row)} className="p-1.5 rounded-md text-amber-500 hover:bg-amber-50 hover:text-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-300 min-w-[32px] min-h-[32px] flex items-center justify-center transition-colors" aria-label="Pay Due" title="Pay Due"><CreditCard size={15} /></button>
               )}
-          <button onClick={() => router.push(`/procurement/suppliers/${row._id}`)} className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="View" title="View"><Eye size={15} /></button>
-          <button onClick={() => openEdit(row)} className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="Edit" title="Edit"><Pencil size={15} /></button>
-          <button onClick={() => setDeleteId(row._id)} className="p-1.5 rounded-md text-secondary hover:bg-red-50 hover:text-red-500 min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="Delete" title="Delete"><Trash2 size={15} /></button>
+          <button onClick={() => router.push(`/procurement/suppliers/${row._id}`)} className="p-1.5 rounded-md text-blue-500 hover:bg-blue-50 hover:text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300 min-w-[32px] min-h-[32px] flex items-center justify-center transition-colors" aria-label="View" title="View"><Eye size={15} /></button>
+          <button onClick={() => openEdit(row)} className="p-1.5 rounded-md text-emerald-500 hover:bg-emerald-50 hover:text-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-300 min-w-[32px] min-h-[32px] flex items-center justify-center transition-colors" aria-label="Edit" title="Edit"><Pencil size={15} /></button>
+          <button onClick={() => setDeleteId(row._id)} className="p-1.5 rounded-md text-red-500 hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-300 min-w-[32px] min-h-[32px] flex items-center justify-center transition-colors" aria-label="Delete" title="Delete"><Trash2 size={15} /></button>
         </div>
       ),
     },
@@ -112,6 +123,8 @@ export default function SuppliersPage() {
           data={data?.data?.suppliers ?? []}
           keyField="_id"
           isLoading={isLoading}
+          headerClassName="text-emerald-700 text-sm font-bold"
+          alwaysShowPagination
           pagination={data?.pagination}
           onPageChange={setPage}
           tableHeadAction={

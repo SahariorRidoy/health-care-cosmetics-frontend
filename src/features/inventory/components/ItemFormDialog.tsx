@@ -82,7 +82,7 @@ export function ItemFormDialog({ open, item, onClose }: ItemFormDialogProps) {
           paymentMethod: 'Cash',
           warehouse: warehouseData?.data?.warehouses?.find((w) => w.isActive && w.isDefault)?._id ?? '',
         }
-      : { type: 'RAW_MATERIAL', unitPrice: 0, quantity: 1, paidAmount: 0, warehouse: warehouseData?.data?.warehouses?.find((w) => w.isActive && w.isDefault)?._id ?? '' },
+      : { name: '', sku: '', type: 'RAW_MATERIAL', description: '', baseUom: '', supplier: '', notes: '', quantity: 1, unitPrice: 0, reorderLevel: 0, paidAmount: 0, paymentMethod: 'Cash', warehouse: warehouseData?.data?.warehouses?.find((w) => w.isActive && w.isDefault)?._id ?? '' },
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, item, grData, poData, warehouseData]);

@@ -33,9 +33,9 @@ const NAV_ITEMS: NavItem[] = [
     href: '/production', label: 'Production', icon: Factory,
     children: [
       { href: '/production/new', label: 'Create Production', icon: Plus },
-      { href: '/production', label: 'Warehouse Production', icon: ClipboardList },
-      { href: '/factory-production', label: 'Factory Batches', icon: Warehouse },
-      { href: '/factory-production/factories', label: 'Factory Ledger', icon: Factory },
+      { href: '/production', label: 'Warehouse Product', icon: ClipboardList },
+      { href: '/factory-production', label: 'Factory Production', icon: Warehouse },
+      // { href: '/factory-production/factories', label: 'Factory Ledger', icon: Factory },
     ],
   },
   {

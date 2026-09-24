@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Search, Pencil, Trash2, Eye, SlidersHorizontal, X, Truck, ClipboardList } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Eye, SlidersHorizontal, X, Truck, ClipboardList, PackagePlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DataTable, type Column } from '@/components/tables/DataTable';
@@ -10,6 +10,7 @@ import { EmptyState, ErrorState, StatusBadge, ConfirmDialog } from '@/components
 import { formatDate } from '@/lib/formatters';
 import { FactoryBatchFormDialog } from '@/features/factory-production/components/FactoryBatchFormDialog';
 import { AddReceiptDialogLoader } from '@/features/factory-production/components/AddReceiptDialogLoader';
+import { RestockMaterialDialog } from '@/features/factory-production/components/RestockMaterialDialog';
 import {
   useGetFactoryBatchesQuery,
   useDeleteFactoryBatchMutation,
@@ -24,6 +25,7 @@ export default function FactoryProductionPage() {
   const [open, setOpen] = useState(false);
   const [editBatch, setEditBatch] = useState<FactoryBatch | null>(null);
   const [receiptBatchId, setReceiptBatchId] = useState<string | null>(null);
+  const [restockBatch, setRestockBatch] = useState<FactoryBatch | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [dispatchId, setDispatchId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -113,6 +115,15 @@ export default function FactoryProductionPage() {
           >
             <Eye size={13} /> View
           </button>
+          {['DISPATCHED', 'IN_PRODUCTION', 'PARTIALLY_RECEIVED'].includes(row.status) && (
+            <button
+              onClick={() => setRestockBatch(row)}
+              className="h-8 px-3 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium flex items-center gap-1.5 transition-colors whitespace-nowrap"
+              aria-label="Send more materials" title="Send More Materials"
+            >
+              <PackagePlus size={13} /> Send More Material
+            </button>
+          )}
           {['DISPATCHED', 'IN_PRODUCTION', 'PARTIALLY_RECEIVED'].includes(row.status) && (
             <button
               onClick={() => setReceiptBatchId(row._id)}
@@ -238,6 +249,10 @@ export default function FactoryProductionPage() {
 
       {receiptBatchId && (
         <AddReceiptDialogLoader batchId={receiptBatchId} onClose={() => setReceiptBatchId(null)} />
+      )}
+
+      {restockBatch && (
+        <RestockMaterialDialog open={!!restockBatch} onClose={() => setRestockBatch(null)} batch={restockBatch} />
       )}
 
       <ConfirmDialog

@@ -2,14 +2,16 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Search, Pencil, Trash2, Eye, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Eye, AlertTriangle, ShoppingCart } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DataTable, type Column } from '@/components/tables/DataTable';
-import { EmptyState, ErrorState, StatusBadge, ConfirmDialog } from '@/components/feedback';
+import { EmptyState, ErrorState, ConfirmDialog } from '@/components/feedback';
 import { formatCurrency, formatDate } from '@/lib/formatters';
 import { useGetItemsQuery, useDeleteItemMutation } from '@/features/inventory/services/inventoryApi';
 import { ItemFormDialog } from '@/features/inventory/components/ItemFormDialog';
+import { BulkPurchaseDialog } from '@/features/inventory/components/BulkPurchaseDialog';
+import { RepurchaseDialog } from '@/features/inventory/components/RepurchaseDialog';
 import type { Item, Supplier } from '@/features/inventory/types';
 
 const ITEM_TYPE_LABELS: Record<string, string> = {
@@ -27,6 +29,9 @@ export default function ItemsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editItem, setEditItem] = useState<Item | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [repurchaseOpen, setRepurchaseOpen] = useState(false);
+  const [repurchaseItem, setRepurchaseItem] = useState<Item | null>(null);
+  const [bulkPurchaseOpen, setBulkPurchaseOpen] = useState(false);
 
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
@@ -58,6 +63,9 @@ export default function ItemsPage() {
 
   function openCreate() { setEditItem(null); setDialogOpen(true); }
   function openEdit(item: Item) { setEditItem(item); setDialogOpen(true); }
+  function handleDialogClose() { setDialogOpen(false); setEditItem(null); }
+  function openRepurchase(item: Item) { setRepurchaseItem(item); setRepurchaseOpen(true); }
+  function closeRepurchase() { setRepurchaseOpen(false); setRepurchaseItem(null); }
 
   async function handleDelete() {
     if (!deleteId) return;
@@ -90,7 +98,7 @@ export default function ItemsPage() {
       },
     },
     {
-      key: 'createdAt', header: 'Date', priority: 'P3', sortable: true,
+      key: 'createdAt', header: 'Added On', priority: 'P3', sortable: true,
       render: (row) => <span className="text-secondary">{formatDate(row.createdAt, 'dd/MM/yyyy, hh:mm a')}</span>,
     },
     {
@@ -122,17 +130,18 @@ export default function ItemsPage() {
       key: 'costPrice', header: 'Cost Price', priority: 'P3', sortable: true,
       render: (row) => formatCurrency(row.costPrice),
     },
-    {
-      key: 'isActive', header: 'Status', priority: 'P2',
-      render: (row) => <StatusBadge status={row.isActive ? 'ACTIVE' : 'INACTIVE'} />,
-    },
+    // {
+    //   key: 'isActive', header: 'Status', priority: 'P2',
+    //   render: (row) => <StatusBadge status={row.isActive ? 'ACTIVE' : 'INACTIVE'} />,
+    // },
     {
       key: 'actions', header: '', priority: 'P1', className: 'w-[100px] text-right',
       render: (row) => (
         <div className="flex items-center justify-end gap-1">
-          <button onClick={() => router.push(`/materials/${row._id}`)} className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="View" title="View"><Eye size={15} /></button>
-          <button onClick={() => openEdit(row)} className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="Edit" title="Edit"><Pencil size={15} /></button>
-          <button onClick={() => setDeleteId(row._id)} className="p-1.5 rounded-md text-secondary hover:bg-red-50 hover:text-red-500 min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="Delete" title="Delete"><Trash2 size={15} /></button>
+          <button onClick={() => router.push(`/materials/${row._id}`)} className="p-1.5 rounded-md text-blue-600 hover:bg-blue-50 min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="View" title="View"><Eye size={15} /></button>
+          <button onClick={() => openRepurchase(row)} className="p-1.5 rounded-md text-emerald-600 hover:bg-emerald-50 min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="Repurchase" title="Repurchase"><ShoppingCart size={15} /></button>
+          <button onClick={() => openEdit(row)} className="p-1.5 rounded-md text-amber-600 hover:bg-amber-50 min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="Edit" title="Edit"><Pencil size={15} /></button>
+          <button onClick={() => setDeleteId(row._id)} className="p-1.5 rounded-md text-red-600 hover:bg-red-50 min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="Delete" title="Delete"><Trash2 size={15} /></button>
         </div>
       ),
     },
@@ -149,9 +158,14 @@ export default function ItemsPage() {
         description="Manage raw materials and packaging stock"
         breadcrumbs={[{ label: 'Materials' }]}
         actions={
-          <button onClick={openCreate} className="h-9 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium flex items-center gap-2 transition-colors">
-            <Plus size={16} aria-hidden="true" /> New Material Purchase
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setBulkPurchaseOpen(true)} className="h-9 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium flex items-center gap-2 transition-colors">
+              <ShoppingCart size={16} aria-hidden="true" /> Purchase New or Existing Materials
+            </button>
+            {/* <button onClick={openCreate} className="h-9 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium flex items-center gap-2 transition-colors">
+              <Plus size={16} aria-hidden="true" /> New Material
+            </button> */}
+          </div>
         }
       />
 
@@ -234,7 +248,9 @@ export default function ItemsPage() {
         />
       )}
 
-      <ItemFormDialog open={dialogOpen} item={editItem} onClose={() => setDialogOpen(false)} />
+      <ItemFormDialog open={dialogOpen} item={editItem} onClose={handleDialogClose} />
+      <RepurchaseDialog open={repurchaseOpen} preselectedItem={repurchaseItem} onClose={closeRepurchase} />
+      <BulkPurchaseDialog open={bulkPurchaseOpen} onClose={() => setBulkPurchaseOpen(false)} />
       <ConfirmDialog open={!!deleteId} title="Delete Item" description="This will soft-delete the item." confirmLabel="Delete" variant="danger" loading={deleting} onConfirm={handleDelete} onCancel={() => setDeleteId(null)} />
     </>
   );

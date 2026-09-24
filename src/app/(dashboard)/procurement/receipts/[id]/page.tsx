@@ -225,7 +225,7 @@ export default function GoodsReceiptDetailPage() {
                   <tr key={i} className="border-b border-border hover:bg-slate-50">
                     <td className="px-4 py-3 font-medium">
                       {item ? (
-                        <button onClick={() => router.push(`/inventory/${item._id}`)} className="text-emerald hover:underline">
+                        <button onClick={() => router.push(`/materials/${item._id}`)} className="text-emerald hover:underline">
                           {item.name}
                         </button>
                       ) : '—'}

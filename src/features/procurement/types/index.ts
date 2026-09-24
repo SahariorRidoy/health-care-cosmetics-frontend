@@ -111,7 +111,7 @@ export interface GoodsReceipt {
 
 export interface POsResponse {
   success: boolean;
-  data: { purchaseOrders: PurchaseOrder[] };
+  data: { purchaseOrders: PurchaseOrder[]; unpaidCount: number };
   pagination: { page: number; pages: number; total: number; limit: number };
 }
 

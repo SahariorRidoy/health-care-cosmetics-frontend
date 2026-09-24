@@ -2,7 +2,7 @@ import { api } from '@/lib/store/api';
 import type {
   FactoryBatchesResponse, FactoryBatchResponse, FactoryLedgerResponse,
   CreateFactoryBatchPayload, UpdateFactoryBatchPayload,
-  AddReceiptPayload, AddMaterialReturnPayload,
+  AddReceiptPayload, AddMaterialReturnPayload, RestockBatchPayload,
 } from '../types';
 
 export const factoryProductionApi = api.injectEndpoints({
@@ -44,6 +44,10 @@ export const factoryProductionApi = api.injectEndpoints({
       query: ({ id, body }) => ({ url: `/factory-batches/${id}/returns`, method: 'POST', body }),
       invalidatesTags: (_r, _e, { id }) => ['FactoryBatch', { type: 'FactoryBatch', id }, 'Stock', 'Item'],
     }),
+    restockFactoryBatch: build.mutation<FactoryBatchResponse, { id: string; body: RestockBatchPayload }>({
+      query: ({ id, body }) => ({ url: `/factory-batches/${id}/restock`, method: 'POST', body }),
+      invalidatesTags: (_r, _e, { id }) => ['FactoryBatch', { type: 'FactoryBatch', id }, 'Stock', 'Item'],
+    }),
     cancelFactoryBatch: build.mutation<FactoryBatchResponse, string>({
       query: (id) => ({ url: `/factory-batches/${id}/cancel`, method: 'PATCH' }),
       invalidatesTags: (_r, _e, id) => ['FactoryBatch', { type: 'FactoryBatch', id }, 'Stock', 'Item'],
@@ -65,6 +69,7 @@ export const {
   useUpdateFactoryBatchStatusMutation,
   useAddFactoryReceiptMutation,
   useAddMaterialReturnMutation,
+  useRestockFactoryBatchMutation,
   useCancelFactoryBatchMutation,
   useDeleteFactoryBatchMutation,
 } = factoryProductionApi;

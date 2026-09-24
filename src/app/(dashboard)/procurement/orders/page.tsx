@@ -5,11 +5,11 @@ import { useRouter } from 'next/navigation';
 import { Search, Eye, Trash2, CreditCard, ChevronDown, X } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DataTable, type Column } from '@/components/tables/DataTable';
-import { EmptyState, ErrorState, StatusBadge, ConfirmDialog } from '@/components/feedback';
+import { EmptyState, ErrorState, ConfirmDialog } from '@/components/feedback';
 import { formatCurrency, formatDate } from '@/lib/formatters';
 import { useGetPurchaseOrdersQuery, useDeletePurchaseOrderMutation, useGetSuppliersQuery } from '@/features/procurement/services/procurementApi';
 import { SupplierPaymentDialog } from '@/features/procurement/components/SupplierPaymentDialog';
-import type { PurchaseOrder, Supplier } from '@/features/procurement/types';
+import type { PaymentStatus, PurchaseOrder, Supplier } from '@/features/procurement/types';
 
 function SupplierDropdown({ value, onChange }: { value: string; onChange: (id: string) => void }) {
   const [open, setOpen] = useState(false);
@@ -87,19 +87,34 @@ function SupplierDropdown({ value, onChange }: { value: string; onChange: (id: s
   );
 }
 
+function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
+  const styles = {
+    PAID: 'bg-emerald-100 text-emerald-700',
+    PARTIAL: 'bg-amber-100 text-amber-700',
+    UNPAID: 'bg-red-100 text-red-700',
+  };
+
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium ${styles[status]}`}>
+      {status}
+    </span>
+  );
+}
+
 export default function PurchaseOrdersPage() {
   const router = useRouter();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [supplierFilter, setSupplierFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<PaymentStatus | ''>('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [payOrder, setPayOrder] = useState<PurchaseOrder | null>(null);
 
   const { data, isLoading, isError, refetch } = useGetPurchaseOrdersQuery({
     page,
+    limit: 10,
     search: search || undefined,
-    status: statusFilter || undefined,
+    paymentStatus: paymentStatusFilter || undefined,
     supplier: supplierFilter || undefined,
   });
   const [deletePO, { isLoading: deleteLoading }] = useDeletePurchaseOrderMutation();
@@ -109,6 +124,11 @@ export default function PurchaseOrdersPage() {
     try {
       await deletePO(deleteId).unwrap();
       setDeleteId(null);
+      if (page > 1 && (data?.data?.purchaseOrders.length ?? 0) === 1) {
+        setPage(page - 1);
+      } else {
+        refetch();
+      }
     } catch {
       // error handled by RTK
     }
@@ -116,8 +136,20 @@ export default function PurchaseOrdersPage() {
 
   const columns: Column<PurchaseOrder>[] = [
     {
+      key: 'sl', header: 'SL No.', priority: 'P1', className: 'w-[72px]',
+      render: (_row, index = 0) => (page - 1) * 10 + index + 1,
+    },
+    {
       key: 'poNumber', header: 'PO Number', priority: 'P1',
-      render: (row) => <span className="font-medium">{row.poNumber}</span>,
+      render: (row) => (
+        <button
+          type="button"
+          onClick={() => router.push(`/procurement/orders/${row._id}`)}
+          className="font-medium text-emerald-800 hover:underline"
+        >
+          {row.poNumber}
+        </button>
+      ),
     },
     {
       key: 'supplier', header: 'Supplier', priority: 'P1',
@@ -126,18 +158,33 @@ export default function PurchaseOrdersPage() {
         return s?.name ?? '—';
       },
     },
-    { key: 'createdAt', header: 'Date', priority: 'P2', render: (row) => formatDate(row.createdAt) },
+    { key: 'createdAt', header: 'Date & Time', priority: 'P2', render: (row) => formatDate(row.createdAt, 'dd/MM/yy, hh:mm a') },
     {
       key: 'totalAmount', header: 'Total', priority: 'P2',
       render: (row) => formatCurrency(row.totalAmount),
     },
     {
-      key: 'paymentStatus', header: 'Payment', priority: 'P2',
-      render: (row) => <StatusBadge status={row.paymentStatus ?? 'UNPAID'} />,
+      key: 'paidAmount', header: 'Paid Amount', priority: 'P2',
+      render: (row) => (
+        <span className={
+          row.paymentStatus === 'PAID' ? 'font-medium text-emerald-700' :
+          row.paymentStatus === 'PARTIAL' ? 'font-medium text-amber-700' :
+          'font-medium text-red-700'
+        }>
+          {formatCurrency(row.paidAmount)}
+        </span>
+      ),
     },
     {
-      key: 'status', header: 'Status', priority: 'P1',
-      render: (row) => <StatusBadge status={row.status} />,
+      key: 'dueBalance', header: 'Due Balance', priority: 'P2',
+      render: (row) => {
+        const due = row.totalAmount - (row.paidAmount ?? 0);
+        return due > 0 ? <span className="text-amber-600 font-extrabold">{formatCurrency(due)}</span> : <span className="text-muted">—</span>;
+      },
+    },
+    {
+      key: 'paymentStatus', header: 'Payment', priority: 'P2',
+      render: (row) => <PaymentStatusBadge status={row.paymentStatus ?? 'UNPAID'} />,
     },
     {
       key: 'actions', header: '', priority: 'P1', className: 'w-[90px] text-right',
@@ -148,11 +195,11 @@ export default function PurchaseOrdersPage() {
               <CreditCard size={15} />
             </button>
           )}
-          <button onClick={() => router.push(`/procurement/orders/${row._id}`)} className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="View" title="View">
+          <button onClick={() => router.push(`/procurement/orders/${row._id}`)} className="p-1.5 rounded-md bg-blue-50 text-blue-600 hover:bg-blue-100 min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="View" title="View">
             <Eye size={15} />
           </button>
           {(
-            <button onClick={() => setDeleteId(row._id)} className="p-1.5 rounded-md text-secondary hover:bg-red-50 hover:text-red-500 min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="Delete" title="Delete">
+            <button onClick={() => setDeleteId(row._id)} className="p-1.5 rounded-md bg-red-50 text-red-600 hover:bg-red-100 min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="Delete" title="Delete">
               <Trash2 size={15} />
             </button>
           )}
@@ -175,13 +222,27 @@ export default function PurchaseOrdersPage() {
           <input type="search" placeholder="Search PO number…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} className="h-9 w-full rounded-md border border-border bg-white pl-9 pr-3 text-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-emerald" />
         </div>
         <SupplierDropdown value={supplierFilter} onChange={(id) => { setSupplierFilter(id); setPage(1); }} />
-        <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} className="h-9 w-full sm:w-auto rounded-md border border-border bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald" aria-label="Filter by status">
-          <option value="">All Statuses</option>
-          <option value="DRAFT">Draft</option>
-          <option value="CONFIRMED">Confirmed</option>
-          <option value="RECEIVED">Received</option>
-          <option value="CLOSED">Closed</option>
+        <select value={paymentStatusFilter} onChange={(e) => { setPaymentStatusFilter(e.target.value as PaymentStatus | ''); setPage(1); }} className="h-9 w-full sm:w-auto rounded-md border border-border bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald" aria-label="Filter by payment status">
+          <option value="">All Payment Statuses</option>
+          <option value="PARTIAL">Partial</option>
+          <option value="PAID">Paid</option>
+          <option value="UNPAID">Unpaid</option>
         </select>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-4 text-sm text-secondary">
+        <div className="flex items-center gap-2">
+          <span>Total Purchase Orders:</span>
+          <span className="text-lg font-bold text-foreground">
+            {data?.pagination?.total ?? 0}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span>Unpaid Orders:</span>
+          <span className="text-lg font-bold text-amber-600">
+            {data?.data?.unpaidCount ?? 0}
+          </span>
+        </div>
       </div>
 
       {isError ? (
@@ -196,14 +257,7 @@ export default function PurchaseOrdersPage() {
           isLoading={isLoading}
           pagination={data?.pagination}
           onPageChange={setPage}
-          tableHeadAction={
-            <div className="flex items-center gap-2 text-xs text-secondary">
-              <span>Unpaid Orders:</span>
-              <span className="font-semibold text-amber-600">
-                {(data?.data?.purchaseOrders ?? []).filter(o => o.paymentStatus !== 'PAID').length}
-              </span>
-            </div>
-          }
+          headerClassName="text-emerald-800"
         />
       )}
 

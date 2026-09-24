@@ -64,6 +64,15 @@ export interface FactoryMaterialReturn {
   createdAt: string;
 }
 
+export interface FactoryRestockEntry {
+  _id: string;
+  restockDate: string;
+  materials: { item: Pick<Item, '_id' | 'name' | 'sku'> | string; qty: number; uom: UOM | string; unitCost: number }[];
+  notes?: string;
+  createdBy: { name: string } | string;
+  createdAt: string;
+}
+
 export interface Factory {
   _id: string;
   name: string;
@@ -83,6 +92,7 @@ export interface FactoryBatch {
   };
   receipts: FactoryReceipt[];
   materialReturns: FactoryMaterialReturn[];
+  restockHistory: FactoryRestockEntry[];
   expectedDeliveryDate?: string;
   notes?: string;
   isActive: boolean;
@@ -170,6 +180,12 @@ export interface AddReceiptPayload {
 export interface AddMaterialReturnPayload {
   returnDate: string;
   materials: { item: string; returnedQty: number; uom: string }[];
+  notes?: string;
+}
+
+export interface RestockBatchPayload {
+  restockDate: string;
+  materials: { item: string; qty: number; uom: string }[];
   notes?: string;
 }
 

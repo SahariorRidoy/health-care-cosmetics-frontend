@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { ArrowLeft, Loader2, X, Plus, Truck, CreditCard } from 'lucide-react';
+import { ArrowLeft, Loader2, X, Plus, Truck, CreditCard, Printer } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { LoadingSpinner, ErrorState, StatusBadge, ConfirmDialog } from '@/components/feedback';
 import { DataTable, type Column } from '@/components/tables/DataTable';
@@ -17,7 +17,6 @@ import {
   useUpdatePOStatusMutation,
   useCreateGoodsReceiptMutation,
   useGetGoodsReceiptsQuery,
-  useGetSupplierDuesQuery,
 } from '@/features/procurement/services/procurementApi';
 import { useGetWarehousesQuery } from '@/features/inventory/services/inventoryApi';
 import { SupplierPaymentDialog } from '@/features/procurement/components/SupplierPaymentDialog';
@@ -149,10 +148,6 @@ export default function PODetailPage() {
 
   const { data, isLoading, isError, refetch } = useGetPurchaseOrderQuery(id, { skip: !id });
   const { data: grData, isLoading: grLoading } = useGetGoodsReceiptsQuery({ purchaseOrder: id }, { skip: !id });
-  const { data: duesData, isLoading: duesLoading } = useGetSupplierDuesQuery(
-    typeof data?.data?.purchaseOrder?.supplier === 'string' ? data.data.purchaseOrder.supplier : (data?.data?.purchaseOrder?.supplier?._id ?? ''),
-    { skip: !data?.data?.purchaseOrder?.supplier },
-  );
   const [updateStatus, { isLoading: statusLoading }] = useUpdatePOStatusMutation();
 
   if (isLoading) return <LoadingSpinner />;
@@ -160,6 +155,7 @@ export default function PODetailPage() {
 
   const po = data.data.purchaseOrder;
   const supplier = typeof po.supplier === 'string' ? null : po.supplier;
+  const dueAmount = Math.max(0, po.totalAmount - (po.paidAmount ?? 0));
 
   async function handleStatusUpdate() {
     if (!confirmStatus) return;
@@ -193,6 +189,9 @@ export default function PODetailPage() {
             <button onClick={() => router.back()} className="h-9 px-3 rounded-md border border-border text-sm text-foreground hover:bg-slate-50 flex items-center gap-2 transition-colors">
               <ArrowLeft size={15} aria-hidden="true" /> Back
             </button>
+            <button onClick={() => window.print()} className="h-9 px-3 rounded-md border border-border text-sm text-foreground hover:bg-slate-50 flex items-center gap-2 transition-colors print:hidden">
+              <Printer size={15} aria-hidden="true" /> Print
+            </button>
             {po.status === 'DRAFT' && (
               <button onClick={() => setConfirmStatus('CONFIRMED')} className="h-9 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium flex items-center gap-2 transition-colors">
                 Confirm PO
@@ -208,17 +207,91 @@ export default function PODetailPage() {
                 Close PO
               </button>
             )}
-            {supplier && (duesData?.data?.outstandingBalance ?? 0) > 0 && (
-              <button onClick={() => setPaymentOpen(true)} disabled={duesLoading} className="h-9 px-4 rounded-md bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium flex items-center gap-2 transition-colors disabled:opacity-60">
-                {duesLoading ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <CreditCard size={15} aria-hidden="true" />} Pay Due
+            {supplier && dueAmount > 0 && (
+              <button onClick={() => setPaymentOpen(true)} className="h-9 px-4 rounded-md bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium flex items-center gap-2 transition-colors">
+                <CreditCard size={15} aria-hidden="true" /> Pay Due
               </button>
             )}
           </div>
         }
       />
 
+      <div className="hidden print:block text-[12px] text-gray-900">
+        <div className="flex items-start justify-between pb-4 border-b-2 border-gray-800 mb-4">
+          <div>
+            <p className="text-[18px] font-bold tracking-tight text-gray-900">Health Care Cosmetics</p>
+            <p className="text-[11px] text-gray-500 mt-0.5">HCC ERP — Purchase Order</p>
+          </div>
+          <div className="text-right">
+            <p className="text-[15px] font-bold text-gray-900">{po.poNumber}</p>
+            <p className="text-[11px] text-gray-500 mt-0.5">{formatDate(po.createdAt, 'dd/MM/yy, hh:mm a')}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-x-6 gap-y-2 mb-4 pb-4 border-b border-gray-200">
+          {[
+            { label: 'Supplier', value: supplier?.name ?? '—' },
+            { label: 'PO Date', value: formatDate(po.createdAt, 'dd/MM/yy, hh:mm a') },
+            { label: 'Status', value: po.status },
+            { label: 'Total Amount', value: formatCurrency(po.totalAmount) },
+            { label: 'Paid Amount', value: formatCurrency(po.paidAmount ?? 0) },
+            { label: 'Due Amount', value: formatCurrency(Math.max(0, po.totalAmount - (po.paidAmount ?? 0))) },
+            { label: 'Payment Status', value: po.paymentStatus ?? 'UNPAID' },
+            ...(po.notes ? [{ label: 'Notes', value: po.notes }] : []),
+          ].map(({ label, value }) => (
+            <div key={label}>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">{label}</p>
+              <p className="font-medium text-gray-900 mt-0.5">{value}</p>
+            </div>
+          ))}
+        </div>
+
+        <table className="w-full border-collapse text-[11px]">
+          <thead>
+            <tr className="border-b-2 border-gray-800">
+              {['#', 'Item', 'SKU', 'Ordered Qty', 'Received Qty', 'Unit Price', 'Total'].map((header) => (
+                <th key={header} className="py-1.5 pr-3 text-left font-semibold text-gray-700 uppercase tracking-wide last:pr-0">{header}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {po.items.map((line, index) => {
+              const item = typeof line.item === 'string' ? null : line.item;
+              const uom = typeof line.uom === 'string' ? line.uom : line.uom?.symbol ?? '';
+              return (
+                <tr key={index} className="border-b border-gray-100">
+                  <td className="py-1.5 pr-3 text-gray-400">{index + 1}</td>
+                  <td className="py-1.5 pr-3 font-medium">{item?.name ?? '—'}</td>
+                  <td className="py-1.5 pr-3 text-gray-500">{item?.sku ?? '—'}</td>
+                  <td className="py-1.5 pr-3">{line.orderedQty} {uom}</td>
+                  <td className="py-1.5 pr-3">{line.receivedQty} {uom}</td>
+                  <td className="py-1.5 pr-3">{formatCurrency(line.unitPrice)}</td>
+                  <td className="py-1.5 font-semibold">{formatCurrency(line.totalPrice)}</td>
+                </tr>
+              );
+            })}
+            <tr className="border-t-2 border-gray-800">
+              <td colSpan={6} className="py-2 text-right font-semibold text-gray-700 pr-3">Grand Total</td>
+              <td className="py-2 font-bold text-gray-900">{formatCurrency(po.totalAmount)}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div className="grid grid-cols-3 gap-6 mt-10">
+          {['Prepared By', 'Approved By', 'Authorized By'].map((label) => (
+            <div key={label} className="border-t border-gray-400 pt-1">
+              <p className="text-[10px] text-gray-500">{label}</p>
+            </div>
+          ))}
+        </div>
+
+        <p className="mt-6 text-center text-[10px] text-gray-400 border-t border-gray-200 pt-3">
+          Printed on {new Date().toLocaleDateString('en-BD')} — HCC ERP
+        </p>
+      </div>
+
       {/* Info */}
-      <div className="bg-white rounded-lg border border-border p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+      <div className="print:hidden bg-white rounded-lg border border-border p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
         {[
           { label: 'PO Number', value: po.poNumber },
           { label: 'Supplier', value: supplier?.name },
@@ -226,7 +299,7 @@ export default function PODetailPage() {
           { label: 'Date', value: formatDate(po.createdAt) },
           { label: 'Total Amount', value: formatCurrency(po.totalAmount) },
           { label: 'Paid Amount', value: formatCurrency(po.paidAmount ?? 0) },
-          { label: 'Due Amount', value: formatCurrency(Math.max(0, po.totalAmount - (po.paidAmount ?? 0))) },
+          { label: 'Due Amount', value: formatCurrency(dueAmount) },
           { label: 'Payment Status', value: <StatusBadge status={po.paymentStatus ?? 'UNPAID'} /> },
         ].map(({ label, value }) => (
           <div key={label} className="flex flex-col gap-0.5">
@@ -243,7 +316,7 @@ export default function PODetailPage() {
       </div>
 
       {/* Line items */}
-      <div className="bg-white rounded-lg border border-border mb-6">
+      <div className="print:hidden bg-white rounded-lg border border-border mb-6">
         <div className="px-4 py-3 border-b border-border">
           <h2 className="text-sm font-semibold">Line Items</h2>
         </div>
@@ -279,7 +352,7 @@ export default function PODetailPage() {
       </div>
 
       {/* Goods receipts */}
-      <div className="bg-white rounded-lg border border-border">
+      <div className="print:hidden bg-white rounded-lg border border-border">
         <div className="px-4 py-3 border-b border-border flex items-center justify-between">
           <h2 className="text-sm font-semibold">Goods Receipts</h2>
           {po.status === 'CONFIRMED' && (
@@ -300,7 +373,7 @@ export default function PODetailPage() {
           open={paymentOpen}
           supplierId={supplier._id}
           supplierName={supplier.name}
-          outstandingBalance={duesData?.data?.outstandingBalance ?? 0}
+          outstandingBalance={dueAmount}
           purchaseOrderId={id}
           onClose={() => setPaymentOpen(false)}
         />

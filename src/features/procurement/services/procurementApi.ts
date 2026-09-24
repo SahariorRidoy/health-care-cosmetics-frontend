@@ -2,12 +2,12 @@ import { api } from '@/lib/store/api';
 import type {
   SuppliersResponse, SupplierResponse, CreateSupplierPayload,
   SupplierPaymentsResponse, SupplierDuesResponse,
-  POsResponse, POResponse, GRsResponse, GRResponse,
+  POsResponse, POResponse, GRsResponse, GRResponse, PaymentStatus,
 } from '../types';
 
 export const procurementApi = api.injectEndpoints({
   endpoints: (build) => ({
-    getSuppliers: build.query<SuppliersResponse, { page?: number; search?: string; isActive?: string }>({
+    getSuppliers: build.query<SuppliersResponse, { page?: number; limit?: number; search?: string; isActive?: string }>({
       query: (params) => ({ url: '/suppliers', params }),
       providesTags: ['Supplier'],
     }),
@@ -45,7 +45,7 @@ export const procurementApi = api.injectEndpoints({
         'GoodsReceipt',
       ],
     }),
-    getPurchaseOrders: build.query<POsResponse, { page?: number; search?: string; status?: string; supplier?: string }>({
+    getPurchaseOrders: build.query<POsResponse, { page?: number; limit?: number; search?: string; status?: string; paymentStatus?: PaymentStatus; supplier?: string }>({
       query: (params) => ({ url: '/purchase-orders', params }),
       providesTags: ['PurchaseOrder'],
     }),

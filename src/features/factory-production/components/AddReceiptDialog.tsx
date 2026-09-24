@@ -66,6 +66,10 @@ function useDispatchedMaterials(batch: FactoryBatch) {
   }, [batch.dispatch.materials]);
 }
 
+function getEntityId(entity: { _id: string } | string) {
+  return typeof entity === 'string' ? entity : entity._id;
+}
+
 function ItemSearchField({ value, onChange }: { value: string; onChange: (id: string, name: string) => void }) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
@@ -123,6 +127,30 @@ export function AddReceiptDialog({ open, onClose, batch }: Props) {
 
   const uoms = useMemo(() => uomData?.data?.uoms?.filter((u) => u.isActive) ?? [], [uomData]);
   const dispatchedMaterials = useDispatchedMaterials(batch);
+  const availableMaterials = useMemo(() => {
+    const used = new Map<string, number>();
+    const returned = new Map<string, number>();
+
+    for (const receipt of batch.receipts) {
+      for (const product of receipt.products) {
+        for (const material of product.materialsUsed) {
+          const itemId = getEntityId(material.item);
+          used.set(itemId, (used.get(itemId) ?? 0) + material.usedQty);
+        }
+      }
+    }
+    for (const materialReturn of batch.materialReturns) {
+      for (const material of materialReturn.materials) {
+        const itemId = getEntityId(material.item);
+        returned.set(itemId, (returned.get(itemId) ?? 0) + material.returnedQty);
+      }
+    }
+
+    return new Map(dispatchedMaterials.map((material) => [
+      material.id,
+      Math.max(0, material.dispatchedQty - (used.get(material.id) ?? 0) - (returned.get(material.id) ?? 0)),
+    ]));
+  }, [batch.materialReturns, batch.receipts, dispatchedMaterials]);
 
   const [receiptDate, setReceiptDate] = useState('');
   const [deliveryCost, setDeliveryCost] = useState('');
@@ -210,6 +238,21 @@ export function AddReceiptDialog({ open, onClose, batch }: Props) {
         if (!mu.item) { toast.error(`Select material for all material-used rows in "${p.productName}"`); return; }
         if (!mu.usedQty || parseFloat(mu.usedQty) <= 0) { toast.error(`Enter used qty for all materials in "${p.productName}"`); return; }
         if (!mu.uom) { toast.error(`Select UOM for all materials in "${p.productName}"`); return; }
+      }
+    }
+
+    const requestedMaterials = new Map<string, number>();
+    for (const product of products) {
+      for (const material of product.materialsUsed) {
+        requestedMaterials.set(material.item, (requestedMaterials.get(material.item) ?? 0) + parseFloat(material.usedQty));
+      }
+    }
+    for (const [itemId, requestedQty] of requestedMaterials) {
+      const availableQty = availableMaterials.get(itemId) ?? 0;
+      if (requestedQty > availableQty) {
+        const materialName = dispatchedMaterials.find((material) => material.id === itemId)?.name ?? 'material';
+        toast.error(`Insufficient ${materialName}: ${availableQty} available, but ${requestedQty} requested`);
+        return;
       }
     }
 
@@ -381,6 +424,7 @@ export function AddReceiptDialog({ open, onClose, batch }: Props) {
                             {p.materialsUsed.map((mu, mIdx) => {
                               const mat = dispatchedMaterials.find((d) => d.id === mu.item);
                               const lineCost = (parseFloat(mu.usedQty) || 0) * (mat?.unitCost ?? 0);
+                              const availableQty = mat ? availableMaterials.get(mat.id) ?? 0 : null;
                               return (
                                 <div key={mIdx} className="grid grid-cols-1 sm:grid-cols-[1fr_100px_120px_32px] gap-2 items-center bg-slate-50 rounded-md p-2">
                                   <div className="flex flex-col gap-0.5">
@@ -399,6 +443,9 @@ export function AddReceiptDialog({ open, onClose, batch }: Props) {
                                     </select>
                                     {lineCost > 0 && (
                                       <span className="text-[10px] text-emerald-600 font-medium px-1">Cost: {formatCurrency(lineCost)}</span>
+                                    )}
+                                    {availableQty !== null && (
+                                      <span className="text-[10px] text-secondary px-1">Available: {availableQty} {mat?.uomSymbol}</span>
                                     )}
                                   </div>
                                   <input

@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronUp, ChevronDown, ChevronsUpDown, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from 'lucide-react';
 import { cn } from '@/lib/formatters';
 
 export interface Column<T> {
@@ -32,6 +32,8 @@ interface DataTableProps<T> {
   onSort?: (key: string) => void;
   emptyMessage?: string;
   tableHeadAction?: React.ReactNode;
+  headerClassName?: string;
+  alwaysShowPagination?: boolean;
   rowClassName?: (row: T) => string;
 }
 
@@ -43,7 +45,7 @@ const PRIORITY_CLASS: Record<string, string> = {
 
 export function DataTable<T>({
   columns, data, keyField, isLoading, pagination,
-  onPageChange, sortKey, sortDir, onSort, emptyMessage = 'No records found.', tableHeadAction, rowClassName,
+  onPageChange, sortKey, sortDir, onSort, emptyMessage = 'No records found.', tableHeadAction, headerClassName, alwaysShowPagination, rowClassName,
 }: DataTableProps<T>) {
   return (
     <div className="flex flex-col gap-0 min-w-0">
@@ -61,14 +63,15 @@ export function DataTable<T>({
                 <th
                   key={col.key}
                   className={cn(
-                    'px-4 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wide whitespace-nowrap',
+                    'px-4 py-3 text-left text-xs font-medium uppercase tracking-wide whitespace-nowrap',
+                    headerClassName ?? 'text-secondary',
                     PRIORITY_CLASS[col.priority ?? 'P1'],
                     col.className,
                     onSort && col.key !== 'actions' && col.key !== 'sl' ? 'cursor-pointer select-none hover:bg-slate-100 transition-colors' : '',
                   )}
                   onClick={() => onSort && col.key !== 'actions' && col.key !== 'sl' ? onSort(col.key) : undefined}
                 >
-                  <div className="flex items-center justify-between gap-2">
+                  <div className={cn('flex items-center gap-2', col.className?.includes('text-center') ? 'justify-center' : 'justify-between')}>
                     <span>{col.header}</span>
                     {onSort && col.key !== 'actions' && col.key !== 'sl' && (
                       <span className="shrink-0">
@@ -132,31 +135,47 @@ export function DataTable<T>({
       </div>
 
       {/* Pagination */}
-      {pagination && pagination.pages > 1 && (
-        <div className="flex items-center justify-between px-1 pt-3 text-sm text-secondary gap-2 flex-wrap">
+      {pagination && (alwaysShowPagination || pagination.pages > 1) && (
+        <div className="flex items-center justify-between px-3 py-2 mt-3 rounded-lg border border-border bg-white text-sm text-secondary gap-3 flex-wrap">
           <span className="text-xs">
             {((pagination.page - 1) * pagination.limit) + 1}–
             {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}
           </span>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => onPageChange?.(1)}
+              disabled={pagination.page <= 1}
+              className="p-1.5 rounded-md border border-border hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed min-w-[32px] min-h-[32px] flex items-center justify-center transition-colors"
+              aria-label="First page"
+            >
+              <ChevronsLeft size={15} />
+            </button>
             <button
               onClick={() => onPageChange?.(pagination.page - 1)}
               disabled={pagination.page <= 1}
-              className="p-1.5 rounded-md hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed min-w-[36px] min-h-[36px] flex items-center justify-center"
+              className="p-1.5 rounded-md border border-border hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed min-w-[32px] min-h-[32px] flex items-center justify-center transition-colors"
               aria-label="Previous page"
             >
-              <ChevronLeft size={16} />
+              <ChevronLeft size={15} />
             </button>
-            <span className="px-2 text-xs">
-              {pagination.page} / {pagination.pages}
+            <span className="min-w-[76px] px-3 py-1.5 rounded-md bg-emerald-50 text-emerald-700 text-xs font-semibold text-center">
+              Page {pagination.page} of {pagination.pages}
             </span>
             <button
               onClick={() => onPageChange?.(pagination.page + 1)}
               disabled={pagination.page >= pagination.pages}
-              className="p-1.5 rounded-md hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed min-w-[36px] min-h-[36px] flex items-center justify-center"
+              className="p-1.5 rounded-md border border-border hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed min-w-[32px] min-h-[32px] flex items-center justify-center transition-colors"
               aria-label="Next page"
             >
-              <ChevronRight size={16} />
+              <ChevronRight size={15} />
+            </button>
+            <button
+              onClick={() => onPageChange?.(pagination.pages)}
+              disabled={pagination.page >= pagination.pages}
+              className="p-1.5 rounded-md border border-border hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed min-w-[32px] min-h-[32px] flex items-center justify-center transition-colors"
+              aria-label="Last page"
+            >
+              <ChevronsRight size={15} />
             </button>
           </div>
         </div>

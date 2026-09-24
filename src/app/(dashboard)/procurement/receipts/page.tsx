@@ -1,25 +1,100 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Eye, Trash2, CreditCard } from 'lucide-react';
+import { Search, Eye, Trash2, CreditCard, ChevronDown, X } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DataTable, type Column } from '@/components/tables/DataTable';
 import { EmptyState, ErrorState, ConfirmDialog } from '@/components/feedback';
 import { formatCurrency, formatDate } from '@/lib/formatters';
-import { useGetGoodsReceiptsQuery, useDeleteGoodsReceiptMutation } from '@/features/procurement/services/procurementApi';
+import { useGetGoodsReceiptsQuery, useDeleteGoodsReceiptMutation, useGetSuppliersQuery } from '@/features/procurement/services/procurementApi';
 import { SupplierPaymentDialog } from '@/features/procurement/components/SupplierPaymentDialog';
 import type { GoodsReceipt, Supplier, PurchaseOrder } from '@/features/procurement/types';
+
+function SupplierDropdown({ value, onChange }: { value: string; onChange: (id: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
+  const { data } = useGetSuppliersQuery({ isActive: 'true' });
+  const suppliers = (data?.data?.suppliers ?? []).filter((supplier) =>
+    supplier.name.toLowerCase().includes(q.toLowerCase())
+  );
+  const selected = (data?.data?.suppliers ?? []).find((supplier) => supplier._id === value);
+
+  useEffect(() => {
+    function handleClick(event: MouseEvent) {
+      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative w-full sm:w-56">
+      <button
+        type="button"
+        onClick={() => { setOpen((isOpen) => !isOpen); setQ(''); }}
+        className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald flex items-center justify-between gap-2"
+      >
+        <span className={selected ? 'truncate' : 'text-muted'}>{selected ? selected.name : 'All Suppliers'}</span>
+        <div className="flex items-center gap-1 shrink-0">
+          {value && (
+            <span onMouseDown={(event) => { event.stopPropagation(); onChange(''); }} className="text-muted hover:text-foreground cursor-pointer">
+              <X size={13} />
+            </span>
+          )}
+          <ChevronDown size={13} className="text-secondary" />
+        </div>
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 z-50 mt-1 w-full min-w-[200px] rounded-md border border-border bg-white shadow-lg">
+          <div className="p-2 border-b border-border">
+            <div className="relative">
+              <Search size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted" />
+              <input
+                autoFocus
+                type="text"
+                placeholder="Search supplier…"
+                value={q}
+                onChange={(event) => setQ(event.target.value)}
+                className="h-8 w-full rounded border border-border pl-7 pr-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald"
+              />
+            </div>
+          </div>
+          <div className="max-h-52 overflow-y-auto">
+            <div
+              onMouseDown={() => { onChange(''); setOpen(false); }}
+              className={`px-3 py-2 text-sm cursor-pointer hover:bg-slate-50 ${!value ? 'bg-emerald-50 text-emerald-700 font-medium' : 'text-muted'}`}
+            >
+              All Suppliers
+            </div>
+            {suppliers.map((supplier) => (
+              <div
+                key={supplier._id}
+                onMouseDown={() => { onChange(supplier._id); setOpen(false); }}
+                className={`px-3 py-2 text-sm cursor-pointer hover:bg-slate-50 ${supplier._id === value ? 'bg-emerald-50 text-emerald-700 font-medium' : 'text-foreground'}`}
+              >
+                {supplier.name}
+              </div>
+            ))}
+            {suppliers.length === 0 && <p className="px-3 py-2 text-sm text-muted">No suppliers found</p>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function GoodsReceiptsPage() {
   const router = useRouter();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [supplierFilter, setSupplierFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [payReceipt, setPayReceipt] = useState<GoodsReceipt | null>(null);
 
-  const { data, isLoading, isError, refetch } = useGetGoodsReceiptsQuery({ page, search: search || undefined });
+  const { data, isLoading, isError, refetch } = useGetGoodsReceiptsQuery({ page, search: search || undefined, supplier: supplierFilter || undefined });
   const [deleteGR, { isLoading: deleteLoading }] = useDeleteGoodsReceiptMutation();
 
   async function handleDelete() {
@@ -119,13 +194,14 @@ export default function GoodsReceiptsPage() {
             className="h-9 w-full rounded-md border border-border bg-white pl-9 pr-3 text-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-emerald"
           />
         </div>
+        <SupplierDropdown value={supplierFilter} onChange={(id) => { setSupplierFilter(id); setPage(1); }} />
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
+          onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
           className="h-9 w-full sm:w-auto rounded-md border border-border bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald"
           aria-label="Filter by payment status"
         >
-          <option value="">All Statuses</option>
+          <option value="">All Payment Statuses</option>
           <option value="UNPAID">Unpaid</option>
           <option value="PARTIAL">Partial</option>
           <option value="PAID">Paid</option>

@@ -85,6 +85,24 @@ export const inventoryApi = api.injectEndpoints({
       query: ({ id, body }) => ({ url: `/warehouses/${id}`, method: 'PATCH', body }),
       invalidatesTags: ['Warehouse'],
     }),
+    repurchaseItem: build.mutation<{ success: boolean; data: { item: import('../types').Item } }, { id: string; supplier: string; warehouse: string; quantity: number; unitPrice: number; paidAmount?: number; paymentMethod?: string; notes?: string }>({
+      query: ({ id, ...body }) => ({ url: `/items/${id}/repurchase`, method: 'POST', body }),
+      invalidatesTags: ['Item', 'Stock', 'Supplier', 'PurchaseOrder'],
+    }),
+    bulkPurchaseItems: build.mutation<
+      { success: boolean; data: { poNumber: string; grNumber: string } },
+      {
+        supplier: string; warehouse: string;
+        items: Array<
+          | { mode: 'existing'; item: string; quantity: number; unitPrice: number; reorderLevel?: number }
+          | { mode: 'new'; name: string; sku?: string; type: string; baseUom: string; description?: string; quantity: number; unitPrice: number; reorderLevel?: number }
+        >;
+        paidAmount?: number; paymentMethod?: string; notes?: string;
+      }
+    >({
+      query: (body) => ({ url: '/items/bulk-purchase', method: 'POST', body }),
+      invalidatesTags: ['Item', 'Stock', 'Supplier', 'PurchaseOrder'],
+    }),
   }),
 });
 
@@ -106,4 +124,6 @@ export const {
   useGetWarehousesQuery,
   useCreateWarehouseMutation,
   useUpdateWarehouseMutation,
+  useRepurchaseItemMutation,
+  useBulkPurchaseItemsMutation,
 } = inventoryApi;
