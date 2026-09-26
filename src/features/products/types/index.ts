@@ -6,6 +6,12 @@ export interface ProductMaterial {
   uom: { _id: string; name: string; symbol: string } | string;
 }
 
+export interface ProductProductionSource {
+  type: 'WAREHOUSE' | 'FACTORY';
+  name: string;
+  identifier: string;
+}
+
 export interface Product {
   _id: string;
   name: string;
@@ -18,6 +24,7 @@ export interface Product {
   costPrice: number;
   salePrice?: number;
   materials: ProductMaterial[];
+  productionSources?: ProductProductionSource[];
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

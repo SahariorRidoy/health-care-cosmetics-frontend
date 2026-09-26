@@ -28,7 +28,7 @@ function buildNotifications(
       type: 'low_stock',
       title: item?.name ?? 'Unknown item',
       detail: `Stock: ${b.quantity} (reorder: ${item?.reorderLevel ?? '—'})`,
-      href: '/inventory/stock',
+      href: '/materials/stock',
     };
   });
 

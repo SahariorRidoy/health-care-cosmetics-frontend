@@ -146,6 +146,7 @@ export default function SuppliersPage() {
           supplierName={paySupplier.name}
           outstandingBalance={paySupplier.balance}
           onClose={() => setPaySupplier(null)}
+          onSuccess={() => refetch()}
         />
       )}
       <ConfirmDialog open={!!deleteId} title="Deactivate Supplier" description="This will deactivate the supplier. Existing records will not be affected." confirmLabel="Deactivate" variant="danger" loading={deleting} onConfirm={handleDelete} onCancel={() => setDeleteId(null)} />

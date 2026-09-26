@@ -10,6 +10,7 @@ import { useGetProductQuery } from '@/features/products/services/productsApi';
 import { useGetStockBalancesQuery, useGetStockMovementsQuery } from '@/features/inventory/services/inventoryApi';
 import { useGetUOMConversionsQuery } from '@/features/settings/services/settingsApi';
 import { ProductionFormDialog } from '@/features/production/components/ProductionFormDialog';
+import { ProductionBatchHistory } from '@/features/production/components/ProductionBatchHistory';
 import type { StockBalance, StockMovement } from '@/features/inventory/types';
 import type { ProductMaterial } from '@/features/products/types';
 import type { UOMConversion } from '@/features/settings/types';
@@ -175,6 +176,10 @@ export default function ProductionDetailPage() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="mb-4">
+        <ProductionBatchHistory productId={id} outputUomSymbol={uomSymbol} />
       </div>
 
       {/* Stock movements */}

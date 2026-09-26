@@ -9,6 +9,7 @@ import { formatCurrency, formatDate } from '@/lib/formatters';
 import { useGetProductQuery } from '@/features/products/services/productsApi';
 import { useGetStockBalancesQuery, useGetStockMovementsQuery } from '@/features/inventory/services/inventoryApi';
 import { useGetProductionOrdersQuery } from '@/features/production/services/productionApi';
+import { ProductionBatchHistory } from '@/features/production/components/ProductionBatchHistory';
 import { ProductFormDialog } from '@/features/products/components/ProductFormDialog';
 import type { Product } from '@/features/products/types';
 import type { StockBalance, StockMovement } from '@/features/inventory/types';
@@ -148,10 +149,14 @@ export default function ProductDetailPage() {
         </div>
       </div>
 
+      <div className="mb-4">
+        <ProductionBatchHistory productId={id} outputUomSymbol={uomSymbol} />
+      </div>
+
       {/* Production history */}
       <div className="bg-white rounded-lg border border-border">
         <div className="px-4 py-3 border-b border-border">
-          <h2 className="text-sm font-semibold text-foreground">Production History</h2>
+          <h2 className="text-sm font-semibold text-foreground">Work Order History</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[480px] text-[13px]">

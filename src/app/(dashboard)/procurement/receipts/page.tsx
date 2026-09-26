@@ -136,6 +136,15 @@ export default function GoodsReceiptsPage() {
       render: (row) => formatCurrency(row.totalAmount),
     },
     {
+      key: 'dueBalance', header: 'Due Balance', priority: 'P2',
+      render: (row) => {
+        const po = typeof row.purchaseOrder === 'string' ? null : row.purchaseOrder as PurchaseOrder;
+        if (!po) return '—';
+        const due = Math.max(0, (po.totalAmount ?? 0) - (po.paidAmount ?? 0));
+        return <span className={due > 0 ? 'text-red-600' : ''}>{formatCurrency(due)}</span>;
+      },
+    },
+    {
       key: 'paymentStatus', header: 'Payment Status', priority: 'P2',
       render: (row) => {
         const po = typeof row.purchaseOrder === 'string' ? null : row.purchaseOrder as PurchaseOrder;
@@ -174,6 +183,9 @@ export default function GoodsReceiptsPage() {
       },
     },
   ];
+
+  const po = typeof payReceipt?.purchaseOrder === 'string' ? null : payReceipt?.purchaseOrder as PurchaseOrder;
+  const due = po ? Math.max(0, (po.totalAmount ?? 0) - (po.paidAmount ?? 0)) : 0;
 
   return (
     <>
@@ -246,7 +258,7 @@ export default function GoodsReceiptsPage() {
           open={!!payReceipt}
           supplierId={typeof payReceipt.supplier === 'string' ? payReceipt.supplier : (payReceipt.supplier as Supplier)._id}
           supplierName={typeof payReceipt.supplier === 'string' ? '' : (payReceipt.supplier as Supplier).name}
-          outstandingBalance={payReceipt.totalAmount}
+          outstandingBalance={due}
           purchaseOrderId={typeof payReceipt.purchaseOrder === 'string' ? payReceipt.purchaseOrder : (payReceipt.purchaseOrder as PurchaseOrder)._id}
           onClose={() => setPayReceipt(null)}
         />

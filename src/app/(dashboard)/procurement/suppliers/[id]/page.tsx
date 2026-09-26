@@ -96,7 +96,7 @@ export default function SupplierDetailPage() {
         const firstItem = row.items?.[0]?.item as { _id: string; name: string } | string | undefined;
         if (!firstItem || typeof firstItem === 'string') return '—';
         return (
-          <button onClick={() => router.push(`/inventory/${firstItem._id}`)} className="text-emerald hover:underline">
+          <button onClick={() => router.push(`/materials/${firstItem._id}`)} className="text-emerald hover:underline">
             {firstItem.name}
             {row.items.length > 1 && <span className="text-muted ml-1">(+{row.items.length - 1})</span>}
           </button>
@@ -330,6 +330,7 @@ export default function SupplierDetailPage() {
         supplierName={supplier.name}
         outstandingBalance={supplier.balance}
         onClose={() => setPaymentOpen(false)}
+        onSuccess={() => refetch()}
       />
     </>
   );

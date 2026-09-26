@@ -5,10 +5,11 @@ import { toast } from 'sonner';
 import { X, Plus, Trash2, Loader2, ChevronDown } from 'lucide-react';
 import { useGetItemsQuery, useGetUOMsQuery, useGetWarehousesQuery, useGenerateSkuQuery, useGetStockBalancesQuery } from '@/features/inventory/services/inventoryApi';
 import { useGetUOMConversionsQuery } from '@/features/settings/services/settingsApi';
-import { useCreateProductMutation, useUpdateProductMutation } from '@/features/products/services/productsApi';
+import { useGetProductsQuery, useUpdateProductMutation } from '@/features/products/services/productsApi';
+import { useCreateProductionBatchMutation } from '@/features/production/services/productionApi';
 import type { Product } from '@/features/products/types';
 import type { UOMConversion } from '@/features/settings/types';
-import { FormField, SelectField } from '@/components/forms/FormField';
+import { FormField, SelectField, TextareaField } from '@/components/forms/FormField';
 import { formatCurrency } from '@/lib/formatters';
 
 interface MaterialLine {
@@ -122,12 +123,20 @@ function resolveConversionFactor(
 
 export function ProductionFormDialog({ open, onClose, product }: Props) {
   const isEdit = !!product;
+  const [productionMode, setProductionMode] = useState<'new' | 'existing'>('new');
+  const [productSearch, setProductSearch] = useState('');
+  const [selectedProductId, setSelectedProductId] = useState('');
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const { data: rawData } = useGetItemsQuery({ type: 'RAW_MATERIAL', isActive: 'true' });
   const { data: pkgData } = useGetItemsQuery({ type: 'PACKAGING', isActive: 'true' });
   const { data: uomData } = useGetUOMsQuery();
   const { data: warehouseData } = useGetWarehousesQuery();
   const { data: convData } = useGetUOMConversionsQuery();
-  const [createProduct, { isLoading: creating }] = useCreateProductMutation();
+  const { data: productsData, isLoading: productsLoading } = useGetProductsQuery(
+    { page: 1, search: productSearch || undefined, isActive: 'true' },
+    { skip: isEdit || !open || productionMode !== 'existing' },
+  );
+  const [createProductionBatch, { isLoading: creating }] = useCreateProductionBatchMutation();
   const [updateProduct, { isLoading: updating }] = useUpdateProductMutation();
   const isLoading = creating || updating;
 
@@ -160,6 +169,7 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
   const [salePrice, setSalePrice] = useState('');
   const [reorderLevel, setReorderLevel] = useState('');
   const [warehouse, setWarehouse] = useState('');
+  const [notes, setNotes] = useState('');
   const [materials, setMaterials] = useState<MaterialLine[]>([{ itemId: '', baseUomId: '', baseUomSymbol: '', costPrice: 0, uomId: '', qty: '' }]);
 
   const materialsFilledRef = useRef(false);
@@ -167,15 +177,19 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
   const allItems = useMemo(() => [...(rawData?.data?.items ?? []), ...(pkgData?.data?.items ?? [])], [rawData, pkgData]);
   const uoms = useMemo(() => uomData?.data?.uoms?.filter((u) => u.isActive) ?? [], [uomData]);
   const conversions = useMemo(() => convData?.data?.conversions ?? [], [convData]);
-  const warehouses = warehouseData?.data?.warehouses?.filter((w) => w.isActive) ?? [];
+  const warehouses = useMemo(() => warehouseData?.data?.warehouses?.filter((w) => w.isActive) ?? [], [warehouseData]);
 
   useEffect(() => {
-    if (!isEdit && skuData?.data?.sku) setSku(skuData.data.sku);
-  }, [skuData, isEdit]);
+    if (!isEdit && productionMode === 'new' && skuData?.data?.sku) setSku(skuData.data.sku);
+  }, [skuData, isEdit, productionMode]);
 
   // reset form fields when dialog opens/closes or product changes
   useEffect(() => {
     if (!open) { materialsFilledRef.current = false; return; }
+    setProductionMode('new');
+    setProductSearch('');
+    setSelectedProductId('');
+    setSelectedProduct(null);
     setName(product?.name ?? '');
     setSku(product?.sku ?? '');
     setOutputUom(product ? (typeof product.baseUom === 'string' ? product.baseUom : (product.baseUom?._id ?? '')) : '');
@@ -190,6 +204,12 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, product?._id]);
+
+  useEffect(() => {
+    if (!open || isEdit || warehouse) return;
+    const defaultWh = warehouses.find((item) => item.isDefault);
+    if (defaultWh) setWarehouse(defaultWh._id);
+  }, [open, isEdit, warehouse, warehouses]);
 
   // pre-fill warehouse from first stock balance
   useEffect(() => {
@@ -295,18 +315,34 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
   }
 
   function reset() {
+    setProductionMode('new'); setProductSearch(''); setSelectedProductId(''); setSelectedProduct(null);
     setName(''); setSku(''); setSkuName(''); setOutputUom('');
     setOutputQty(''); setSalePrice(''); setReorderLevel(''); setWarehouse('');
+    setNotes('');
     setMaterials([{ itemId: '', baseUomId: '', baseUomSymbol: '', costPrice: 0, uomId: '', qty: '' }]);
   }
 
+  function selectExistingProduct(productId: string) {
+    const selected = productsData?.data.items.find((item) => item._id === productId) ?? null;
+    setSelectedProductId(productId);
+    setSelectedProduct(selected);
+    if (!selected) return;
+    setName(selected.name);
+    setSku(selected.sku);
+    setOutputUom(typeof selected.baseUom === 'string' ? selected.baseUom : selected.baseUom._id);
+    setSalePrice(selected.salePrice ? String(selected.salePrice) : '');
+    setReorderLevel(String(selected.reorderLevel ?? 0));
+  }
+
   async function handleSave() {
-    if (!name.trim() || !sku.trim() || !outputUom) {
+    if ((!isEdit && productionMode === 'existing' && (!selectedProductId || !selectedProduct)) ||
+      (!isEdit && productionMode === 'new' && (!name.trim() || !sku.trim() || !outputUom)) ||
+      (isEdit && (!name.trim() || !sku.trim() || !outputUom))) {
       toast.error('Fill in all required product fields');
       return;
     }
     if (outQty <= 0) { toast.error('Output qty is required'); return; }
-    if (!(parseFloat(salePrice) > 0)) { toast.error('Sale price is required'); return; }
+    if ((isEdit || productionMode === 'new') && !(parseFloat(salePrice) > 0)) { toast.error('Sale price is required'); return; }
     if (!warehouse) { toast.error('Select a warehouse'); return; }
     if (materials.every((m) => !m.itemId)) { toast.error('Add at least one input material'); return; }
     if (materials.some((m) => m.itemId && !(parseFloat(m.qty) > 0))) {
@@ -340,19 +376,24 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
         }).unwrap();
         toast.success('Product updated');
       } else {
-        await createProduct({
-          name: name.trim(),
-          sku: sku.trim(),
-          baseUom: outputUom,
-          reorderLevel: parseInt(reorderLevel) >= 0 ? parseInt(reorderLevel) : 0,
+        const result = await createProductionBatch({
+          ...(productionMode === 'existing'
+            ? { productId: selectedProductId }
+            : {
+                newProduct: {
+                  name: name.trim(),
+                  sku: sku.trim(),
+                  baseUom: outputUom,
+                  reorderLevel: parseInt(reorderLevel) >= 0 ? parseInt(reorderLevel) : 0,
+                  salePrice: parseFloat(salePrice),
+                },
+              }),
           warehouse,
-          quantity: outQty,
-          unitPrice: costPerUnit > 0 ? costPerUnit : 0,
-          costPrice,
-          salePrice: parseFloat(salePrice) || undefined,
-          materials: filledMaterials,
+          quantityProduced: outQty,
+          materials: filledMaterials.map(({ item, qty, uom }) => ({ item, qty, uom })),
+          notes: notes.trim() || undefined,
         }).unwrap();
-        toast.success('Product created');
+        toast.success(`Production batch ${result.data.batch.batchNumber} recorded`);
       }
       reset();
       onClose();
@@ -385,7 +426,60 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
           {/* Product details */}
           <div>
             <p className="text-[11px] font-semibold text-secondary uppercase tracking-wide mb-3">Product Details</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {!isEdit && (
+              <div className="flex gap-1 mb-4" role="group" aria-label="Production product mode">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (productionMode === 'existing') {
+                      setSelectedProductId('');
+                      setSelectedProduct(null);
+                      setName('');
+                      setSku('');
+                      setSkuName('');
+                      setOutputUom('');
+                      setSalePrice('');
+                      setReorderLevel('');
+                    }
+                    setProductionMode('new');
+                  }}
+                  className={`h-8 px-3 rounded-md text-sm font-medium ${productionMode === 'new' ? 'bg-emerald text-white' : 'text-secondary hover:bg-slate-100'}`}
+                >
+                  New product
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProductionMode('existing')}
+                  className={`h-8 px-3 rounded-md text-sm font-medium ${productionMode === 'existing' ? 'bg-emerald text-white' : 'text-secondary hover:bg-slate-100'}`}
+                >
+                  Existing product
+                </button>
+              </div>
+            )}
+            {!isEdit && productionMode === 'existing' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormField
+                  label="Search product by name or SKU"
+                  placeholder="Type a product name or SKU…"
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                />
+                <SelectField label="Finished Product" required value={selectedProductId} onChange={(e) => selectExistingProduct(e.target.value)}>
+                  <option value="">{productsLoading ? 'Loading products…' : 'Select product…'}</option>
+                  {(productsData?.data.items ?? []).map((item) => (
+                    <option key={item._id} value={item._id}>{item.name} · {item.sku}</option>
+                  ))}
+                </SelectField>
+                {selectedProduct && (
+                  <p className="sm:col-span-2 text-xs text-secondary">
+                    Selected: <span className="font-semibold text-foreground">{selectedProduct.name}</span>
+                    {' · SKU '}{selectedProduct.sku}
+                    {' · Current stock '}{selectedProduct.currentStock}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormField
                 label="Product Name" required placeholder="e.g. Aloe Vera Cream 200ml"
                 value={name}
@@ -398,7 +492,8 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
                 }}
               />
               <FormField label="SKU" required={isEdit} placeholder={isEdit ? '' : 'Auto-generated'} value={sku} onChange={(e) => setSku(e.target.value)} />
-            </div>
+              </div>
+            )}
           </div>
 
           {/* Input materials */}
@@ -498,16 +593,28 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
           <div>
             <p className="text-[11px] font-semibold text-secondary uppercase tracking-wide mb-3">Output</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <SelectField label="Output UOM" required value={outputUom} onChange={(e) => setOutputUom(e.target.value)}>
+              <SelectField label="Output UOM" required value={outputUom} disabled={!isEdit && productionMode === 'existing'} onChange={(e) => setOutputUom(e.target.value)}>
                 <option value="">Select UOM…</option>
                 {uoms.map((u) => <option key={u._id} value={u._id}>{u.name} ({u.symbol})</option>)}
               </SelectField>
-              <FormField label="Output Qty (units produced)" required type="number" min={0} step="any" placeholder="e.g. 100" value={outputQty} onChange={(e) => setOutputQty(e.target.value)} />
+              <FormField label="Output Qty Produced" required type="number" min={0} step="any" placeholder="e.g. 100" value={outputQty} onChange={(e) => setOutputQty(e.target.value)} />
               <SelectField label="Warehouse" required value={warehouse} onChange={(e) => setWarehouse(e.target.value)}>
                 <option value="">Select warehouse…</option>
                 {warehouses.map((w) => <option key={w._id} value={w._id}>{w.name}</option>)}
               </SelectField>
-              <FormField label="Low Stock Qty" type="number" min={0} step="1" placeholder="e.g. 10" value={reorderLevel} onChange={(e) => setReorderLevel(e.target.value)} />
+              {isEdit || productionMode === 'new' ? (
+                <FormField label="Low Stock Qty" type="number" min={0} step="1" placeholder="e.g. 10" value={reorderLevel} onChange={(e) => setReorderLevel(e.target.value)} />
+              ) : (
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-medium text-secondary">Low Stock Qty</span>
+                  <p className="h-10 flex items-center text-sm text-foreground">{selectedProduct?.reorderLevel ?? 0}</p>
+                </div>
+              )}
+              {!isEdit && (
+                <div className="sm:col-span-2 lg:col-span-4">
+                  <TextareaField label="Batch Notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+                </div>
+              )}
             </div>
           </div>
 
@@ -534,7 +641,7 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
                 </div>
                 <div className="flex justify-between items-center border-t border-border pt-2">
                   <span className="text-sm font-semibold text-violet-600">Sale Price (৳)</span>
-                  <input
+                  {isEdit || productionMode === 'new' ? <input
                     type="number"
                     min={0}
                     step="0.01"
@@ -542,7 +649,7 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
                     value={salePrice}
                     onChange={(e) => setSalePrice(e.target.value)}
                     className="w-28 h-8 rounded-md border border-green-300 bg-violet-green px-2 text-sm font-semibold text-green-700 placeholder:text-violet-300 focus:outline-none focus:ring-2 focus:ring-green-400"
-                  />
+                  /> : <span className="text-sm font-semibold text-green-700">{selectedProduct?.salePrice ? formatCurrency(selectedProduct.salePrice) : '—'}</span>}
                 </div>
               </div>
             </div>
@@ -556,7 +663,7 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
           </button>
           <button type="button" onClick={handleSave} disabled={isLoading} className="h-10 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium disabled:opacity-60 transition-colors flex items-center justify-center gap-2">
             {isLoading && <Loader2 size={14} className="animate-spin" />}
-            {isEdit ? 'Save Changes' : 'Save & Create Product'}
+            {isEdit ? 'Save Changes' : 'Record Production Batch'}
           </button>
         </div>
       </div>

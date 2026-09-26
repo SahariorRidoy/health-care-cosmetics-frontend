@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Search, Pencil, Trash2, Eye, SlidersHorizontal, X } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Eye, SlidersHorizontal, X, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DataTable, type Column } from '@/components/tables/DataTable';
@@ -75,6 +75,31 @@ export default function ProductionPage() {
       },
     },
     { key: 'sku', header: 'SKU', priority: 'P1' },
+    {
+      key: 'productionSources', header: 'Production Source', priority: 'P2',
+      render: (row) => {
+        const sources = row.productionSources ?? [];
+        if (sources.length === 0) return <span className="text-muted">—</span>;
+        const warehouseCount = sources.filter((source) => source.type === 'WAREHOUSE').length;
+        const factoryCount = sources.filter((source) => source.type === 'FACTORY').length;
+        return (
+          <details className="group">
+            <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded px-1.5 py-1 text-xs text-secondary hover:bg-slate-50" title="Expand to view production identifiers">
+              <span>{[warehouseCount > 0 && `Warehouse${warehouseCount > 1 ? ` (${warehouseCount})` : ''}`, factoryCount > 0 && `Factory${factoryCount > 1 ? ` (${factoryCount})` : ''}`].filter(Boolean).join(' · ')}</span>
+              <ChevronDown size={13} className="transition-transform group-open:rotate-180" aria-hidden="true" />
+            </summary>
+            <div className="mt-1 space-y-1 border-l-2 border-border pl-2">
+              {sources.map((source) => (
+                <div key={`${source.type}-${source.identifier}`} className="flex items-center gap-2 text-xs">
+                  <span className="text-secondary">{source.type === 'FACTORY' ? 'Factory' : 'Warehouse'}</span>
+                  <span className="font-mono text-foreground" title={source.identifier}>{source.identifier}</span>
+                </div>
+              ))}
+            </div>
+          </details>
+        );
+      },
+    },
     {
       key: 'currentStock', header: 'Stock', priority: 'P2',
       render: (row) => {
