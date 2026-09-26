@@ -84,6 +84,17 @@ export const salesApi = api.injectEndpoints({
       query: (body) => ({ url: '/sales/orders', method: 'POST', body }),
       invalidatesTags: ['SalesOrder', 'Invoice', 'CustomerPayment', 'Stock'],
     }),
+    updateSalesOrder: build.mutation<SalesOrderResponse, {
+      id: string;
+      body: {
+        customer: string; warehouse: string;
+        items: { item: string; description?: string; qty: number; unitPrice: number; discount: number; uom: string }[];
+        taxPercent: number; notes?: string;
+      };
+    }>({
+      query: ({ id, body }) => ({ url: `/sales/orders/${id}`, method: 'PATCH', body }),
+      invalidatesTags: (_r, _e, { id }) => ['SalesOrder', { type: 'SalesOrder', id }, 'Invoice', 'CustomerPayment', 'Stock'],
+    }),
     cancelSalesOrder: build.mutation<SalesOrderResponse, string>({
       query: (id) => ({ url: `/sales/orders/${id}/cancel`, method: 'PATCH' }),
       invalidatesTags: (_r, _e, id) => ['SalesOrder', { type: 'SalesOrder', id }],
@@ -101,6 +112,22 @@ export const salesApi = api.injectEndpoints({
     getInvoice: build.query<InvoiceResponse, string>({
       query: (id) => `/sales/invoices/${id}`,
       providesTags: (_r, _e, id) => [{ type: 'Invoice', id }],
+    }),
+    updateInvoice: build.mutation<InvoiceResponse, {
+      id: string;
+      body: {
+        items: { item: string; description?: string; qty: number; unitPrice: number; discount: number; uom: string }[];
+        taxPercent: number; dueDate?: string; notes?: string;
+      };
+    }>({
+      query: ({ id, body }) => ({ url: `/sales/invoices/${id}`, method: 'PATCH', body }),
+      invalidatesTags: (_r, _e, { id }) => ['Invoice', { type: 'Invoice', id }, 'SalesOrder', 'Customer'],
+    }),
+    updateCustomerPayment: build.mutation<CustomerPaymentResponse, {
+      id: string; body: { amount: number; method: string; paymentDate?: string; reference?: string; notes?: string };
+    }>({
+      query: ({ id, body }) => ({ url: `/sales/payments/${id}`, method: 'PATCH', body }),
+      invalidatesTags: (_r, _e, { id }) => ['CustomerPayment', { type: 'CustomerPayment', id }, 'Invoice', 'SalesOrder', 'Customer'],
     }),
     deleteInvoice: build.mutation<{ success: boolean; message: string }, string>({
       query: (id) => ({ url: `/sales/invoices/${id}`, method: 'DELETE' }),
@@ -136,11 +163,14 @@ export const {
   useGetSalesOrdersQuery,
   useGetSalesOrderQuery,
   useCreateSalesOrderMutation,
+  useUpdateSalesOrderMutation,
   useCancelSalesOrderMutation,
   useDeleteSalesOrderMutation,
   useGetInvoicesQuery,
   useGetInvoiceQuery,
+  useUpdateInvoiceMutation,
   useDeleteInvoiceMutation,
   useCreateInvoiceMutation,
   useDeletePaymentMutation,
+  useUpdateCustomerPaymentMutation,
 } = salesApi;

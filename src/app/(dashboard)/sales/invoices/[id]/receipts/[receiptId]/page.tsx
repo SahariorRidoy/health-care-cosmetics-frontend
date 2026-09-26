@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Printer, FileDown, Loader2 } from 'lucide-react';
+import { ArrowLeft, Printer, FileDown, Loader2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { LoadingSpinner, ErrorState } from '@/components/feedback';
@@ -10,11 +10,13 @@ import { formatCurrency, formatDate } from '@/lib/formatters';
 import { useGetCustomerPaymentQuery } from '@/features/sales/services/salesApi';
 import { useAppSelector } from '@/lib/store/hooks';
 import type { Customer } from '@/features/sales/types';
+import { ReceiptEditDialog } from '@/features/sales/components/SalesRecordEditDialogs';
 
 export default function ReceiptDetailPage() {
   const { id, receiptId } = useParams<{ id: string; receiptId: string }>();
   const router = useRouter();
   const [downloading, setDownloading] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const token = useAppSelector((s) => s.auth.accessToken);
 
   const { data, isLoading, isError, refetch } = useGetCustomerPaymentQuery(receiptId);
@@ -85,6 +87,9 @@ export default function ReceiptDetailPage() {
             <button onClick={() => router.back()} className="h-9 px-3 rounded-md border border-border text-sm text-foreground hover:bg-slate-50 flex items-center gap-2 transition-colors">
               <ArrowLeft size={15} /> Back
             </button>
+            <button onClick={() => setEditOpen(true)} className="h-9 px-3 rounded-md border border-border text-sm text-foreground hover:bg-slate-50 flex items-center gap-2 transition-colors">
+              <Pencil size={14} /> Edit Receipt
+            </button>
             <button onClick={handlePrint} className="h-9 px-4 rounded-md border border-border text-sm font-medium flex items-center gap-2 hover:bg-slate-50 transition-colors">
               <Printer size={15} /> Print
             </button>
@@ -132,6 +137,7 @@ export default function ReceiptDetailPage() {
           </div>
         )}
       </div>
+      <ReceiptEditDialog payment={payment} open={editOpen} onClose={() => setEditOpen(false)} />
     </>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Eye, FileDown, Printer, Loader2, Search, X, Trash2 } from 'lucide-react';
+import { Eye, FileDown, Printer, Loader2, Search, X, Trash2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DataTable, type Column } from '@/components/tables/DataTable';
@@ -11,6 +11,7 @@ import { formatCurrency, formatDate } from '@/lib/formatters';
 import { useGetAllPaymentsQuery, useDeletePaymentMutation } from '@/features/sales/services/salesApi';
 import { useAppSelector } from '@/lib/store/hooks';
 import type { CustomerPayment, Customer } from '@/features/sales/types';
+import { ReceiptEditDialog } from '@/features/sales/components/SalesRecordEditDialogs';
 
 const PAYMENT_METHODS = ['CASH', 'BANK_TRANSFER', 'CHEQUE', 'MOBILE_BANKING'];
 
@@ -23,6 +24,7 @@ export default function ReceiptsPage() {
   const [dateTo, setDateTo] = useState('');
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [editPayment, setEditPayment] = useState<CustomerPayment | null>(null);
   const token = useAppSelector((s) => s.auth.accessToken);
   const [deletePayment, { isLoading: deleting }] = useDeletePaymentMutation();
 
@@ -117,11 +119,18 @@ export default function ReceiptsPage() {
       render: (row) => <span className="font-semibold text-emerald-600">{formatCurrency(row.amount)}</span>,
     },
     {
-      key: 'actions', header: '', priority: 'P1', className: 'w-[120px] text-right',
+      key: 'actions', header: '', priority: 'P1', className: 'w-[152px] text-right',
       render: (row) => {
         const invoiceId = typeof row.invoice === 'string' ? row.invoice : row.invoice?._id;
         return (
           <div className="flex items-center justify-end gap-1">
+            <button
+              onClick={() => setEditPayment(row)}
+              className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[32px] min-h-[32px] flex items-center justify-center"
+              aria-label="Edit receipt" title="Edit"
+            >
+              <Pencil size={15} />
+            </button>
             <button
               onClick={() => invoiceId && router.push(`/sales/invoices/${invoiceId}/receipts/${row._id}`)}
               className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[32px] min-h-[32px] flex items-center justify-center"
@@ -246,6 +255,8 @@ export default function ReceiptsPage() {
         }}
         onCancel={() => setDeleteId(null)}
       />
+
+      {editPayment && <ReceiptEditDialog payment={editPayment} open onClose={() => setEditPayment(null)} />}
     </>
   );
 }

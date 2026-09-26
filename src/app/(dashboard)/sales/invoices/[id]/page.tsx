@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { ArrowLeft, Loader2, X, CreditCard, FileDown, Printer } from 'lucide-react';
+import { ArrowLeft, Loader2, X, CreditCard, FileDown, Printer, Pencil } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { LoadingSpinner, ErrorState, StatusBadge } from '@/components/feedback';
 import { DataTable, type Column } from '@/components/tables/DataTable';
@@ -19,6 +19,7 @@ import {
 } from '@/features/sales/services/salesApi';
 import { useAppSelector } from '@/lib/store/hooks';
 import type { InvoiceItem, CustomerPayment } from '@/features/sales/types';
+import { InvoiceEditDialog } from '@/features/sales/components/SalesRecordEditDialogs';
 
 // ── Receipt dialog ────────────────────────────────────────────────────────────
 
@@ -114,7 +115,9 @@ function RecordReceiptDialog({
 export default function InvoiceDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [receiptOpen, setReceiptOpen] = useState(false);
+  const [editInvoiceOpen, setEditInvoiceOpen] = useState(searchParams.get('edit') === '1');
   const [paymentPage, setPaymentPage] = useState(1);
   const [downloading, setDownloading] = useState(false);
   const token = useAppSelector((s) => s.auth.accessToken);
@@ -283,6 +286,11 @@ export default function InvoiceDetailPage() {
             <button onClick={() => router.back()} className="h-9 px-3 rounded-md border border-border text-sm text-foreground hover:bg-slate-50 flex items-center gap-2 transition-colors">
               <ArrowLeft size={15} aria-hidden="true" /> Back
             </button>
+            {invoice.status !== 'CANCELLED' && (
+              <button onClick={() => setEditInvoiceOpen(true)} className="h-9 px-3 rounded-md border border-border text-sm text-foreground hover:bg-slate-50 flex items-center gap-2 transition-colors">
+                <Pencil size={14} aria-hidden="true" /> Edit Invoice
+              </button>
+            )}
             {canPay && (
               <button onClick={() => setReceiptOpen(true)} className="h-9 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium flex items-center gap-2 transition-colors">
                 <CreditCard size={15} aria-hidden="true" /> Record Payment
@@ -410,6 +418,7 @@ export default function InvoiceDetailPage() {
           onClose={() => setReceiptOpen(false)}
         />
       )}
+      <InvoiceEditDialog invoice={invoice} open={editInvoiceOpen} onClose={() => setEditInvoiceOpen(false)} />
     </>
   );
 }

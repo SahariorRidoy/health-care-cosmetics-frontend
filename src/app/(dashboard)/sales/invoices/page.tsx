@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Eye, FileDown, Printer, Loader2, Search, X, CreditCard, Trash2 } from 'lucide-react';
+import { Eye, FileDown, Printer, Loader2, Search, X, CreditCard, Trash2, Pencil } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -182,7 +182,7 @@ export default function InvoicesPage() {
     },
     { key: 'status', header: 'Status', priority: 'P1', render: (row) => <StatusBadge status={row.status} /> },
     {
-      key: 'actions', header: '', priority: 'P1', className: 'w-[140px] text-right',
+      key: 'actions', header: '', priority: 'P1', className: 'w-[172px] text-right',
       render: (row) => (
         <div className="flex items-center justify-end gap-1">
           {row.dueAmount > 0 && row.status !== 'CANCELLED' && (
@@ -192,6 +192,15 @@ export default function InvoicesPage() {
               title="Pay Due" aria-label="Pay Due"
             >
               <CreditCard size={15} />
+            </button>
+          )}
+          {row.status !== 'CANCELLED' && (
+            <button
+              onClick={() => router.push(`/sales/invoices/${row._id}?edit=1`)}
+              className="p-1.5 rounded-md text-emerald-700 hover:bg-emerald-50 min-w-[32px] min-h-[32px] flex items-center justify-center"
+              aria-label="Edit invoice" title="Edit"
+            >
+              <Pencil size={15} />
             </button>
           )}
           <button onClick={() => router.push(`/sales/invoices/${row._id}`)} className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="View invoice" title="View">

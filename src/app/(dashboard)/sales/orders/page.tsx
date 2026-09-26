@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Plus, Search, Eye, CreditCard, Loader2, X, Trash2 } from 'lucide-react';
+import { Plus, Search, Eye, CreditCard, Loader2, X, Trash2, Pencil } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -140,7 +140,7 @@ export default function SalesOrdersPage() {
       },
     },
     {
-      key: 'actions', header: '', priority: 'P1', className: 'w-[100px] text-right',
+      key: 'actions', header: '', priority: 'P1', className: 'w-[132px] text-right',
       render: (row) => (
         <div className="flex items-center justify-end gap-1">
           {row.dueAmount > 0 && row.invoiceId && (
@@ -150,6 +150,15 @@ export default function SalesOrdersPage() {
               aria-label="Pay due" title="Pay Due"
             >
               <CreditCard size={15} />
+            </button>
+          )}
+          {row.status === 'ACTIVE' && (
+            <button
+              onClick={() => router.push(`/sales/orders/${row._id}?edit=1`)}
+              className="p-1.5 rounded-md text-emerald-700 hover:bg-emerald-50 min-w-[32px] min-h-[32px] flex items-center justify-center"
+              aria-label="Edit order" title="Edit"
+            >
+              <Pencil size={15} />
             </button>
           )}
           <button

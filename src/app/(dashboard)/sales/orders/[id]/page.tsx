@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { ArrowLeft, Loader2, X, CreditCard, FileDown, Printer, FileText } from 'lucide-react';
+import { ArrowLeft, Loader2, X, CreditCard, FileDown, Printer, FileText, Pencil } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { LoadingSpinner, ErrorState, StatusBadge, ConfirmDialog } from '@/components/feedback';
 import { DataTable, type Column } from '@/components/tables/DataTable';
@@ -21,6 +21,7 @@ import {
 } from '@/features/sales/services/salesApi';
 import { useAppSelector } from '@/lib/store/hooks';
 import type { SalesOrderItem, Invoice } from '@/features/sales/types';
+import { SalesOrderEditDialog } from '@/features/sales/components/SalesRecordEditDialogs';
 
 // ── Record payment dialog ─────────────────────────────────────────────────────
 
@@ -122,7 +123,9 @@ function RecordPaymentDialog({
 export default function SalesOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
+  const [editOrderOpen, setEditOrderOpen] = useState(searchParams.get('edit') === '1');
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const token = useAppSelector((s) => s.auth.accessToken);
@@ -273,6 +276,11 @@ export default function SalesOrderDetailPage() {
               <ArrowLeft size={15} aria-hidden="true" /> Back
             </button>
             {order.status === 'ACTIVE' && (
+              <button onClick={() => setEditOrderOpen(true)} className="h-9 px-3 rounded-md border border-border text-sm text-foreground hover:bg-slate-50 flex items-center gap-2 transition-colors">
+                <Pencil size={14} aria-hidden="true" /> Edit Order
+              </button>
+            )}
+            {order.status === 'ACTIVE' && (
               <button onClick={() => setConfirmCancel(true)} className="h-9 px-3 rounded-md border border-red-200 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors">
                 Cancel Order
               </button>
@@ -389,6 +397,8 @@ export default function SalesOrderDetailPage() {
         customerId={customerId ?? ''}
         onClose={() => setPaymentInvoice(null)}
       />
+
+      <SalesOrderEditDialog order={order} open={editOrderOpen} onClose={() => setEditOrderOpen(false)} />
 
       <ConfirmDialog
         open={confirmCancel}
