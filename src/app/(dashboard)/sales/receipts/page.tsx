@@ -10,7 +10,7 @@ import { EmptyState, ErrorState, ConfirmDialog } from '@/components/feedback';
 import { formatCurrency, formatDate } from '@/lib/formatters';
 import { useGetAllPaymentsQuery, useDeletePaymentMutation } from '@/features/sales/services/salesApi';
 import { useAppSelector } from '@/lib/store/hooks';
-import type { CustomerPayment, Customer } from '@/features/sales/types';
+import type { CustomerPayment, Dealer } from '@/features/sales/types';
 import { ReceiptEditDialog } from '@/features/sales/components/SalesRecordEditDialogs';
 
 const PAYMENT_METHODS = ['CASH', 'BANK_TRANSFER', 'CHEQUE', 'MOBILE_BANKING'];
@@ -95,10 +95,10 @@ export default function ReceiptsPage() {
       },
     },
     {
-      key: 'customer', header: 'Customer', priority: 'P1',
+      key: 'dealer', header: 'Dealer', priority: 'P1',
       render: (row) => {
-        const c = typeof row.customer === 'string' ? null : row.customer as Customer;
-        return c?.name ?? '—';
+        const d = typeof row.dealer === 'string' ? null : row.dealer as Dealer;
+        return d?.name ?? '—';
       },
     },
     {
@@ -172,7 +172,7 @@ export default function ReceiptsPage() {
     <>
       <PageHeader
         title="Receipts"
-        description="All customer payment receipts"
+        description="All dealer payment receipts"
         breadcrumbs={[{ label: 'Sales' }, { label: 'Receipts' }]}
       />
 
@@ -181,7 +181,7 @@ export default function ReceiptsPage() {
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
           <input
             type="search"
-            placeholder="Search by receipt #, customer…"
+            placeholder="Search by receipt #, dealer…"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             className="h-9 w-full rounded-md border border-border bg-white pl-9 pr-3 text-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-emerald"

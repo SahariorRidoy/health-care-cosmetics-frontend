@@ -50,7 +50,7 @@ const NAV_ITEMS: NavItem[] = [
       { href: '/sales/orders', label: 'Orders', icon: ClipboardList },
       { href: '/sales/invoices', label: 'Invoices', icon: FileText },
       { href: '/sales/receipts', label: 'Receipts', icon: ReceiptText },
-      { href: '/sales/customers', label: 'Customers', icon: UserCircle },
+      { href: '/sales/dealers', label: 'Dealers', icon: UserCircle },
     ],
   },
   {

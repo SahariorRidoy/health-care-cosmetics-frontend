@@ -17,7 +17,7 @@ import {
   useCancelSalesOrderMutation,
   useGetInvoicesQuery,
   useCreateCustomerPaymentMutation,
-  useGetCustomerPaymentsQuery,
+  useGetDealerPaymentsQuery,
 } from '@/features/sales/services/salesApi';
 import { useAppSelector } from '@/lib/store/hooks';
 import type { SalesOrderItem, Invoice } from '@/features/sales/types';
@@ -37,11 +37,11 @@ type PaymentForm = z.infer<typeof paymentSchema>;
 const PAYMENT_METHODS = ['CASH', 'BANK_TRANSFER', 'CHEQUE', 'MOBILE_BANKING'];
 
 function RecordPaymentDialog({
-  open, invoice, customerId, onClose,
+  open, invoice, dealerId, onClose,
 }: {
   open: boolean;
   invoice: Invoice | null;
-  customerId: string;
+  dealerId: string;
   onClose: () => void;
 }) {
   const [createPayment, { isLoading }] = useCreateCustomerPaymentMutation();
@@ -59,7 +59,7 @@ function RecordPaymentDialog({
     if (!invoice) return;
     try {
       await createPayment({
-        customer: customerId,
+        dealer: dealerId,
         invoice: invoice._id,
         amount: values.amount,
         method: values.method,
@@ -175,25 +175,25 @@ export default function SalesOrderDetailPage() {
   }
 
   const { data, isLoading, isError, refetch } = useGetSalesOrderQuery(id);
-  const customerId = data?.data?.salesOrder
-    ? (typeof data.data.salesOrder.customer === 'string' ? data.data.salesOrder.customer : data.data.salesOrder.customer._id)
+  const dealerId = data?.data?.salesOrder
+    ? (typeof data.data.salesOrder.dealer === 'string' ? data.data.salesOrder.dealer : data.data.salesOrder.dealer._id)
     : undefined;
   const { data: invoicesData, isLoading: invLoading } = useGetInvoicesQuery(
-    { customer: customerId },
-    { skip: !customerId },
+    { dealer: dealerId },
+    { skip: !dealerId },
   );
   const [cancelOrder, { isLoading: cancelling }] = useCancelSalesOrderMutation();
 
-  useGetCustomerPaymentsQuery(
-    { customerId: customerId! },
-    { skip: !customerId },
+  useGetDealerPaymentsQuery(
+    { dealerId: dealerId! },
+    { skip: !dealerId },
   );
 
   if (isLoading) return <LoadingSpinner />;
   if (isError || !data?.data?.salesOrder) return <ErrorState onRetry={refetch} />;
 
   const order = data.data.salesOrder;
-  const customer = typeof order.customer === 'string' ? null : order.customer;
+  const dealer = typeof order.dealer === 'string' ? null : order.dealer;
   const orderInvoices = invoicesData?.data?.invoices?.filter((inv) => {
     const so = typeof inv.salesOrder === 'string' ? inv.salesOrder : inv.salesOrder?._id;
     return so === id;
@@ -268,7 +268,7 @@ export default function SalesOrderDetailPage() {
     <>
       <PageHeader
         title={order.orderNumber}
-        description={`Customer: ${customer?.name ?? '—'}`}
+        description={`Dealer: ${dealer?.name ?? '—'}`}
         breadcrumbs={[{ label: 'Sales' }, { label: 'Orders', href: '/sales/orders' }, { label: order.orderNumber }]}
         actions={
           <div className="flex items-center gap-2 flex-wrap">
@@ -298,8 +298,8 @@ export default function SalesOrderDetailPage() {
           <span className="text-sm text-foreground">{order.orderNumber}</span>
         </div>
         <div className="flex flex-col gap-0.5">
-          <span className="text-xs font-medium text-muted uppercase tracking-wide">Customer</span>
-          <span className="text-sm text-foreground">{customer?.name ?? '—'}</span>
+          <span className="text-xs font-medium text-muted uppercase tracking-wide">Dealer</span>
+          <span className="text-sm text-foreground">{dealer?.name ?? '—'}</span>
         </div>
         <div className="flex flex-col gap-0.5">
           <span className="text-xs font-medium text-muted uppercase tracking-wide">Date</span>
@@ -320,6 +320,10 @@ export default function SalesOrderDetailPage() {
         <div className="flex flex-col gap-0.5">
           <span className="text-xs font-medium text-muted uppercase tracking-wide">Total Amount</span>
           <span className="text-sm font-semibold text-emerald-600">{formatCurrency(order.totalAmount)}</span>
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs font-medium text-muted uppercase tracking-wide">Commission ({order.commissionRate}%)</span>
+          <span className="text-sm font-semibold text-violet-600">{formatCurrency(order.commissionAmount)}</span>
         </div>
         <div className="flex flex-col gap-0.5">
           <span className="text-xs font-medium text-muted uppercase tracking-wide">Paid</span>
@@ -394,7 +398,7 @@ export default function SalesOrderDetailPage() {
       <RecordPaymentDialog
         open={!!paymentInvoice}
         invoice={paymentInvoice}
-        customerId={customerId ?? ''}
+        dealerId={dealerId ?? ''}
         onClose={() => setPaymentInvoice(null)}
       />
 

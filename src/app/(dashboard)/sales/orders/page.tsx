@@ -13,7 +13,7 @@ import { EmptyState, ErrorState, StatusBadge, ConfirmDialog } from '@/components
 import { FormField, SelectField } from '@/components/forms/FormField';
 import { formatCurrency, formatDate } from '@/lib/formatters';
 import { useGetSalesOrdersQuery, useCreateCustomerPaymentMutation, useDeleteSalesOrderMutation } from '@/features/sales/services/salesApi';
-import type { SalesOrder, Customer } from '@/features/sales/types';
+import type { SalesOrder, Dealer } from '@/features/sales/types';
 
 const paymentSchema = z.object({
   amount: z.coerce.number().min(0.01, 'Amount must be > 0'),
@@ -41,9 +41,9 @@ function QuickPayDialog({
 
   async function onSubmit(values: PaymentForm) {
     if (!order?.invoiceId) return;
-    const customerId = typeof order.customer === 'string' ? order.customer : order.customer._id;
+    const dealerId = typeof order.dealer === 'string' ? order.dealer : order.dealer._id;
     try {
-      await createPayment({ customer: customerId, invoice: order.invoiceId, amount: values.amount, method: values.method, reference: values.reference }).unwrap();
+      await createPayment({ dealer: dealerId, invoice: order.invoiceId, amount: values.amount, method: values.method, reference: values.reference }).unwrap();
       toast.success('Payment recorded');
       onClose();
     } catch (err: unknown) {
@@ -100,14 +100,14 @@ export default function SalesOrdersPage() {
   const [paymentFilter, setPaymentFilter] = useState<PaymentStatusFilter>('');
   const [payOrder, setPayOrder] = useState<SalesOrder | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const customerFilter = searchParams.get('customer') ?? undefined;
+  const dealerFilter = searchParams.get('dealer') ?? undefined;
   const [deleteSalesOrder, { isLoading: deleting }] = useDeleteSalesOrderMutation();
 
   const { data, isLoading, isError, refetch } = useGetSalesOrdersQuery({
     page,
     search: search || undefined,
     status: paymentFilter || undefined,
-    customer: customerFilter,
+    dealer: dealerFilter,
   });
 
   const orders = data?.data?.salesOrders ?? [];
@@ -118,15 +118,16 @@ export default function SalesOrdersPage() {
       render: (row) => <span className="font-medium">{row.orderNumber}</span>,
     },
     {
-      key: 'customer', header: 'Customer', priority: 'P1',
+      key: 'dealer', header: 'Dealer', priority: 'P1',
       render: (row) => {
-        const c = typeof row.customer === 'string' ? null : row.customer as Customer;
-        return c?.name ?? '—';
+        const d = typeof row.dealer === 'string' ? null : row.dealer as Dealer;
+        return d?.name ?? '—';
       },
     },
     { key: 'createdAt', header: 'Date', priority: 'P2', render: (row) => formatDate(row.createdAt, 'dd MMM yyyy, hh:mm a') },
 
     { key: 'totalAmount', header: 'Total', priority: 'P2', render: (row) => <span className={row.totalAmount > 0 ? 'font-semibold' : ''}>{formatCurrency(row.totalAmount)}</span> },
+    { key: 'commissionAmount', header: 'Commission', priority: 'P3', render: (row) => row.commissionAmount > 0 ? <span className="text-violet-600 font-medium">{formatCurrency(row.commissionAmount)}</span> : <span className="text-muted">—</span> },
     { key: 'paidAmount', header: 'Paid', priority: 'P2', render: (row) => <span className={`${row.paidAmount > 0 && row.paidAmount < row.totalAmount ? 'text-amber-500' : row.paidAmount >= row.totalAmount && row.paidAmount > 0 ? 'text-emerald-600' : ''} ${row.paidAmount > 0 ? 'font-semibold' : ''}`}>{formatCurrency(row.paidAmount)}</span> },
     { key: 'dueAmount', header: 'Due', priority: 'P2', render: (row) => <span className={`${row.dueAmount > 0 ? 'text-red-500 font-semibold' : ''}`}>{formatCurrency(row.dueAmount)}</span> },
     {
@@ -184,7 +185,7 @@ export default function SalesOrdersPage() {
     <>
       <PageHeader
         title="Sales Orders"
-        description={customerFilter ? 'Filtered by customer' : 'Manage customer orders and dispatch'}
+        description={dealerFilter ? 'Filtered by dealer' : 'Manage dealer orders and dispatch'}
         breadcrumbs={[{ label: 'Sales' }, { label: 'Orders' }]}
         actions={
           <button
@@ -201,7 +202,7 @@ export default function SalesOrdersPage() {
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
           <input
             type="search"
-            placeholder="Search by order #, customer name or phone…"
+            placeholder="Search by order #, dealer name or phone…"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             className="h-9 w-full rounded-md border border-border bg-white pl-9 pr-3 text-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-emerald"
@@ -216,7 +217,7 @@ export default function SalesOrdersPage() {
           <option value="">All</option>
           {PAYMENT_STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s.charAt(0) + s.slice(1).toLowerCase()}</option>)}
         </select>
-        {customerFilter && (
+        {dealerFilter && (
           <button
             onClick={() => router.push('/sales/orders')}
             className="h-9 px-3 rounded-md border border-border text-sm text-secondary hover:bg-slate-50 transition-colors"

@@ -14,7 +14,7 @@ import { FormField, SelectField } from '@/components/forms/FormField';
 import { formatCurrency, formatDate } from '@/lib/formatters';
 import { useGetInvoicesQuery, useCreateCustomerPaymentMutation, useDeleteInvoiceMutation } from '@/features/sales/services/salesApi';
 import { useAppSelector } from '@/lib/store/hooks';
-import type { Invoice, Customer } from '@/features/sales/types';
+import type { Invoice, Dealer } from '@/features/sales/types';
 
 const STATUS_OPTIONS = ['UNPAID', 'PARTIAL', 'PAID', 'CANCELLED'];
 const PAYMENT_METHODS = ['CASH', 'BANK_TRANSFER', 'CHEQUE', 'MOBILE_BANKING'];
@@ -39,9 +39,9 @@ function QuickPayDialog({ invoice, onClose }: { invoice: Invoice | null; onClose
 
   async function onSubmit(values: PaymentForm) {
     if (!invoice) return;
-    const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer._id;
+    const dealerId = typeof invoice.dealer === 'string' ? invoice.dealer : invoice.dealer._id;
     try {
-      await createPayment({ customer: customerId, invoice: invoice._id, amount: values.amount, method: values.method, reference: values.reference }).unwrap();
+      await createPayment({ dealer: dealerId, invoice: invoice._id, amount: values.amount, method: values.method, reference: values.reference }).unwrap();
       toast.success('Payment recorded');
       onClose();
     } catch (err: unknown) {
@@ -98,7 +98,7 @@ export default function InvoicesPage() {
   const [payInvoice, setPayInvoice] = useState<Invoice | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
-  const customerFilter = searchParams.get('customer') ?? undefined;
+  const dealerFilter = searchParams.get('dealer') ?? undefined;
   const token = useAppSelector((s) => s.auth.accessToken);
   const [deleteInvoice, { isLoading: deleting }] = useDeleteInvoiceMutation();
 
@@ -107,7 +107,7 @@ export default function InvoicesPage() {
   const { data, isLoading, isError, refetch } = useGetInvoicesQuery({
     page,
     status: statusFilter || undefined,
-    customer: customerFilter,
+    dealer: dealerFilter,
     search: search || undefined,
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
@@ -153,16 +153,22 @@ export default function InvoicesPage() {
       render: (row) => <span className="font-medium text-emerald-600 cursor-pointer hover:underline" onClick={() => router.push(`/sales/invoices/${row._id}`)}>{row.invoiceNumber}</span>,
     },
     {
-      key: 'customer', header: 'Customer', priority: 'P1',
+      key: 'dealer', header: 'Dealer', priority: 'P1',
       render: (row) => {
-        const c = typeof row.customer === 'string' ? null : row.customer as Customer;
-        return c?.name ?? '—';
+        const d = typeof row.dealer === 'string' ? null : row.dealer as Dealer;
+        return d?.name ?? '—';
       },
     },
     { key: 'createdAt', header: 'Date', priority: 'P2', render: (row) => formatDate(row.createdAt, 'dd MMM yyyy, hh:mm a') },
     {
       key: 'totalAmount', header: 'Total', priority: 'P2',
       render: (row) => <span className={row.totalAmount > 0 ? 'font-semibold' : ''}>{formatCurrency(row.totalAmount)}</span>,
+    },
+    {
+      key: 'commissionAmount', header: 'Commission', priority: 'P3',
+      render: (row) => row.commissionAmount > 0
+        ? <span className="text-violet-600 font-medium">{formatCurrency(row.commissionAmount)}</span>
+        : <span className="text-muted">—</span>,
     },
     {
       key: 'paidAmount', header: 'Paid', priority: 'P2',
@@ -233,7 +239,7 @@ export default function InvoicesPage() {
     <>
       <PageHeader
         title="Invoices"
-        description={customerFilter ? 'Filtered by customer' : 'View and manage customer invoices'}
+        description={dealerFilter ? 'Filtered by dealer' : 'View and manage dealer invoices'}
         breadcrumbs={[{ label: 'Sales' }, { label: 'Invoices' }]}
       />
 
@@ -242,7 +248,7 @@ export default function InvoicesPage() {
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
           <input
             type="search"
-            placeholder="Search by invoice #, customer name or phone…"
+            placeholder="Search by invoice #, dealer name or phone…"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             className="h-9 w-full rounded-md border border-border bg-white pl-9 pr-3 text-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-emerald"
@@ -283,7 +289,7 @@ export default function InvoicesPage() {
             </button>
           )}
         </div>
-        {customerFilter && (
+        {dealerFilter && (
           <button
             onClick={() => router.push('/sales/invoices')}
             className="h-9 px-3 rounded-md border border-border text-sm text-secondary hover:bg-slate-50 transition-colors"

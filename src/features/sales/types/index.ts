@@ -1,9 +1,10 @@
-export interface Customer {
+export interface Dealer {
   _id: string;
   name: string;
   phone?: string;
   email?: string;
   address?: string;
+  commissionRate: number;
   balance: number;
   isActive: boolean;
   createdAt: string;
@@ -13,7 +14,7 @@ export interface Customer {
 export interface CustomerPayment {
   _id: string;
   receiptNumber: string;
-  customer: Customer | string;
+  dealer: Dealer | string;
   invoice: { _id: string; invoiceNumber: string; totalAmount: number } | string;
   amount: number;
   changeAmount?: number;
@@ -32,12 +33,14 @@ export interface InvoiceSummary {
   dueAmount: number;
   status: string;
   dueDate?: string;
+  commissionRate: number;
+  commissionAmount: number;
   salesOrder?: { orderNumber: string } | string;
   createdAt: string;
 }
 
-export interface CustomerDues {
-  customer: { _id: string; name: string };
+export interface DealerDues {
+  dealer: { _id: string; name: string; commissionRate: number };
   outstandingBalance: number;
   aging: {
     current: number;
@@ -66,7 +69,7 @@ export interface SalesOrderItem {
 export interface SalesOrder {
   _id: string;
   orderNumber: string;
-  customer: Customer | string;
+  dealer: Dealer | string;
   warehouse: { _id: string; name: string } | string;
   items: SalesOrderItem[];
   subtotal: number;
@@ -76,6 +79,8 @@ export interface SalesOrder {
   totalAmount: number;
   paidAmount: number;
   dueAmount: number;
+  commissionRate: number;
+  commissionAmount: number;
   invoiceId?: string | null;
   status: SalesOrderStatus;
   notes?: string;
@@ -98,7 +103,7 @@ export interface InvoiceItem {
 export interface Invoice {
   _id: string;
   invoiceNumber: string;
-  customer: Customer | string;
+  dealer: Dealer | string;
   salesOrder?: { _id: string; orderNumber: string } | string;
   items: InvoiceItem[];
   subtotal: number;
@@ -108,6 +113,8 @@ export interface Invoice {
   totalAmount: number;
   paidAmount: number;
   dueAmount: number;
+  commissionRate: number;
+  commissionAmount: number;
   status: InvoiceStatus;
   dueDate?: string;
   notes?: string;
@@ -117,18 +124,18 @@ export interface Invoice {
 }
 
 // API response shapes
-export interface CustomersResponse {
+export interface DealersResponse {
   success: boolean;
-  data: { customers: Customer[] };
+  data: { dealers: Dealer[] };
   pagination: { page: number; pages: number; total: number; limit: number };
 }
-export interface CustomerResponse {
+export interface DealerResponse {
   success: boolean;
-  data: { customer: Customer };
+  data: { dealer: Dealer };
 }
-export interface CustomerDuesResponse {
+export interface DealerDuesResponse {
   success: boolean;
-  data: CustomerDues;
+  data: DealerDues;
 }
 export interface CustomerPaymentsResponse {
   success: boolean;

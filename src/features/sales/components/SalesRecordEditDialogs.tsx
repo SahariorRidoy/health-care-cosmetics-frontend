@@ -12,7 +12,7 @@ import {
   useUpdateSalesOrderMutation,
   useUpdateInvoiceMutation,
   useUpdateCustomerPaymentMutation,
-  useGetCustomersQuery,
+  useGetDealersQuery,
 } from '../services/salesApi';
 import type { CustomerPayment, Invoice, SalesOrder } from '../types';
 import { useGetItemsQuery, useGetWarehousesQuery } from '@/features/inventory/services/inventoryApi';
@@ -28,7 +28,7 @@ const lineSchema = z.object({
 });
 
 const orderSchema = z.object({
-  customer: z.string().min(1, 'Customer is required'),
+  dealer: z.string().min(1, 'Dealer is required'),
   warehouse: z.string().min(1, 'Warehouse is required'),
   taxPercent: z.coerce.number().min(0).max(100),
   notes: z.string().optional(),
@@ -128,16 +128,16 @@ export function SalesOrderEditDialog({ order, open, onClose }: { order: SalesOrd
   const [update, { isLoading }] = useUpdateSalesOrderMutation();
   const { data: itemsData } = useGetItemsQuery({ page: 1, type: 'FINISHED_GOOD' });
   const { data: warehouseData } = useGetWarehousesQuery();
-  const { data: customersData } = useGetCustomersQuery({ page: 1 });
+  const { data: dealersData } = useGetDealersQuery({ page: 1 });
   const items = itemsData?.data?.items ?? [];
   const warehouses = warehouseData?.data?.warehouses ?? [];
-  const customers = customersData?.data?.customers ?? [];
+  const dealers = dealersData?.data?.dealers ?? [];
   const { register, control, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<OrderForm>({ resolver: zodResolver(orderSchema) });
   const watchedItems = watch('items');
 
   useEffect(() => {
     if (open) reset({
-      customer: idOf(order.customer), warehouse: idOf(order.warehouse), taxPercent: order.taxPercent,
+      dealer: idOf(order.dealer), warehouse: idOf(order.warehouse), taxPercent: order.taxPercent,
       notes: order.notes ?? '',
       items: order.items.map((line) => ({ item: idOf(line.item), uom: idOf(line.uom), qty: line.qty, unitPrice: line.unitPrice, discount: line.discount, description: line.description ?? '' })),
     });
@@ -159,9 +159,9 @@ export function SalesOrderEditDialog({ order, open, onClose }: { order: SalesOrd
       <div className="overflow-y-auto px-6 py-4">
         <EditLineItems register={register} control={control} lineErrors={errors.items as Array<Record<string, { message?: string } | undefined>> | undefined} items={items} fallbackItems={order.items.flatMap((line) => typeof line.item === 'string' ? [] : [{ _id: line.item._id, name: line.item.name, sku: line.item.sku }])} setValue={setValue} watchedItems={watchedItems} />
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <SelectField label="Customer" required error={errors.customer?.message} {...register('customer')}>
-            {!customers.some((customer) => customer._id === idOf(order.customer)) && <option value={idOf(order.customer)}>{typeof order.customer === 'string' ? 'Current customer' : order.customer.name}</option>}
-            {customers.map((customer) => <option key={customer._id} value={customer._id}>{customer.name}</option>)}
+          <SelectField label="Dealer" required error={errors.dealer?.message} {...register('dealer')}>
+            {!dealers.some((d) => d._id === idOf(order.dealer)) && <option value={idOf(order.dealer)}>{typeof order.dealer === 'string' ? 'Current dealer' : order.dealer.name}</option>}
+            {dealers.map((d) => <option key={d._id} value={d._id}>{d.name}</option>)}
           </SelectField>
           <SelectField label="Warehouse" required error={errors.warehouse?.message} {...register('warehouse')}>
             {!warehouses.some((warehouse) => warehouse._id === idOf(order.warehouse)) && <option value={idOf(order.warehouse)}>{typeof order.warehouse === 'string' ? 'Current warehouse' : order.warehouse.name}</option>}

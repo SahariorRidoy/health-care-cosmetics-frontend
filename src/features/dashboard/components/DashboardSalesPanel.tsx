@@ -21,10 +21,10 @@ function Bar({ value, max, color }: { value: number; max: number; color: string 
 
 export function DashboardSalesPanel({ sales }: Props) {
   const topProducts = sales?.topProducts ?? [];
-  const topCustomers = sales?.topCustomers ?? [];
+  const topDealers = sales?.topCustomers ?? [];
   const orderSummary = sales?.orderSummary ?? [];
   const maxProductRevenue = topProducts[0]?.totalRevenue ?? 1;
-  const maxCustomerAmount = topCustomers[0]?.totalAmount ?? 1;
+  const maxDealerAmount = topDealers[0]?.totalAmount ?? 1;
   const totalOrders = orderSummary.reduce((s, r) => s + r.count, 0);
   const totalRevenue = orderSummary.reduce((s, r) => s + r.totalAmount, 0);
   const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
@@ -39,7 +39,7 @@ export function DashboardSalesPanel({ sales }: Props) {
           </div>
           <div>
             <h2 className="text-sm font-bold text-foreground">Sales Overview</h2>
-            <p className="text-[11px] text-secondary">Orders, products & customer performance</p>
+            <p className="text-[11px] text-secondary">Orders, products & dealer performance</p>
           </div>
         </div>
         <Link href="/reports/sales" className="text-xs text-emerald-600 hover:underline font-semibold">
@@ -133,17 +133,17 @@ export function DashboardSalesPanel({ sales }: Props) {
             )}
           </div>
 
-          {/* Top Customers */}
+          {/* Top Dealers */}
           <div>
             <div className="flex items-center gap-1.5 mb-3">
               <UserCheck size={12} className="text-blue-500" />
-              <p className="text-[11px] font-bold text-secondary uppercase tracking-widest">Top Customers</p>
+              <p className="text-[11px] font-bold text-secondary uppercase tracking-widest">Top Dealers</p>
             </div>
-            {topCustomers.length === 0 ? (
+            {topDealers.length === 0 ? (
               <p className="text-xs text-muted">No data.</p>
             ) : (
               <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
-                {topCustomers.slice(0, 8).map((c, i) => (
+                {topDealers.slice(0, 8).map((c, i) => (
                   <div key={c._id}>
                     <div className="flex items-center justify-between text-xs">
                       <div className="flex items-center gap-1.5 min-w-0">
@@ -152,7 +152,7 @@ export function DashboardSalesPanel({ sales }: Props) {
                       </div>
                       <span className="font-semibold text-foreground shrink-0 ml-2">{formatCurrency(c.totalAmount)}</span>
                     </div>
-                    <Bar value={c.totalAmount} max={maxCustomerAmount} color="bg-blue-400" />
+                    <Bar value={c.totalAmount} max={maxDealerAmount} color="bg-blue-400" />
                   </div>
                 ))}
               </div>

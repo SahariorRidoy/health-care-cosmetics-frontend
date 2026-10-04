@@ -5,9 +5,9 @@ import { Bell, Package, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { cn, formatCurrency } from '@/lib/formatters';
 import { useGetStockBalancesQuery } from '@/features/inventory/services/inventoryApi';
-import { useGetCustomersQuery } from '@/features/sales/services/salesApi';
+import { useGetDealersQuery } from '@/features/sales/services/salesApi';
 import type { StockBalance } from '@/features/inventory/types';
-import type { Customer } from '@/features/sales/types';
+import type { Dealer } from '@/features/sales/types';
 
 interface Notification {
   id: string;
@@ -19,7 +19,7 @@ interface Notification {
 
 function buildNotifications(
   balances: StockBalance[],
-  customers: Customer[],
+  dealers: Dealer[],
 ): Notification[] {
   const stockAlerts: Notification[] = balances.map((b) => {
     const item = typeof b.item === 'object' ? b.item : null;
@@ -32,14 +32,14 @@ function buildNotifications(
     };
   });
 
-  const duesAlerts: Notification[] = customers
-    .filter((c) => c.balance > 0)
-    .map((c) => ({
-      id: `dues-${c._id}`,
+  const duesAlerts: Notification[] = dealers
+    .filter((d) => d.balance > 0)
+    .map((d) => ({
+      id: `dues-${d._id}`,
       type: 'overdue_dues',
-      title: c.name,
-      detail: `Outstanding: ${formatCurrency(c.balance)}`,
-      href: `/sales/customers/${c._id}`,
+      title: d.name,
+      detail: `Outstanding: ${formatCurrency(d.balance)}`,
+      href: `/sales/dealers/${d._id}`,
     }));
 
   return [...stockAlerts, ...duesAlerts];
@@ -53,14 +53,14 @@ export function NotificationBell() {
     { lowStock: true, page: 1 },
     { pollingInterval: 5 * 60 * 1000 },
   );
-  const { data: customersData } = useGetCustomersQuery(
+  const { data: dealersData } = useGetDealersQuery(
     { page: 1 },
     { pollingInterval: 5 * 60 * 1000 },
   );
 
   const balances = stockData?.data?.balances ?? [];
-  const customers = customersData?.data?.customers ?? [];
-  const notifications = buildNotifications(balances, customers);
+  const dealers = dealersData?.data?.dealers ?? [];
+  const notifications = buildNotifications(balances, dealers);
   const count = notifications.length;
 
   // Close on outside click
@@ -160,7 +160,7 @@ export function NotificationBell() {
                 View stock
               </Link>
               <Link
-                href="/sales/customers"
+                href="/sales/dealers"
                 onClick={() => setOpen(false)}
                 className="flex-1 py-2.5 text-center text-xs text-secondary hover:text-foreground hover:bg-slate-50 transition-colors"
               >

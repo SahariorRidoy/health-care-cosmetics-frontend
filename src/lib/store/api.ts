@@ -55,7 +55,7 @@ export const api = createApi({
     'User', 'UOM', 'UOMConversion', 'Warehouse', 'Item', 'Stock', 'Batch',
     'Supplier', 'PurchaseOrder', 'GoodsReceipt', 'SupplierPayment',
     'Production', 'FactoryOrder', 'FactoryBatch',
-    'Customer', 'SalesOrder', 'Invoice', 'CustomerPayment',
+    'Customer', 'Dealer', 'SalesOrder', 'Invoice', 'CustomerPayment',
     'Expense', 'ExpenseCategory',
     'Department', 'Employee', 'Attendance', 'Leave', 'Payroll',
     'Report',

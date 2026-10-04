@@ -14,7 +14,7 @@ import { FormField, SelectField, TextareaField } from '@/components/forms/FormFi
 import { formatCurrency, formatDate } from '@/lib/formatters';
 import {
   useGetInvoiceQuery,
-  useGetCustomerPaymentsQuery,
+  useGetDealerPaymentsQuery,
   useCreateCustomerPaymentMutation,
 } from '@/features/sales/services/salesApi';
 import { useAppSelector } from '@/lib/store/hooks';
@@ -35,11 +35,11 @@ type ReceiptForm = z.infer<typeof receiptSchema>;
 const PAYMENT_METHODS = ['CASH', 'BANK_TRANSFER', 'CHEQUE', 'MOBILE_BANKING'];
 
 function RecordReceiptDialog({
-  open, invoiceId, customerId, maxAmount, onClose,
+  open, invoiceId, dealerId, maxAmount, onClose,
 }: {
   open: boolean;
   invoiceId: string;
-  customerId: string;
+  dealerId: string;
   maxAmount: number;
   onClose: () => void;
 }) {
@@ -53,7 +53,7 @@ function RecordReceiptDialog({
   async function onSubmit(values: ReceiptForm) {
     try {
       await createPayment({
-        customer: customerId,
+        dealer: dealerId,
         invoice: invoiceId,
         amount: values.amount,
         method: values.method,
@@ -125,13 +125,13 @@ export default function InvoiceDetailPage() {
   const { data, isLoading, isError, refetch } = useGetInvoiceQuery(id);
   const invoice = data?.data?.invoice;
 
-  const customerId = invoice
-    ? (typeof invoice.customer === 'string' ? invoice.customer : invoice.customer._id)
+  const dealerId = invoice
+    ? (typeof invoice.dealer === 'string' ? invoice.dealer : invoice.dealer._id)
     : '';
 
-  const { data: paymentsData, isLoading: paymentsLoading } = useGetCustomerPaymentsQuery(
-    { customerId, page: paymentPage },
-    { skip: !customerId },
+  const { data: paymentsData, isLoading: paymentsLoading } = useGetDealerPaymentsQuery(
+    { dealerId, page: paymentPage },
+    { skip: !dealerId },
   );
 
   const invoicePayments = paymentsData?.data?.payments?.filter((p) => {
@@ -225,7 +225,7 @@ export default function InvoiceDetailPage() {
   if (isLoading) return <LoadingSpinner />;
   if (isError || !invoice) return <ErrorState onRetry={refetch} />;
 
-  const customer = typeof invoice.customer === 'string' ? null : invoice.customer;
+  const dealer = typeof invoice.dealer === 'string' ? null : invoice.dealer;
   const salesOrder = typeof invoice.salesOrder === 'string' ? null : invoice.salesOrder;
   const canPay = invoice.status !== 'PAID' && invoice.status !== 'CANCELLED' && invoice.dueAmount > 0;
 
@@ -279,7 +279,7 @@ export default function InvoiceDetailPage() {
     <>
       <PageHeader
         title={invoice.invoiceNumber}
-        description={`Customer: ${customer?.name ?? '—'}`}
+        description={`Dealer: ${dealer?.name ?? '—'}`}
         breadcrumbs={[{ label: 'Sales' }, { label: 'Invoices', href: '/sales/invoices' }, { label: invoice.invoiceNumber }]}
         actions={
           <div className="flex items-center gap-2">
@@ -318,13 +318,14 @@ export default function InvoiceDetailPage() {
       <div className="bg-white rounded-lg border border-border p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
         {[
           { label: 'Invoice Number', value: invoice.invoiceNumber },
-          { label: 'Customer', value: customer?.name },
+          { label: 'Dealer', value: dealer?.name },
           { label: 'Sales Order', value: salesOrder?.orderNumber ?? '—' },
           { label: 'Status', value: <StatusBadge status={invoice.status} /> },
           { label: 'Date', value: formatDate(invoice.createdAt) },
           { label: 'Subtotal', value: formatCurrency(invoice.subtotal) },
           { label: `Tax (${invoice.taxPercent}%)`, value: formatCurrency(invoice.taxAmount) },
           { label: 'Total Amount', value: <span className="font-semibold">{formatCurrency(invoice.totalAmount)}</span> },
+          { label: `Commission (${invoice.commissionRate}%)`, value: <span className="font-semibold text-violet-600">{formatCurrency(invoice.commissionAmount)}</span> },
           { label: 'Paid Amount', value: <span className="text-emerald-600 font-medium">{formatCurrency(invoice.paidAmount)}</span> },
           {
             label: invoice.dueAmount > 0 ? 'Due Amount' : 'Due Amount',
@@ -409,11 +410,11 @@ export default function InvoiceDetailPage() {
         </div>
       </div>
 
-      {customerId && (
+      {dealerId && (
         <RecordReceiptDialog
           open={receiptOpen}
           invoiceId={id}
-          customerId={customerId}
+          dealerId={dealerId}
           maxAmount={invoice.dueAmount}
           onClose={() => setReceiptOpen(false)}
         />

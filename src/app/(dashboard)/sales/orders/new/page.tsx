@@ -10,10 +10,10 @@ import { Plus, Trash2, Loader2, ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { FormField, SelectField, TextareaField } from '@/components/forms/FormField';
-import { CustomerFormDialog } from '@/features/sales/components/CustomerFormDialog';
+import { DealerFormDialog } from '@/features/sales/components/DealerFormDialog';
 import { formatCurrency } from '@/lib/formatters';
-import { useCreateSalesOrderMutation, useGetCustomersQuery } from '@/features/sales/services/salesApi';
-import type { Customer } from '@/features/sales/types';
+import { useCreateSalesOrderMutation, useGetDealersQuery } from '@/features/sales/services/salesApi';
+import type { Dealer } from '@/features/sales/types';
 import { useGetItemsQuery, useGetWarehousesQuery } from '@/features/inventory/services/inventoryApi';
 
 const PAYMENT_METHODS = ['CASH', 'BANK_TRANSFER', 'CHEQUE', 'MOBILE_BANKING'];
@@ -28,9 +28,10 @@ const lineSchema = z.object({
 });
 
 const orderSchema = z.object({
-  customer: z.string().min(1, 'Customer is required'),
+  dealer: z.string().min(1, 'Dealer is required'),
   warehouse: z.string().min(1, 'Warehouse is required'),
   taxPercent: z.coerce.number().min(0).max(100).default(0),
+  commissionRate: z.coerce.number().min(0).max(25).default(0),
   notes: z.string().optional(),
   items: z.array(lineSchema).min(1, 'Add at least one item'),
   payNow: z.boolean().default(false),
@@ -49,16 +50,16 @@ function LineTotal({ qty, price, discount }: { qty: number; price: number; disco
 export default function NewSalesOrderPage() {
   const router = useRouter();
   const [createOrder, { isLoading }] = useCreateSalesOrderMutation();
-  const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
-  const [extraCustomers, setExtraCustomers] = useState<Customer[]>([]);
-  const { data: customersData } = useGetCustomersQuery({ page: 1 });
+  const [dealerDialogOpen, setDealerDialogOpen] = useState(false);
+  const [extraDealers, setExtraDealers] = useState<Dealer[]>([]);
+  const { data: dealersData } = useGetDealersQuery({ page: 1 });
   const { data: itemsData } = useGetItemsQuery({ page: 1, type: 'FINISHED_GOOD' });
   const { data: warehouseData } = useGetWarehousesQuery();
 
   const { register, control, handleSubmit, setValue, formState: { errors } } = useForm<OrderForm>({
     resolver: zodResolver(orderSchema),
     defaultValues: {
-      taxPercent: 0, payNow: false,
+      taxPercent: 0, commissionRate: 0, payNow: false,
       paymentMethod: 'CASH', paymentAmount: 0,
       items: [{ item: '', uom: '', qty: 1, unitPrice: 0, discount: 0 }],
     },
@@ -93,9 +94,10 @@ export default function NewSalesOrderPage() {
   async function onSubmit(values: OrderForm) {
     try {
       const result = await createOrder({
-        customer: values.customer,
+        dealer: values.dealer,
         warehouse: values.warehouse,
         taxPercent: values.taxPercent,
+        commissionRate: values.commissionRate,
         notes: values.notes,
         items: values.items.map((l) => ({
           item: l.item, uom: l.uom, qty: l.qty,
@@ -117,7 +119,7 @@ export default function NewSalesOrderPage() {
     }
   }
 
-  const customers = [...(customersData?.data?.customers?.filter((c) => c.isActive) ?? []), ...extraCustomers];
+  const dealers = [...(dealersData?.data?.dealers?.filter((d) => d.isActive) ?? []), ...extraDealers];
   const items = itemsData?.data?.items ?? [];
 
   return (
@@ -200,20 +202,24 @@ export default function NewSalesOrderPage() {
                 <div className="flex-1">
                   <Controller
                     control={control}
-                    name="customer"
+                    name="dealer"
                     render={({ field }) => (
-                      <SelectField label="Customer" required error={errors.customer?.message} {...field}>
-                        <option value="">Select customer…</option>
-                        {customers.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
+                      <SelectField label="Dealer" required error={errors.dealer?.message} {...field} onChange={(e) => {
+                        field.onChange(e);
+                        const d = dealers.find((x) => x._id === e.target.value);
+                        if (d) setValue('commissionRate', d.commissionRate ?? 0);
+                      }}>
+                        <option value="">Select dealer…</option>
+                        {dealers.map((d) => <option key={d._id} value={d._id}>{d.name}{d.commissionRate ? ` (${d.commissionRate}%)` : ''}</option>)}
                       </SelectField>
                     )}
                   />
                 </div>
                 <button
                   type="button"
-                  onClick={() => setCustomerDialogOpen(true)}
+                  onClick={() => setDealerDialogOpen(true)}
                   className="h-10 w-10 rounded-md bg-emerald hover:bg-emerald-600 text-white flex items-center justify-center shrink-0 transition-colors mb-[1px]"
-                  title="New customer" aria-label="Create new customer"
+                  title="New dealer" aria-label="Create new dealer"
                 >
                   <Plus size={16} />
                 </button>
@@ -225,6 +231,9 @@ export default function NewSalesOrderPage() {
                 </div>
                 <div className="w-24 shrink-0">
                   <FormField label="Tax %" type="number" min={0} max={100} step="0.01" error={errors.taxPercent?.message} {...register('taxPercent')} />
+                </div>
+                <div className="w-28 shrink-0">
+                  <FormField label="Commission %" type="number" min={0} max={25} step="0.01" error={errors.commissionRate?.message} {...register('commissionRate')} />
                 </div>
               </div>
 
@@ -297,13 +306,14 @@ export default function NewSalesOrderPage() {
 
       </form>
 
-      <CustomerFormDialog
-        open={customerDialogOpen}
+      <DealerFormDialog
+        open={dealerDialogOpen}
         onClose={(created) => {
-          setCustomerDialogOpen(false);
+          setDealerDialogOpen(false);
           if (created) {
-            setExtraCustomers((prev) => [...prev, created]);
-            setValue('customer', created._id);
+            setExtraDealers((prev) => [...prev, created]);
+            setValue('dealer', created._id);
+            setValue('commissionRate', created.commissionRate ?? 0);
           }
         }}
       />
