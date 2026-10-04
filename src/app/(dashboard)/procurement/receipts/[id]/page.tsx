@@ -166,7 +166,7 @@ export default function GoodsReceiptDetailPage() {
       {/* ── SCREEN VIEW (hidden when printing) ────────────────────────────── */}
 
       {/* Summary */}
-      <div className="print:hidden bg-white rounded-lg border border-border p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+      <div className="print:hidden bg-white rounded-lg border border-border p-6 grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
         <InfoRow label="GR Number" value={gr.grNumber} />
         <InfoRow label="Supplier" value={
           supplier ? (
@@ -183,9 +183,20 @@ export default function GoodsReceiptDetailPage() {
           ) : '—'
         } />
         <InfoRow label="Warehouse" value={warehouse ? `${warehouse.name} (${warehouse.code})` : '—'} />
-        <InfoRow label="Received Date" value={formatDate(gr.receivedDate)} />
-        <InfoRow label="Total Amount" value={<span className="font-semibold">{formatCurrency(gr.totalAmount)}</span>} />
-        <InfoRow label="Paid Amount" value={<span className="font-semibold">{formatCurrency(paidAmount)}</span>} />
+        <InfoRow label="Received Date" value={formatDate(gr.receivedDate, 'dd/MM/yyyy, hh:mm a')} />
+        {gr.notes && <InfoRow label="Notes" value={gr.notes} />}
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs font-medium text-muted uppercase tracking-wide">Total Amount</span>
+          <span className="text-sm font-semibold text-blue-600">{formatCurrency(gr.totalAmount)}</span>
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs font-medium text-muted uppercase tracking-wide">Paid Amount</span>
+          <span className="text-sm font-semibold text-emerald-600">{formatCurrency(paidAmount)}</span>
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs font-medium text-muted uppercase tracking-wide">Due Amount</span>
+          <span className="text-sm font-semibold text-orange-500">{formatCurrency(dueAmount)}</span>
+        </div>
         {paymentStatus && (
           <InfoRow label="Payment Status" value={
             <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
@@ -195,12 +206,6 @@ export default function GoodsReceiptDetailPage() {
             }`}>{paymentStatus}</span>
           } />
         )}
-        {paymentStatus && paymentStatus !== 'PAID' && (
-          <InfoRow label="Due Amount" value={
-            <span className="text-red-600 font-semibold">{formatCurrency(dueAmount)}</span>
-          } />
-        )}
-        {gr.notes && <InfoRow label="Notes" value={gr.notes} />}
       </div>
 
       {/* Line items */}

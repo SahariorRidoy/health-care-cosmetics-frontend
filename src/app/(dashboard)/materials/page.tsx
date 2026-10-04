@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Search, Pencil, Trash2, Eye, AlertTriangle, ShoppingCart } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Eye, AlertTriangle, ShoppingCart, FlaskConical, Box, Layers } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DataTable, type Column } from '@/components/tables/DataTable';
@@ -13,12 +13,6 @@ import { ItemFormDialog } from '@/features/inventory/components/ItemFormDialog';
 import { BulkPurchaseDialog } from '@/features/inventory/components/BulkPurchaseDialog';
 import { RepurchaseDialog } from '@/features/inventory/components/RepurchaseDialog';
 import type { Item, Supplier } from '@/features/inventory/types';
-
-const ITEM_TYPE_LABELS: Record<string, string> = {
-  RAW_MATERIAL: 'Raw Material',
-  PACKAGING: 'Packaging',
-  SEMI_FINISHED: 'Semi-Finished',
-};
 
 export default function ItemsPage() {
   const router = useRouter();
@@ -54,7 +48,12 @@ export default function ItemsPage() {
     sortDir,
   });
 
-  const items = (data?.data.items ?? []).filter((it) => {
+  const allItems = data?.data.items ?? [];
+  const lowStockItems = allItems.filter(
+    (it) => (it.reorderLevel ?? 0) > 0 && it.currentStock <= it.reorderLevel!,
+  );
+
+  const items = allItems.filter((it) => {
     if (lowStockFilter) return (it.reorderLevel ?? 0) > 0 && it.currentStock <= it.reorderLevel!;
     return true;
   });
@@ -91,9 +90,14 @@ export default function ItemsPage() {
       render: (row) => {
         const isLow = (row.reorderLevel ?? 0) > 0 && row.currentStock <= row.reorderLevel!;
         return (
-          <span className={`font-bold leading-snug whitespace-normal break-words ${isLow ? 'text-red-700' : 'text-foreground'}`}>
+          <button
+            onClick={() => router.push(`/materials/${row._id}`)}
+            className={`text-sm font-bold leading-snug whitespace-normal break-words text-left hover:underline capitalize ${
+              isLow ? 'text-red-700' : 'text-blue-900'
+            }`}
+          >
             {row.name}
-          </span>
+          </button>
         );
       },
     },
@@ -103,7 +107,22 @@ export default function ItemsPage() {
     },
     {
       key: 'type', header: 'Type', priority: 'P2',
-      render: (row) => <span className="text-secondary">{ITEM_TYPE_LABELS[row.type] ?? row.type}</span>,
+      render: (row) => {
+        const config: Record<string, { label: string; icon: React.ElementType; className: string }> = {
+          RAW_MATERIAL: { label: 'Raw Material', icon: FlaskConical, className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+          PACKAGING:    { label: 'Packaging',    icon: Box,          className: 'bg-blue-50 text-blue-700 border-blue-200' },
+          SEMI_FINISHED:{ label: 'Semi-Finished',icon: Layers,       className: 'bg-violet-50 text-violet-700 border-violet-200' },
+        };
+        const c = config[row.type];
+        if (!c) return <span className="text-secondary">{row.type}</span>;
+        const Icon = c.icon;
+        return (
+          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-xs font-semibold ${c.className}`}>
+            <Icon size={11} className="shrink-0" />
+            {c.label}
+          </span>
+        );
+      },
     },
     {
       key: 'supplier', header: 'Supplier', priority: 'P2',
@@ -116,18 +135,20 @@ export default function ItemsPage() {
       key: 'currentStock', header: 'Stock', priority: 'P2', sortable: true,
       render: (row) => {
         const isLow = (row.reorderLevel ?? 0) > 0 && row.currentStock <= row.reorderLevel!;
+        const uom = typeof row.baseUom === 'object' ? row.baseUom.symbol : '';
         return (
           <span className={`inline-flex items-center gap-1.5 font-bold ${
             isLow ? 'text-red-600' : 'text-foreground'
           }`}>
             {isLow && <AlertTriangle size={13} className="shrink-0" />}
             {row.currentStock}
+            {uom && <span className="text-xs text-muted">{uom}</span>}
           </span>
         );
       },
     },
     {
-      key: 'costPrice', header: 'Cost Price', priority: 'P3', sortable: true,
+      key: 'costPrice', header: 'Unit Cost', priority: 'P3', sortable: true,
       render: (row) => formatCurrency(row.costPrice),
     },
     // {
@@ -147,10 +168,6 @@ export default function ItemsPage() {
     },
   ];
 
-  const lowStockItems = items.filter(
-    (it) => (it.reorderLevel ?? 0) > 0 && it.currentStock <= it.reorderLevel!,
-  );
-
   return (
     <>
       <PageHeader
@@ -169,18 +186,7 @@ export default function ItemsPage() {
         }
       />
 
-      {lowStockItems.length > 0 && (
-        <div className="mb-4 flex items-center gap-2.5 px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
-          <AlertTriangle size={15} className="shrink-0" />
-          <span>
-            <span className="font-semibold">{lowStockItems.length} material{lowStockItems.length > 1 ? 's' : ''}</span> below low stock qty:{' '}
-            {lowStockItems.slice(0, 3).map((it) => it.name).join(', ')}
-            {lowStockItems.length > 3 ? ` +${lowStockItems.length - 3} more` : ''}
-          </span>
-        </div>
-      )}
-
-      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+<div className="flex flex-col sm:flex-row gap-3 mb-4">
         <div className="relative flex-1 min-w-0">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
           <input
@@ -214,6 +220,11 @@ export default function ItemsPage() {
         >
           <AlertTriangle size={13} />
           Low Stock
+          {lowStockItems.length > 0 && (
+            <span className={`ml-0.5 px-1.5 py-0.5 rounded-full text-xs font-bold ${
+              lowStockFilter ? 'bg-red-200 text-red-700' : 'bg-red-100 text-red-600'
+            }`}>{lowStockItems.length}</span>
+          )}
         </button>
       </div>
 

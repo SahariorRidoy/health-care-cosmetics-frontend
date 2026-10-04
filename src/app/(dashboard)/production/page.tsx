@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Search, Pencil, Trash2, Eye, SlidersHorizontal, X, ChevronDown } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Eye, SlidersHorizontal, X, ChevronDown, Package, TrendingDown, DollarSign, Layers } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DataTable, type Column } from '@/components/tables/DataTable';
@@ -56,43 +56,53 @@ export default function ProductionPage() {
   }
 
   const allItems = data?.data.items ?? [];
-  const items = lowStockOnly
-    ? allItems.filter((p) => p.currentStock <= p.reorderLevel)
-    : allItems;
-
+  const items = lowStockOnly ? allItems.filter((p) => p.currentStock <= p.reorderLevel) : allItems;
   const hasActiveFilters = search || statusFilter !== 'active' || lowStockOnly;
+
+  // Stats
+  const totalProducts = data?.pagination?.total ?? allItems.length;
+  const activeCount = allItems.filter((p) => p.isActive).length;
+  const lowStockCount = allItems.filter((p) => p.currentStock <= p.reorderLevel).length;
+  const totalStockValue = allItems.reduce((s, p) => s + (p.currentStock * (p.costPrice ?? 0)), 0);
 
   const columns: Column<Product>[] = [
     {
-      key: 'name', header: 'Name', priority: 'P1',
+      key: 'name', header: 'Product', priority: 'P1',
       render: (row) => {
         const isLow = row.currentStock <= row.reorderLevel;
         return (
-          <span className={`font-bold ${isLow ? 'text-red-600' : 'text-foreground'}`}>
-            {row.name}
-          </span>
+          <div className="flex items-center gap-3">
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isLow ? 'bg-red-100' : 'bg-emerald-50'}`}>
+              <Package size={14} className={isLow ? 'text-red-500' : 'text-emerald-600'} />
+            </div>
+            <div className="min-w-0">
+              <p className={`font-semibold text-sm truncate ${isLow ? 'text-red-600' : 'text-foreground'}`}>{row.name}</p>
+              <p className="text-xs text-muted font-mono">{row.sku}</p>
+            </div>
+          </div>
         );
       },
     },
-    { key: 'sku', header: 'SKU', priority: 'P1' },
     {
-      key: 'productionSources', header: 'Production Source', priority: 'P2',
+      key: 'productionSources', header: 'Source', priority: 'P2',
       render: (row) => {
         const sources = row.productionSources ?? [];
-        if (sources.length === 0) return <span className="text-muted">—</span>;
-        const warehouseCount = sources.filter((source) => source.type === 'WAREHOUSE').length;
-        const factoryCount = sources.filter((source) => source.type === 'FACTORY').length;
+        if (sources.length === 0) return <span className="text-muted text-xs">—</span>;
+        const warehouseCount = sources.filter((s) => s.type === 'WAREHOUSE').length;
+        const factoryCount = sources.filter((s) => s.type === 'FACTORY').length;
         return (
           <details className="group">
-            <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded px-1.5 py-1 text-xs text-secondary hover:bg-slate-50" title="Expand to view production identifiers">
-              <span>{[warehouseCount > 0 && `Warehouse${warehouseCount > 1 ? ` (${warehouseCount})` : ''}`, factoryCount > 0 && `Factory${factoryCount > 1 ? ` (${factoryCount})` : ''}`].filter(Boolean).join(' · ')}</span>
-              <ChevronDown size={13} className="transition-transform group-open:rotate-180" aria-hidden="true" />
+            <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-md px-2 py-1 text-xs bg-slate-50 border border-border text-secondary hover:bg-slate-100 transition-colors">
+              <span>{[warehouseCount > 0 && `WH${warehouseCount > 1 ? ` ×${warehouseCount}` : ''}`, factoryCount > 0 && `Factory${factoryCount > 1 ? ` ×${factoryCount}` : ''}`].filter(Boolean).join(' · ')}</span>
+              <ChevronDown size={11} className="transition-transform group-open:rotate-180" />
             </summary>
-            <div className="mt-1 space-y-1 border-l-2 border-border pl-2">
+            <div className="mt-1.5 space-y-1 border-l-2 border-emerald/30 pl-2">
               {sources.map((source) => (
                 <div key={`${source.type}-${source.identifier}`} className="flex items-center gap-2 text-xs">
-                  <span className="text-secondary">{source.type === 'FACTORY' ? 'Factory' : 'Warehouse'}</span>
-                  <span className="font-mono text-foreground" title={source.identifier}>{source.identifier}</span>
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${source.type === 'FACTORY' ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'}`}>
+                    {source.type === 'FACTORY' ? 'Factory' : 'WH'}
+                  </span>
+                  <span className="font-mono text-foreground">{source.identifier}</span>
                 </div>
               ))}
             </div>
@@ -105,33 +115,70 @@ export default function ProductionPage() {
       render: (row) => {
         const isLow = row.currentStock <= row.reorderLevel;
         const uom = typeof row.baseUom === 'object' ? (row.baseUom as { symbol: string }).symbol : '';
+        const pct = row.reorderLevel > 0 ? Math.min((row.currentStock / (row.reorderLevel * 3)) * 100, 100) : 100;
         return (
-          <span className={`font-medium ${isLow ? 'text-red-500' : 'text-foreground'}`}>
-            {row.currentStock}{uom ? ` ${uom}` : ''}
-            {isLow && <span className="ml-1.5 text-[10px] font-semibold bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full">Low</span>}
-          </span>
+          <div className="min-w-[80px]">
+            <div className="flex items-center gap-1.5">
+              <span className={`text-sm font-semibold ${isLow ? 'text-red-600' : 'text-foreground'}`}>
+                {row.currentStock}{uom ? ` ${uom}` : ''}
+              </span>
+              {isLow && (
+                <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full">
+                  <TrendingDown size={9} /> Low
+                </span>
+              )}
+            </div>
+            <div className="mt-1 h-1 w-full rounded-full bg-slate-100 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${isLow ? 'bg-red-400' : 'bg-emerald'}`}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          </div>
         );
       },
     },
     {
-      key: 'costPrice', header: 'Cost Price', priority: 'P3',
-      render: (row) => row.costPrice > 0 ? <span className="font-medium text-blue-600">{formatCurrency(row.costPrice)}</span> : <span className="text-muted">—</span>,
+      key: 'costPrice', header: 'Cost', priority: 'P3',
+      render: (row) => row.costPrice > 0
+        ? <span className="text-sm font-medium text-blue-600">{formatCurrency(row.costPrice)}</span>
+        : <span className="text-muted text-xs">—</span>,
     },
     {
       key: 'salePrice', header: 'Sale Price', priority: 'P2',
-      render: (row) => row.salePrice ? <span className="font-medium text-emerald-600">{formatCurrency(row.salePrice)}</span> : <span className="text-muted">—</span>,
+      render: (row) => row.salePrice
+        ? <span className="text-sm font-semibold text-emerald-600">{formatCurrency(row.salePrice)}</span>
+        : <span className="text-muted text-xs">—</span>,
     },
     {
       key: 'isActive', header: 'Status', priority: 'P2',
       render: (row) => <StatusBadge status={row.isActive ? 'ACTIVE' : 'INACTIVE'} />,
     },
     {
-      key: 'actions', header: '', priority: 'P1', className: 'w-[100px] text-right',
+      key: 'actions', header: '', priority: 'P1', className: 'w-[116px] text-right',
       render: (row) => (
-        <div className="flex items-center justify-end gap-1">
-          <button onClick={() => router.push(`/production/${row._id}`)} className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="View" title="View"><Eye size={15} /></button>
-          <button onClick={() => openEdit(row)} className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="Edit" title="Edit"><Pencil size={15} /></button>
-          <button onClick={() => setDeleteId(row._id)} className="p-1.5 rounded-md text-secondary hover:bg-red-50 hover:text-red-500 min-w-[32px] min-h-[32px] flex items-center justify-center" aria-label="Delete" title="Delete"><Trash2 size={15} /></button>
+        <div className="flex items-center justify-end gap-1.5">
+          <button
+            onClick={() => router.push(`/production/${row._id}`)}
+            className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center justify-center transition-colors"
+            title="View"
+          >
+            <Eye size={14} />
+          </button>
+          <button
+            onClick={() => openEdit(row)}
+            className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 flex items-center justify-center transition-colors"
+            title="Edit"
+          >
+            <Pencil size={14} />
+          </button>
+          <button
+            onClick={() => setDeleteId(row._id)}
+            className="w-8 h-8 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 flex items-center justify-center transition-colors"
+            title="Delete"
+          >
+            <Trash2 size={14} />
+          </button>
         </div>
       ),
     },
@@ -141,67 +188,86 @@ export default function ProductionPage() {
     <>
       <PageHeader
         title="Production"
-        description="Create new products from raw materials"
+        description="Manufacture products from raw materials and track batch history"
         breadcrumbs={[{ label: 'Production' }]}
         actions={
-          <button onClick={openCreate} className="h-9 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium flex items-center gap-2 transition-colors">
-            <Plus size={16} aria-hidden="true" /> New Production
+          <button onClick={openCreate} className="h-9 px-4 rounded-lg bg-emerald hover:bg-emerald-600 text-white text-sm font-semibold flex items-center gap-2 transition-colors shadow-sm">
+            <Plus size={15} /> New Production
           </button>
         }
       />
 
+      {/* Stats row */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+        {[
+          { label: 'Total Products', value: totalProducts, icon: Package, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: 'Active', value: activeCount, icon: Layers, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+          { label: 'Low Stock', value: lowStockCount, icon: TrendingDown, color: 'text-red-500', bg: 'bg-red-50' },
+          { label: 'Stock Value', value: formatCurrency(totalStockValue), icon: DollarSign, color: 'text-violet-600', bg: 'bg-violet-50' },
+        ].map(({ label, value, icon: Icon, color, bg }) => (
+          <div key={label} className="bg-white rounded-xl border border-border px-4 py-3 flex items-center gap-3 shadow-sm">
+            <div className={`w-9 h-9 rounded-lg ${bg} flex items-center justify-center shrink-0`}>
+              <Icon size={16} className={color} />
+            </div>
+            <div>
+              <p className="text-xs text-muted font-medium">{label}</p>
+              <p className="text-base font-bold text-foreground leading-tight">{value}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
       {/* Search + filter bar */}
       <div className="flex items-center gap-2 mb-3">
         <div className="relative flex-1">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
           <input
             type="search"
-            placeholder="Search name or SKU…"
+            placeholder="Search by name or SKU…"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="h-9 w-full rounded-md border border-border bg-white pl-9 pr-3 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-emerald"
+            className="h-9 w-full rounded-lg border border-border bg-white pl-9 pr-3 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-emerald/40 focus:border-emerald transition-colors"
           />
         </div>
         <button
           onClick={() => setShowFilters((v) => !v)}
-          className={`h-9 px-3 rounded-md border text-sm flex items-center gap-2 transition-colors ${showFilters ? 'border-emerald bg-emerald/5 text-emerald' : 'border-border text-secondary hover:bg-slate-50'}`}
+          className={`h-9 px-3 rounded-lg border text-sm flex items-center gap-2 transition-colors font-medium ${showFilters ? 'border-emerald bg-emerald/5 text-emerald' : 'border-border text-secondary hover:bg-slate-50'}`}
         >
-          <SlidersHorizontal size={15} />
+          <SlidersHorizontal size={14} />
           Filters
-          {hasActiveFilters && <span className="w-1.5 h-1.5 rounded-full bg-emerald" />}
+          {hasActiveFilters && <span className="w-2 h-2 rounded-full bg-emerald" />}
         </button>
         {hasActiveFilters && (
-          <button onClick={clearFilters} className="h-9 px-3 rounded-md border border-border text-sm text-secondary hover:bg-slate-50 flex items-center gap-1.5 transition-colors">
+          <button onClick={clearFilters} className="h-9 px-3 rounded-lg border border-border text-sm text-secondary hover:bg-slate-50 flex items-center gap-1.5 transition-colors">
             <X size={13} /> Clear
           </button>
         )}
       </div>
 
-      {/* Expanded filter panel */}
+      {/* Filter panel */}
       {showFilters && (
-        <div className="mb-4 p-4 rounded-lg border border-border bg-white flex flex-wrap gap-4 items-end">
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-secondary">Status</span>
-            <div className="flex rounded-md border border-border overflow-hidden text-sm">
+        <div className="mb-4 p-4 rounded-xl border border-border bg-white flex flex-wrap gap-4 items-end shadow-sm">
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-semibold text-secondary uppercase tracking-wide">Status</span>
+            <div className="flex rounded-lg border border-border overflow-hidden text-sm">
               {(['all', 'active', 'inactive'] as const).map((s) => (
                 <button
                   key={s}
                   onClick={() => { setStatusFilter(s); setPage(1); }}
-                  className={`px-3 h-8 capitalize transition-colors ${statusFilter === s ? 'bg-emerald text-white' : 'text-secondary hover:bg-slate-50'}`}
+                  className={`px-3 h-8 capitalize font-medium transition-colors ${statusFilter === s ? 'bg-emerald text-white' : 'text-secondary hover:bg-slate-50'}`}
                 >
                   {s}
                 </button>
               ))}
             </div>
           </div>
-
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-secondary">Stock Level</span>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-semibold text-secondary uppercase tracking-wide">Stock Level</span>
             <button
               onClick={() => setLowStockOnly((v) => !v)}
-              className={`h-8 px-3 rounded-md border text-sm font-medium transition-colors flex items-center gap-2 ${lowStockOnly ? 'border-red-300 bg-red-50 text-red-600' : 'border-border text-secondary hover:bg-slate-50'}`}
+              className={`h-8 px-3 rounded-lg border text-sm font-medium transition-colors flex items-center gap-2 ${lowStockOnly ? 'border-red-300 bg-red-50 text-red-600' : 'border-border text-secondary hover:bg-slate-50'}`}
             >
-              <span className={`w-2 h-2 rounded-full ${lowStockOnly ? 'bg-red-500' : 'bg-slate-300'}`} />
+              <TrendingDown size={13} />
               Low stock only
             </button>
           </div>
@@ -213,11 +279,11 @@ export default function ProductionPage() {
       ) : items.length === 0 && !isLoading ? (
         <EmptyState
           title="No products found"
-          description={hasActiveFilters ? 'Try adjusting your filters.' : 'Create your first production to get started.'}
+          description={hasActiveFilters ? 'Try adjusting your filters.' : 'Create your first production batch to get started.'}
           action={
             !hasActiveFilters ? (
-              <button onClick={openCreate} className="h-9 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium flex items-center gap-2 transition-colors">
-                <Plus size={16} aria-hidden="true" /> New Production
+              <button onClick={openCreate} className="h-9 px-4 rounded-lg bg-emerald hover:bg-emerald-600 text-white text-sm font-semibold flex items-center gap-2 transition-colors">
+                <Plus size={15} /> New Production
               </button>
             ) : undefined
           }
@@ -231,7 +297,7 @@ export default function ProductionPage() {
       <ConfirmDialog
         open={!!deleteId}
         title="Delete Product"
-        description="This will soft-delete the product."
+        description="This will soft-delete the product and remove it from active production."
         confirmLabel="Delete"
         variant="danger"
         loading={deleting}

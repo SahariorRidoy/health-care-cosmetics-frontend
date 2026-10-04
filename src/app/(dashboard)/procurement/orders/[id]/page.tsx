@@ -291,15 +291,12 @@ export default function PODetailPage() {
       </div>
 
       {/* Info */}
-      <div className="print:hidden bg-white rounded-lg border border-border p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+      <div className="print:hidden bg-white rounded-lg border border-border p-6 grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
         {[
           { label: 'PO Number', value: po.poNumber },
           { label: 'Supplier', value: supplier?.name },
           { label: 'Status', value: <StatusBadge status={po.status} /> },
-          { label: 'Date', value: formatDate(po.createdAt) },
-          { label: 'Total Amount', value: formatCurrency(po.totalAmount) },
-          { label: 'Paid Amount', value: formatCurrency(po.paidAmount ?? 0) },
-          { label: 'Due Amount', value: formatCurrency(dueAmount) },
+          { label: 'Date', value: formatDate(po.createdAt, 'dd/MM/yyyy, hh:mm a') },
           { label: 'Payment Status', value: <StatusBadge status={po.paymentStatus ?? 'UNPAID'} /> },
         ].map(({ label, value }) => (
           <div key={label} className="flex flex-col gap-0.5">
@@ -313,6 +310,18 @@ export default function PODetailPage() {
             <span className="text-sm text-foreground">{po.notes}</span>
           </div>
         )}
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs font-medium text-muted uppercase tracking-wide">Total Amount</span>
+          <span className="text-sm font-semibold text-blue-600">{formatCurrency(po.totalAmount)}</span>
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs font-medium text-muted uppercase tracking-wide">Paid Amount</span>
+          <span className="text-sm font-semibold text-emerald-600">{formatCurrency(po.paidAmount ?? 0)}</span>
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs font-medium text-muted uppercase tracking-wide">Due Amount</span>
+          <span className="text-sm font-semibold text-orange-500">{formatCurrency(dueAmount)}</span>
+        </div>
       </div>
 
       {/* Line items */}

@@ -191,8 +191,8 @@ export function RepurchaseDialog({ open, preselectedItem, onClose }: Props) {
                 {warehouses.map((w) => <option key={w._id} value={w._id}>{w.name}</option>)}
               </SelectField>
 
-              <FormField label={`Quantity (${uomSymbol})`} type="number" min={0.001} step="0.001" required error={errors.quantity?.message} {...register('quantity')} />
-              <FormField label="Unit Price (৳)" type="number" min={0} step="0.01" required error={errors.unitPrice?.message} {...register('unitPrice')} />
+              <FormField label={`Quantity (${uomSymbol})`} type="number" min={0.001} step="0.001" required error={errors.quantity?.message} onFocus={(e) => e.target.select()} {...register('quantity')} />
+              <FormField label="Unit Price (৳)" type="number" min={0} step="0.01" required error={errors.unitPrice?.message} onFocus={(e) => e.target.select()} {...register('unitPrice')} />
             </div>
 
             {/* Total */}
@@ -204,7 +204,7 @@ export function RepurchaseDialog({ open, preselectedItem, onClose }: Props) {
             )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <FormField label="Paid Now (৳)" type="number" min={0} step="0.01" placeholder="0.00 — leave blank if unpaid" error={errors.paidAmount?.message} {...register('paidAmount')} />
+              <FormField label="Paid Now (৳)" type="number" min={0} step="0.01" placeholder="0.00 — leave blank if unpaid" error={errors.paidAmount?.message} onFocus={(e) => e.target.select()} {...register('paidAmount')} />
               <SelectField label="Payment Method" {...register('paymentMethod')}>
                 {['Cash', 'Bank Transfer', 'Cheque', 'Mobile Banking', 'Other'].map((m) => <option key={m} value={m}>{m}</option>)}
               </SelectField>

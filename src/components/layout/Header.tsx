@@ -19,9 +19,11 @@ function DateTime() {
     return () => clearInterval(t);
   }, []);
   return (
-    <span className="text-base font-semibold text-muted">
-      {now.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-      {' · '}
+    <span className="text-sm font-semibold text-muted whitespace-nowrap">
+      <span className="hidden lg:inline">
+        {now.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+        {' · '}
+      </span>
       {now.toLocaleTimeString()}
     </span>
   );
@@ -40,7 +42,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   }
 
   return (
-    <header className="sticky top-0 z-40 h-16 bg-white border-b border-border flex items-center px-4 gap-4">
+    <header className="sticky top-0 z-40 h-16 bg-white border-b border-border flex items-center px-4 gap-4 print:hidden">
       {/* Hamburger — mobile only */}
       <button
         onClick={onMenuClick}
@@ -50,14 +52,17 @@ export function Header({ onMenuClick }: HeaderProps) {
         <Menu size={20} />
       </button>
 
-      <div className="flex-1 flex items-center justify-center gap-4">
-        <div className="flex items-center gap-2">
-          <FlaskConical size={26} className="text-emerald" />
-          <span className="text-2xl font-black text-emerald tracking-tight">Health Care Cosmetics</span>
-          <span className="text-xs font-bold text-white bg-emerald px-1.5 py-0.5 rounded">ERP</span>
+      <div className="flex-1 flex items-center justify-center gap-2 sm:gap-4 min-w-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+          <FlaskConical size={22} className="text-emerald shrink-0" />
+          <span className="font-black text-emerald tracking-tight">
+            <span className="sm:hidden text-base">HCC</span>
+            <span className="hidden sm:inline text-xl lg:text-2xl">Health Care Cosmetics</span>
+          </span>
+          <span className="text-xs font-bold text-white bg-emerald px-1.5 py-0.5 rounded shrink-0">ERP</span>
         </div>
-        <div className="w-px h-6 bg-border" />
-        <DateTime />
+        <div className="hidden sm:block w-px h-6 bg-border shrink-0" />
+        <div className="hidden sm:block"><DateTime /></div>
       </div>
 
       <NotificationBell />

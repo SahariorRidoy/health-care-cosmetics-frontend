@@ -335,17 +335,17 @@ export function BulkPurchaseDialog({ open, preselectedItem, onClose }: Props) {
                     {/* Shared fields */}
                     <div className="flex flex-col gap-1">
                       <label className="text-xs font-medium text-foreground">Quantity <span className="text-red-500">*</span></label>
-                      <input type="number" min={0.001} step="0.001" value={line.quantity} onChange={(e) => updateLine(line.id, { quantity: Number(e.target.value) })} className="h-9 rounded-md border border-border bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald" />
+                      <input type="number" min={0.001} step="0.001" value={line.quantity} onChange={(e) => updateLine(line.id, { quantity: Number(e.target.value) })} onFocus={(e) => e.target.select()} className="h-9 rounded-md border border-border bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald" />
                     </div>
 
                     <div className="flex flex-col gap-1">
                       <label className="text-xs font-medium text-foreground">Unit Price (৳) <span className="text-red-500">*</span></label>
-                      <input type="number" min={0} step="0.01" value={line.unitPrice} onChange={(e) => updateLine(line.id, { unitPrice: Number(e.target.value) })} className="h-9 rounded-md border border-border bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald" />
+                      <input type="number" min={0} step="0.01" value={line.unitPrice} onChange={(e) => updateLine(line.id, { unitPrice: Number(e.target.value) })} onFocus={(e) => e.target.select()} className="h-9 rounded-md border border-border bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald" />
                     </div>
 
                     <div className="flex flex-col gap-1">
                       <label className="text-xs font-medium text-foreground">Low Stock Qty</label>
-                      <input type="number" min={0} step="1" value={line.reorderLevel} onChange={(e) => updateLine(line.id, { reorderLevel: Number(e.target.value) })} placeholder="0" className="h-9 rounded-md border border-border bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald" />
+                      <input type="number" min={0} step="1" value={line.reorderLevel} onChange={(e) => updateLine(line.id, { reorderLevel: Number(e.target.value) })} onFocus={(e) => e.target.select()} placeholder="0" className="h-9 rounded-md border border-border bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald" />
                     </div>
 
                     {line.quantity > 0 && line.unitPrice > 0 && (
@@ -369,7 +369,7 @@ export function BulkPurchaseDialog({ open, preselectedItem, onClose }: Props) {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-border">
                   <div className="flex flex-col gap-1">
                     <label className="text-xs font-medium text-foreground">Paid Now (৳)</label>
-                    <input type="number" min={0} step="0.01" value={paidAmount || ''} onChange={(e) => setPaidAmount(Number(e.target.value))} placeholder="0.00 — leave blank if unpaid" className="h-9 rounded-md border border-border bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald" />
+                    <input type="number" min={0} step="0.01" value={paidAmount || ''} onChange={(e) => setPaidAmount(Number(e.target.value))} onFocus={(e) => e.target.select()} placeholder="0.00 — leave blank if unpaid" className="h-9 rounded-md border border-border bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald" />
                   </div>
                   <div className="flex flex-col gap-1">
                     <label className="text-xs font-medium text-foreground">Payment Method</label>

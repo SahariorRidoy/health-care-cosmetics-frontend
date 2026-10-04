@@ -56,7 +56,7 @@ function MaterialSelect({ value, items, stockMap, onChange }: MaterialSelectProp
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="h-9 w-full rounded-md border border-border bg-white px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald flex items-center justify-between gap-1"
+        className="h-9 w-full rounded-lg border border-border bg-white px-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald/40 focus:border-emerald flex items-center justify-between gap-1 transition-colors"
         aria-label="Select material"
       >
         <span className="truncate">{selected ? selected.name : <span className="text-muted">Select material…</span>}</span>
@@ -64,15 +64,15 @@ function MaterialSelect({ value, items, stockMap, onChange }: MaterialSelectProp
       </button>
 
       {selectedStock !== null && (
-        <p className={`text-[10px] leading-tight font-medium ${selectedStock <= 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+        <p className={`text-[10px] leading-tight font-semibold ${selectedStock <= 0 ? 'text-red-500' : 'text-emerald-600'}`}>
           Stock: {selectedStock} {selectedUom}
         </p>
       )}
 
       {open && (
-        <div className="absolute top-full left-0 z-50 mt-1 w-max min-w-full rounded-md border border-border bg-white shadow-lg max-h-56 overflow-y-auto">
+        <div className="absolute top-full left-0 z-50 mt-1 w-max min-w-full rounded-xl border border-border bg-white shadow-xl max-h-56 overflow-y-auto">
           <div
-            className="px-3 py-2 text-sm text-muted hover:bg-slate-50 cursor-pointer"
+            className="px-3 py-2 text-sm text-muted hover:bg-slate-50 cursor-pointer rounded-t-xl"
             onMouseDown={() => { onChange(''); setOpen(false); }}
           >
             Select material…
@@ -84,16 +84,16 @@ function MaterialSelect({ value, items, stockMap, onChange }: MaterialSelectProp
               <div
                 key={item._id}
                 onMouseDown={() => { onChange(item._id); setOpen(false); }}
-                className={`px-3 py-2 cursor-pointer hover:bg-slate-50 flex items-center gap-4 ${
-                  item._id === value ? 'bg-emerald-50' : ''
+                className={`px-3 py-2.5 cursor-pointer hover:bg-slate-50 flex items-center gap-4 transition-colors ${
+                  item._id === value ? 'bg-emerald-50 border-l-2 border-emerald' : ''
                 }`}
               >
-                <span className="text-sm text-foreground whitespace-nowrap">{item.name}</span>
+                <span className="text-sm text-foreground whitespace-nowrap font-medium">{item.name}</span>
                 <span className="ml-auto shrink-0 flex items-center gap-2 text-[11px]">
-                  <span className={stock <= 0 ? 'text-red-500 font-medium' : 'text-blue-600 font-medium'}>
+                  <span className={`px-1.5 py-0.5 rounded font-semibold ${stock <= 0 ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-600'}`}>
                     {stock} {uomSymbol}
                   </span>
-                  <span className="text-amber-600 font-medium">{formatCurrency(item.costPrice)}/{uomSymbol}</span>
+                  <span className="bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded font-semibold">{formatCurrency(item.costPrice)}/{uomSymbol}</span>
                 </span>
               </div>
             );
@@ -408,16 +408,19 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
-      <div className="fixed inset-0 bg-black/40" onClick={handleClose} aria-hidden="true" />
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={handleClose} aria-hidden="true" />
       <div
         role="dialog"
         aria-modal="true"
         aria-label={isEdit ? 'Edit Product' : 'New Production'}
-        className="relative w-full sm:max-w-3xl bg-white rounded-none sm:rounded-xl shadow-lg z-10 max-h-[92vh] flex flex-col"
+        className="relative w-full sm:max-w-3xl bg-white rounded-none sm:rounded-2xl shadow-2xl z-10 max-h-[92vh] flex flex-col"
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
-          <h2 className="text-base font-semibold text-foreground">{isEdit ? 'Edit Product' : 'New Production'}</h2>
-          <button onClick={handleClose} className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[36px] min-h-[36px] flex items-center justify-center" aria-label="Close">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0 bg-gradient-to-r from-slate-50 to-white rounded-t-2xl">
+          <div>
+            <h2 className="text-base font-bold text-foreground">{isEdit ? 'Edit Product' : 'New Production'}</h2>
+            <p className="text-xs text-muted mt-0.5">{isEdit ? 'Update product details and materials' : 'Record a new production batch'}</p>
+          </div>
+          <button onClick={handleClose} className="p-1.5 rounded-lg text-secondary hover:bg-slate-100 min-w-[36px] min-h-[36px] flex items-center justify-center transition-colors" aria-label="Close">
             <X size={18} />
           </button>
         </div>
@@ -425,7 +428,7 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
         <div className="overflow-y-auto flex-1 px-6 py-4 space-y-6">
           {/* Product details */}
           <div>
-            <p className="text-[11px] font-semibold text-secondary uppercase tracking-wide mb-3">Product Details</p>
+            <p className="text-[11px] font-bold text-secondary uppercase tracking-wider mb-3 flex items-center gap-2"><span className="w-4 h-0.5 bg-emerald rounded-full" />Product Details</p>
             {!isEdit && (
               <div className="flex gap-1 mb-4" role="group" aria-label="Production product mode">
                 <button
@@ -443,14 +446,14 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
                     }
                     setProductionMode('new');
                   }}
-                  className={`h-8 px-3 rounded-md text-sm font-medium ${productionMode === 'new' ? 'bg-emerald text-white' : 'text-secondary hover:bg-slate-100'}`}
+                  className={`h-8 px-4 rounded-lg text-sm font-semibold transition-colors ${productionMode === 'new' ? 'bg-emerald text-white shadow-sm' : 'text-secondary hover:bg-slate-100'}`}
                 >
                   New product
                 </button>
                 <button
                   type="button"
                   onClick={() => setProductionMode('existing')}
-                  className={`h-8 px-3 rounded-md text-sm font-medium ${productionMode === 'existing' ? 'bg-emerald text-white' : 'text-secondary hover:bg-slate-100'}`}
+                  className={`h-8 px-4 rounded-lg text-sm font-semibold transition-colors ${productionMode === 'existing' ? 'bg-emerald text-white shadow-sm' : 'text-secondary hover:bg-slate-100'}`}
                 >
                   Existing product
                 </button>
@@ -497,13 +500,13 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
           </div>
 
           {/* Input materials */}
-          <div className="bg-slate-50 rounded-xl p-4">
+          <div className="bg-slate-50/80 rounded-xl p-4 border border-border/60">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-[11px] font-semibold text-secondary uppercase tracking-wide">Input Materials</p>
+              <p className="text-[11px] font-bold text-secondary uppercase tracking-wider flex items-center gap-2"><span className="w-4 h-0.5 bg-violet-400 rounded-full" />Input Materials</p>
               <button
                 type="button"
                 onClick={addMaterial}
-                className="h-8 px-3 rounded-md bg-emerald hover:bg-emerald-600 text-white text-xs font-medium flex items-center gap-1.5 transition-colors"
+                className="h-8 px-3 rounded-lg bg-emerald hover:bg-emerald-600 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm"
               >
                 <Plus size={13} /> Add Material
               </button>
@@ -523,7 +526,7 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
                 const compat = compatibleUoms(m.baseUomId);
                 const uomMismatch = m.itemId && m.uomId && m.uomId !== m.baseUomId && !hasConversion;
                 return (
-                  <div key={idx} className="grid grid-cols-1 sm:grid-cols-[1fr_120px_90px_110px_36px] gap-2 items-start bg-white rounded-lg p-2">
+                  <div key={idx} className="grid grid-cols-1 sm:grid-cols-[1fr_120px_90px_110px_36px] gap-2 items-start bg-white rounded-xl p-2.5 border border-border/60 shadow-sm">
                     <MaterialSelect
                       value={m.itemId}
                       items={allItems}
@@ -591,7 +594,7 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
 
           {/* Output */}
           <div>
-            <p className="text-[11px] font-semibold text-secondary uppercase tracking-wide mb-3">Output</p>
+            <p className="text-[11px] font-bold text-secondary uppercase tracking-wider mb-3 flex items-center gap-2"><span className="w-4 h-0.5 bg-blue-400 rounded-full" />Output</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <SelectField label="Output UOM" required value={outputUom} disabled={!isEdit && productionMode === 'existing'} onChange={(e) => setOutputUom(e.target.value)}>
                 <option value="">Select UOM…</option>
@@ -619,10 +622,10 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
           </div>
 
           {/* Cost summary */}
-          <div className="rounded-lg border border-border bg-slate-50 px-4 py-3 space-y-1.5">
+          <div className="rounded-xl border border-emerald/20 bg-gradient-to-br from-emerald-50/60 to-slate-50 px-4 py-4 space-y-1.5">
             <div className="flex justify-end">
               <div className="flex flex-col space-y-1.5 w-full max-w-sm">
-                <p className="text-[11px] font-semibold text-secondary uppercase tracking-wide mb-2">Cost Summary</p>
+                <p className="text-[11px] font-bold text-secondary uppercase tracking-wider mb-3 flex items-center gap-2"><span className="w-4 h-0.5 bg-amber-400 rounded-full" />Cost Summary</p>
                 <div className="flex justify-between text-sm">
                   <span className="text-secondary">Total Raw Material Cost</span>
                   <span className="font-medium text-foreground">{formatCurrency(totalCost)}</span>
@@ -657,11 +660,11 @@ export function ProductionFormDialog({ open, onClose, product }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 px-6 py-4 border-t border-border shrink-0">
-          <button type="button" onClick={handleClose} disabled={isLoading} className="h-10 px-4 rounded-md border border-border text-sm text-foreground hover:bg-slate-50 disabled:opacity-50 transition-colors">
+        <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 px-6 py-4 border-t border-border shrink-0 bg-slate-50/40 rounded-b-2xl">
+          <button type="button" onClick={handleClose} disabled={isLoading} className="h-10 px-4 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-white disabled:opacity-50 transition-colors">
             Cancel
           </button>
-          <button type="button" onClick={handleSave} disabled={isLoading} className="h-10 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium disabled:opacity-60 transition-colors flex items-center justify-center gap-2">
+          <button type="button" onClick={handleSave} disabled={isLoading} className="h-10 px-5 rounded-lg bg-emerald hover:bg-emerald-600 text-white text-sm font-bold disabled:opacity-60 transition-colors flex items-center justify-center gap-2 shadow-sm">
             {isLoading && <Loader2 size={14} className="animate-spin" />}
             {isEdit ? 'Save Changes' : 'Record Production Batch'}
           </button>

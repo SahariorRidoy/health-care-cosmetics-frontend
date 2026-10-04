@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { Loader2, ArrowLeft, Plus, Trash2, Search, AlertCircle, Package, ShoppingCart, ChevronDown } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -46,9 +46,10 @@ function SkuAutoFill({ trigger, onSku }: { trigger: string; onSku: (sku: string)
 
 export default function NewPurchaseOrderPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [lines, setLines] = useState<Line[]>([makeExistingLine()]);
-  const [supplierId, setSupplierId] = useState('');
+  const [supplierId, setSupplierId] = useState(() => searchParams.get('supplier') ?? '');
   const [warehouseId, setWarehouseId] = useState('');
   const [paidAmount, setPaidAmount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState('Cash');
@@ -155,7 +156,7 @@ export default function NewPurchaseOrderPage() {
       }
 
       toast.success(`Purchase recorded — ${lines.length} item${lines.length > 1 ? 's' : ''} stock updated`);
-      router.push('/materials');
+      router.push('/materials/purchase-orders');
     } catch (err: unknown) {
       toast.error((err as { data?: { message?: string } })?.data?.message ?? 'Operation failed');
     }
@@ -175,7 +176,7 @@ export default function NewPurchaseOrderPage() {
       />
 
       <form onSubmit={handleSubmit} noValidate>
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6 items-start">
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_260px] gap-6 items-start">
 
           {/* Left */}
           <div className="flex flex-col gap-5">
@@ -186,7 +187,7 @@ export default function NewPurchaseOrderPage() {
                 <ShoppingCart size={14} className="text-emerald shrink-0" />
                 <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Order Details</p>
               </div>
-              <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="p-5 grid grid-cols-1 xl:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1">
                   <label className="text-sm font-bold text-foreground">Supplier <span className="text-red-500">*</span></label>
                   <div className="flex gap-2">
@@ -222,7 +223,7 @@ export default function NewPurchaseOrderPage() {
                   </select>
                 </div>
 
-                <div className="sm:col-span-2">
+                <div className="xl:col-span-2">
                   <label className="text-sm font-bold text-foreground block mb-1">Notes</label>
                   <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes…" rows={2} className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm text-foreground placeholder:text-muted resize-none focus:outline-none focus:ring-2 focus:ring-emerald" />
                 </div>
@@ -283,8 +284,8 @@ export default function NewPurchaseOrderPage() {
                     <div className="p-4 flex flex-col gap-3">
                       {line.mode === 'existing' ? (
                         <>
-                          {/* Row: material (half) + qty + unit price */}
-                          <div className="grid grid-cols-[2fr_1fr_1fr] gap-3">
+                          {/* Row: material + qty + unit price */}
+                          <div className="flex flex-col xl:grid xl:grid-cols-[2fr_1fr_1fr] gap-3">
                             <div className="flex flex-col gap-1" ref={(el) => { dropdownRefs.current[line.id] = el; }}>
                               <label className="text-sm font-bold text-foreground">Material <span className="text-red-500">*</span></label>
                               <div className="relative">
@@ -318,11 +319,11 @@ export default function NewPurchaseOrderPage() {
                             </div>
                             <div className="flex flex-col gap-1">
                                 <label className="text-sm font-bold text-foreground">Quantity <span className="text-red-500">*</span></label>
-                                <input type="number" min={0.001} step="0.001" value={line.quantity} onChange={(e) => updateLine(line.id, { quantity: Number(e.target.value) })} className="h-10 rounded-md border border-border bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald" />
+                                <input type="number" min={0.001} step="0.001" value={line.quantity} onChange={(e) => updateLine(line.id, { quantity: Number(e.target.value) })} onFocus={(e) => e.target.select()} className="h-10 rounded-md border border-border bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald" />
                               </div>
                               <div className="flex flex-col gap-1">
                                 <label className="text-sm font-bold text-foreground">Unit Price (৳) <span className="text-red-500">*</span></label>
-                                <input type="number" min={0} step="0.01" value={line.unitPrice} onChange={(e) => updateLine(line.id, { unitPrice: Number(e.target.value) })} className="h-10 rounded-md border border-border bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald" />
+                                <input type="number" min={0} step="0.01" value={line.unitPrice} onChange={(e) => updateLine(line.id, { unitPrice: Number(e.target.value) })} onFocus={(e) => e.target.select()} className="h-10 rounded-md border border-border bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald" />
                               </div>
                             </div>
                           {line.quantity > 0 && line.unitPrice > 0 && (
@@ -335,8 +336,8 @@ export default function NewPurchaseOrderPage() {
                       ) : (
                         <>
                           <SkuAutoFill trigger={line.skuTrigger} onSku={(sku) => updateLine(line.id, { sku } as Partial<NewLine>)} />
-                          {/* Row 1: name (half) + SKU + type */}
-                          <div className="grid grid-cols-[2fr_1fr_1fr] gap-3">
+                          {/* Row 1: name + SKU + type */}
+                          <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr_1fr] gap-3">
                             <div className="flex flex-col gap-1">
                               <label className="text-sm font-bold text-foreground">Item Name <span className="text-red-500">*</span></label>
                               <input type="text" value={line.name} onChange={(e) => { const v = e.target.value; clearTimeout((window as unknown as Record<string, ReturnType<typeof setTimeout>>)._skuTimer); (window as unknown as Record<string, ReturnType<typeof setTimeout>>)._skuTimer = setTimeout(() => updateLine(line.id, { skuTrigger: v } as Partial<NewLine>), 500); updateLine(line.id, { name: v } as Partial<NewLine>); }} placeholder="e.g. Aloe Vera Gel" className="h-10 rounded-md border border-border bg-white px-3 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-emerald" />
@@ -353,7 +354,7 @@ export default function NewPurchaseOrderPage() {
                             </div>
                           </div>
                           {/* Row 2: base UOM + qty + unit price + low stock qty */}
-                          <div className="grid grid-cols-[2fr_1fr_1fr_1fr] gap-3">
+                          <div className="grid grid-cols-2 xl:grid-cols-[2fr_1fr_1fr_1fr] gap-3">
                             <div className="flex flex-col gap-1">
                               <label className="text-sm font-bold text-foreground">Base UOM <span className="text-red-500">*</span></label>
                               <select value={line.baseUom} onChange={(e) => updateLine(line.id, { baseUom: e.target.value } as Partial<NewLine>)} className="h-10 rounded-md border border-border bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald">
@@ -363,15 +364,15 @@ export default function NewPurchaseOrderPage() {
                             </div>
                             <div className="flex flex-col gap-1">
                               <label className="text-sm font-bold text-foreground">Quantity <span className="text-red-500">*</span></label>
-                              <input type="number" min={0.001} step="0.001" value={line.quantity} onChange={(e) => updateLine(line.id, { quantity: Number(e.target.value) })} className="h-10 rounded-md border border-border bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald" />
+                              <input type="number" min={0.001} step="0.001" value={line.quantity} onChange={(e) => updateLine(line.id, { quantity: Number(e.target.value) })} onFocus={(e) => e.target.select()} className="h-10 rounded-md border border-border bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald" />
                             </div>
                             <div className="flex flex-col gap-1">
                               <label className="text-sm font-bold text-foreground">Unit Price (৳) <span className="text-red-500">*</span></label>
-                              <input type="number" min={0} step="0.01" value={line.unitPrice} onChange={(e) => updateLine(line.id, { unitPrice: Number(e.target.value) })} className="h-10 rounded-md border border-border bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald" />
+                              <input type="number" min={0} step="0.01" value={line.unitPrice} onChange={(e) => updateLine(line.id, { unitPrice: Number(e.target.value) })} onFocus={(e) => e.target.select()} className="h-10 rounded-md border border-border bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald" />
                             </div>
                             <div className="flex flex-col gap-1">
                               <label className="text-sm font-bold text-amber-600">Low Stock Qty</label>
-                              <input type="number" min={0} step="1" value={line.reorderLevel} onChange={(e) => updateLine(line.id, { reorderLevel: Number(e.target.value) })} placeholder="0" className="h-10 rounded-md border border-amber-200 bg-amber-50 px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-400" />
+                              <input type="number" min={0} step="1" value={line.reorderLevel} onChange={(e) => updateLine(line.id, { reorderLevel: Number(e.target.value) })} onFocus={(e) => e.target.select()} placeholder="0" className="h-10 rounded-md border border-amber-200 bg-amber-50 px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-400" />
                             </div>
                           </div>
                           {/* Row 3: description + line total */}
@@ -416,7 +417,7 @@ export default function NewPurchaseOrderPage() {
           </div>
 
           {/* Right — sticky summary */}
-          <div className="flex flex-col gap-4 lg:sticky lg:top-6">
+          <div className="flex flex-col gap-4 xl:sticky xl:top-6">
             <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
               <div className="px-5 py-3.5 border-b border-border bg-slate-50/60">
                 <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Order Summary</p>

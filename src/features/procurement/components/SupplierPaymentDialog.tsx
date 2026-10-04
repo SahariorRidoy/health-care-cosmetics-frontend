@@ -163,7 +163,12 @@ export function SupplierPaymentDialog({
         supplier: supplierId,
         purchaseOrder: purchaseOrderId ?? values.purchaseOrderId,
         amount: values.amount,
-        paymentDate: new Date(values.paymentDate).toISOString(),
+        paymentDate: (() => {
+          const d = new Date(values.paymentDate);
+          const now = new Date();
+          d.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+          return d.toISOString();
+        })(),
         method: values.method,
         reference: values.reference,
         notes: values.notes,

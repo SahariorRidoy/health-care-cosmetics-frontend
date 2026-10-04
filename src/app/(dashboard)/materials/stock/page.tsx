@@ -28,7 +28,6 @@ const PRODUCTION_TYPES = new Set(['FINISHED_GOOD']);
 
 export default function StockPage() {
   const [balancePage, setBalancePage] = useState(1);
-  const [movementPage, setMovementPage] = useState(1);
   const [tab, setTab] = useState<'balance' | 'movements'>('movements');
 
   // balance filters
@@ -41,11 +40,43 @@ export default function StockPage() {
   const [movementTab, setMovementTab] = useState<'all' | 'materials' | 'production'>('all');
   const [movementTypeFilter, setMovementTypeFilter] = useState('');
 
+  function handleMovementTabChange(t: 'all' | 'materials' | 'production') {
+    setMovementTab(t);
+    setMovementPageAll(1);
+    setMovementPageMaterials(1);
+    setMovementPageProduction(1);
+    setMovementTypeFilter('');
+  }
+
+  // When on production tab, only fetch PRODUCTION_OUTPUT & PRODUCTION_ISSUE
+  // When on materials tab, fetch everything except those
+  // The backend `type` param accepts a single value, so for multi-type we fetch all and filter client-side
+  // BUT we use separate page states so pagination is correct per tab
+  const [movementPageAll, setMovementPageAll] = useState(1);
+  const [movementPageMaterials, setMovementPageMaterials] = useState(1);
+  const [movementPageProduction, setMovementPageProduction] = useState(1);
+
+  const setActivePage = (p: number) => {
+    if (movementTab === 'materials') setMovementPageMaterials(p);
+    else if (movementTab === 'production') setMovementPageProduction(p);
+    else setMovementPageAll(p);
+  };
+
   const { data: balanceData, isLoading: balanceLoading, isError: balanceError, refetch: refetchBalance } =
     useGetStockBalancesQuery({ page: balancePage, search: balanceSearch || undefined });
 
-  const { data: movementData, isLoading: movementLoading, isError: movementError } =
-    useGetStockMovementsQuery({ page: movementPage, limit: 15, activeOnly: true });
+  const { data: movementDataAll, isLoading: movementLoadingAll, isError: movementErrorAll } =
+    useGetStockMovementsQuery({ page: movementPageAll, limit: 20, type: movementTypeFilter || undefined }, { skip: movementTab !== 'all' });
+
+  const { data: movementDataMaterials, isLoading: movementLoadingMaterials, isError: movementErrorMaterials } =
+    useGetStockMovementsQuery({ page: movementPageMaterials, limit: 20, type: 'PURCHASE_RECEIPT' }, { skip: movementTab !== 'materials' });
+
+  const { data: movementDataProduction, isLoading: movementLoadingProduction, isError: movementErrorProduction } =
+    useGetStockMovementsQuery({ page: movementPageProduction, limit: 20, type: 'PRODUCTION_OUTPUT' }, { skip: movementTab !== 'production' });
+
+  const movementData = movementTab === 'materials' ? movementDataMaterials : movementTab === 'production' ? movementDataProduction : movementDataAll;
+  const movementLoading = movementTab === 'materials' ? movementLoadingMaterials : movementTab === 'production' ? movementLoadingProduction : movementLoadingAll;
+  const movementError = movementTab === 'materials' ? movementErrorMaterials : movementTab === 'production' ? movementErrorProduction : movementErrorAll;
 
   const filteredBalances = useMemo(() => {
     return (balanceData?.data?.balances ?? []).filter((b) => {
@@ -66,11 +97,7 @@ export default function StockPage() {
   const filteredMovements = useMemo(() => {
     return (movementData?.data?.movements ?? []).filter((m) => {
       const item = typeof m.item === 'string' ? null : m.item as Item;
-
-      if (movementTab === 'materials' && (!item || !MATERIAL_TYPES.has(item.type))) return false;
-      if (movementTab === 'production' && (!item || !PRODUCTION_TYPES.has(item.type))) return false;
       if (movementTypeFilter && m.type !== movementTypeFilter) return false;
-
       if (movementSearch) {
         const q = movementSearch.toLowerCase();
         return (
@@ -81,7 +108,7 @@ export default function StockPage() {
       }
       return true;
     });
-  }, [movementData, movementSearch, movementTab, movementTypeFilter]);
+  }, [movementData, movementSearch, movementTypeFilter]);
 
   const balanceColumns: Column<StockBalance>[] = [
     {
@@ -130,10 +157,12 @@ export default function StockPage() {
       render: (row) => {
         const item = typeof row.item === 'string' ? null : row.item as Item;
         const isLow = item?.reorderLevel != null && row.quantity <= item.reorderLevel;
+        const uom = item && typeof item.baseUom === 'object' ? (item.baseUom as { symbol: string }).symbol : '';
         return (
           <span className={`inline-flex items-center gap-1 font-medium ${isLow ? 'text-red-600' : 'text-foreground'}`}>
             {isLow && <AlertTriangle size={12} className="shrink-0" />}
             {row.quantity}
+            {uom && <span className="text-xs text-muted font-normal">{uom}</span>}
             {isLow && <span className="text-[10px] font-normal text-red-400">/ low</span>}
           </span>
         );
@@ -194,13 +223,30 @@ export default function StockPage() {
     },
     {
       key: 'quantity', header: 'Qty', priority: 'P1',
-      render: (row) => (
-        <span className={row.quantity > 0 ? 'text-emerald-600 font-medium' : 'text-red-500 font-medium'}>
-          {row.quantity > 0 ? '+' : ''}{row.quantity}
-        </span>
-      ),
+      render: (row) => {
+        const item = typeof row.item === 'string' ? null : row.item as Item;
+        const uom = item && typeof item.baseUom === 'object' ? (item.baseUom as { symbol: string }).symbol : '';
+        return (
+          <span className={row.quantity > 0 ? 'text-emerald-600 font-medium' : 'text-red-500 font-medium'}>
+            {row.quantity > 0 ? '+' : ''}{row.quantity}
+            {uom && <span className="ml-1 text-xs text-muted font-normal">{uom}</span>}
+          </span>
+        );
+      },
     },
-    { key: 'balanceAfter', header: 'Balance After', priority: 'P2', render: (row) => row.balanceAfter },
+    {
+      key: 'balanceAfter', header: 'Balance After', priority: 'P2',
+      render: (row) => {
+        const item = typeof row.item === 'string' ? null : row.item as Item;
+        const uom = item && typeof item.baseUom === 'object' ? (item.baseUom as { symbol: string }).symbol : '';
+        return (
+          <span className="font-medium">
+            {row.balanceAfter}
+            {uom && <span className="ml-1 text-xs text-muted font-normal">{uom}</span>}
+          </span>
+        );
+      },
+    },
     { key: 'reference', header: 'Reference', priority: 'P3', render: (row) => row.reference ?? '—' },
     { key: 'notes', header: 'Notes', priority: 'P3', render: (row) => row.notes ?? '—' },
   ];
@@ -208,8 +254,8 @@ export default function StockPage() {
   return (
     <>
       <PageHeader
-        title="Stock"
-        description="Stock balances and movement history"
+        title="Stock Balances & Movements History"
+        // description="Stock balances and movement history"
         breadcrumbs={[{ label: 'Materials', href: '/materials' }, { label: 'Stock' }]}
       />
 
@@ -297,7 +343,7 @@ export default function StockPage() {
             ] as const).map(({ key, label }) => (
               <button
                 key={key}
-                onClick={() => setMovementTab(key)}
+                onClick={() => handleMovementTabChange(key)}
                 className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors shrink-0 whitespace-nowrap ${
                   movementTab === key ? 'border-emerald text-emerald-600' : 'border-transparent text-secondary hover:text-foreground'
                 }`}
@@ -320,7 +366,7 @@ export default function StockPage() {
             </div>
             <select
               value={movementTypeFilter}
-              onChange={(e) => setMovementTypeFilter(e.target.value)}
+              onChange={(e) => { setMovementTypeFilter(e.target.value); setActivePage(1); }}
               className="h-9 w-full sm:w-auto rounded-md border border-border bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald"
               aria-label="Filter by movement type"
             >
@@ -344,8 +390,8 @@ export default function StockPage() {
               data={filteredMovements}
               keyField="_id"
               isLoading={movementLoading}
-              pagination={movementTab === 'all' && !movementSearch && !movementTypeFilter ? movementData?.pagination : undefined}
-              onPageChange={movementTab === 'all' && !movementSearch && !movementTypeFilter ? setMovementPage : undefined}
+              pagination={movementData?.pagination}
+              onPageChange={setActivePage}
               emptyMessage="No stock movements found."
             />
           )}

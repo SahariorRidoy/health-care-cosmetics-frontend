@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Package, Factory, TrendingUp,
   DollarSign, Users, BarChart2, Settings, X, ChevronLeft, ChevronRight,
   ChevronDown, UserCircle, ClipboardList, FileText, ShoppingCart,
-  Warehouse, ReceiptText, Building2, Plus,
+  Warehouse, ReceiptText, Building2, Plus, Truck,
 } from 'lucide-react';
 import { cn } from '@/lib/formatters';
 
@@ -19,20 +19,25 @@ type NavItem =
 const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   {
-    href: '/materials', label: 'Materials', icon: Package,
+    href: '/procurement', label: 'Procurement', icon: Truck,
     children: [
       { href: '/procurement/suppliers', label: 'Suppliers List', icon: Building2 },
       { href: '/materials/purchase-orders/new', label: 'Create Purchase', icon: Plus },
-      { href: '/materials', label: 'Materials List', icon: Package },
       { href: '/procurement/orders', label: 'Purchase Orders', icon: ShoppingCart },
       { href: '/procurement/receipts', label: 'Goods Receipts', icon: ReceiptText },
+    ],
+  },
+  {
+    href: '/materials', label: 'Materials', icon: Package,
+    children: [
+      { href: '/materials', label: 'Materials List', icon: Package },
       { href: '/materials/stock', label: 'Materials Stock', icon: Warehouse },
     ],
   },
   {
     href: '/production', label: 'Production', icon: Factory,
     children: [
-      { href: '/production/new', label: 'Create Production', icon: Plus },
+      // { href: '/production/new', label: 'Create Production', icon: Plus },
       { href: '/production', label: 'Warehouse Product', icon: ClipboardList },
       { href: '/factory-production', label: 'Factory Production', icon: Warehouse },
       // { href: '/factory-production/factories', label: 'Factory Ledger', icon: Factory },
@@ -187,14 +192,15 @@ export function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose }: Si
                 <ul className="mt-0.5 ml-4 pl-3 border-l border-navy-700 space-y-0.5">
                   {item.children.map((child) => {
                     const ChildIcon = child.icon;
+                    const noPrefix = [
+                      '/sales/orders/new', '/materials', '/production',
+                      '/factory-production', '/materials/purchase-orders/new',
+                      '/procurement/suppliers/new',
+                    ];
                     const childActive = pathname === child.href || (
-                          child.href !== '/sales/orders/new' &&
-                          child.href !== '/materials' &&
-                          child.href !== '/production' &&
-                          child.href !== '/factory-production' &&
-                          child.href !== '/factory-production/factories' &&
-                          pathname.startsWith(child.href + '/')
-                        );
+                      !noPrefix.includes(child.href) &&
+                      pathname.startsWith(child.href + '/')
+                    );
                     return (
                       <li key={child.href}>
                         <Link
@@ -238,7 +244,7 @@ export function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose }: Si
       {/* Desktop sidebar */}
       <aside
         className={cn(
-          'hidden lg:flex flex-col fixed inset-y-0 left-0 z-30 bg-navy transition-all duration-200',
+          'hidden lg:flex flex-col fixed inset-y-0 left-0 z-30 bg-navy transition-all duration-200 print:hidden',
           collapsed ? 'w-16' : 'w-60',
         )}
       >
