@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Plus, Search, Pencil, Trash2, Eye, CreditCard, ShoppingCart,
@@ -318,7 +318,7 @@ export default function SuppliersPage() {
   const { data, isLoading, isError, refetch } = useGetSuppliersQuery({ limit: 200, search: search || undefined });
   const [deleteSupplier, { isLoading: deleting }] = useDeleteSupplierMutation();
 
-  const suppliers = data?.data?.suppliers ?? [];
+  const suppliers = useMemo(() => data?.data?.suppliers ?? [], [data]);
   const selected = suppliers.find((s) => s._id === selectedId) ?? null;
 
   // Auto-select first supplier

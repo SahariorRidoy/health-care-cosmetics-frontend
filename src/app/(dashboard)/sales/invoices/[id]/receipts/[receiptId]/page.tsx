@@ -9,7 +9,7 @@ import { LoadingSpinner, ErrorState } from '@/components/feedback';
 import { formatCurrency, formatDate } from '@/lib/formatters';
 import { useGetCustomerPaymentQuery } from '@/features/sales/services/salesApi';
 import { useAppSelector } from '@/lib/store/hooks';
-import type { Customer } from '@/features/sales/types';
+import type { Dealer } from '@/features/sales/types';
 import { ReceiptEditDialog } from '@/features/sales/components/SalesRecordEditDialogs';
 
 export default function ReceiptDetailPage() {
@@ -68,14 +68,14 @@ export default function ReceiptDetailPage() {
   if (isLoading) return <LoadingSpinner />;
   if (isError || !payment) return <ErrorState onRetry={refetch} />;
 
-  const customer = typeof payment.customer === 'string' ? null : payment.customer as Customer;
+  const dealer = typeof payment.dealer === 'string' ? null : payment.dealer as Dealer;
   const invoice = typeof payment.invoice === 'string' ? null : payment.invoice as { _id: string; invoiceNumber: string; totalAmount: number };
 
   return (
     <>
       <PageHeader
         title={payment.receiptNumber}
-        description={`Customer: ${customer?.name ?? '—'}`}
+        description={`Dealer: ${dealer?.name ?? '—'}`}
         breadcrumbs={[
           { label: 'Sales' },
           { label: 'Invoices', href: '/sales/invoices' },
@@ -103,7 +103,7 @@ export default function ReceiptDetailPage() {
       <div className="bg-white rounded-lg border border-border p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {[
           { label: 'Receipt Number', value: payment.receiptNumber },
-          { label: 'Customer', value: customer?.name },
+          { label: 'Dealer', value: dealer?.name },
           { label: 'Invoice', value: invoice?.invoiceNumber },
           { label: 'Payment Date', value: formatDate(payment.paymentDate, 'dd MMM yyyy, hh:mm a') },
           { label: 'Payment Method', value: payment.method.replace('_', ' ') },
