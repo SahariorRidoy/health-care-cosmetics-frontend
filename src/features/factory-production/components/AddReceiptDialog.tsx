@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { X, Plus, Trash2, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Plus, Trash2, Loader2, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { FormField, SelectField } from '@/components/forms/FormField';
 import { useGetUOMsQuery, useGenerateSkuQuery, useGetItemsQuery } from '@/features/inventory/services/inventoryApi';
+import { useGetUOMConversionsQuery } from '@/features/settings/services/settingsApi';
 import { useAddFactoryReceiptMutation } from '../services/factoryProductionApi';
 import { formatCurrency } from '@/lib/formatters';
 import type { FactoryBatch, FactoryDispatchMaterial } from '../types';
@@ -28,7 +29,6 @@ interface ProductLine {
   uom: string;
   salePrice: string;
   materialsUsed: MaterialUsedLine[];
-  expanded: boolean;
 }
 
 interface Props {
@@ -43,7 +43,6 @@ function emptyProduct(): ProductLine {
     newName: '', newSku: '', newBaseUom: '', newSalePrice: '', newReorderLevel: '',
     receivedQty: '', uom: '', salePrice: '',
     materialsUsed: [{ item: '', usedQty: '', uom: '' }],
-    expanded: true,
   };
 }
 
@@ -81,7 +80,7 @@ function ItemSearchField({ value, onChange }: { value: string; onChange: (id: st
 
   return (
     <div className="relative">
-      <label className="block text-xs font-medium text-foreground mb-1">Existing Item <span className="text-red-500">*</span></label>
+      <label className="block text-sm font-bold text-foreground mb-1">Existing Item <span className="text-red-500">*</span></label>
       <div className="relative">
         <input
           type="text"
@@ -90,8 +89,18 @@ function ItemSearchField({ value, onChange }: { value: string; onChange: (id: st
           onChange={(e) => { setQuery(e.target.value); setDisplay(''); onChange('', ''); setOpen(true); }}
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
-          className="h-9 w-full rounded-md border border-border bg-white px-3 pr-8 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-emerald"
+          className="h-9 w-full rounded-md border border-border bg-white px-3 pr-14 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-emerald"
         />
+        {value && (
+          <button
+            type="button"
+            onMouseDown={() => { onChange('', ''); setDisplay(''); setQuery(''); }}
+            className="absolute right-7 top-1/2 -translate-y-1/2 text-red-400 hover:text-red-600 transition-colors"
+            aria-label="Clear selection"
+          >
+            <X size={14} />
+          </button>
+        )}
         <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted" />
       </div>
       {open && items.length > 0 && (
@@ -123,9 +132,20 @@ function SkuAutoFill({ name, onSku }: { name: string; onSku: (sku: string) => vo
 
 export function AddReceiptDialog({ open, onClose, batch }: Props) {
   const { data: uomData } = useGetUOMsQuery();
+  const { data: convData } = useGetUOMConversionsQuery();
   const [addReceipt, { isLoading }] = useAddFactoryReceiptMutation();
 
   const uoms = useMemo(() => uomData?.data?.uoms?.filter((u) => u.isActive) ?? [], [uomData]);
+  const conversions = useMemo(() => convData?.data?.conversions ?? [], [convData]);
+
+  const getRelatedUomIds = useCallback((baseUomId: string): string[] => {
+    const related = new Set<string>([baseUomId]);
+    for (const c of conversions) {
+      if (c.fromUOM._id === baseUomId) related.add(c.toUOM._id);
+      if (c.toUOM._id === baseUomId) related.add(c.fromUOM._id);
+    }
+    return Array.from(related);
+  }, [conversions]);
   const dispatchedMaterials = useDispatchedMaterials(batch);
   const availableMaterials = useMemo(() => {
     const used = new Map<string, number>();
@@ -152,14 +172,14 @@ export function AddReceiptDialog({ open, onClose, batch }: Props) {
     ]));
   }, [batch.materialReturns, batch.receipts, dispatchedMaterials]);
 
-  const [receiptDate, setReceiptDate] = useState('');
+  const [receiptDate, setReceiptDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [deliveryCost, setDeliveryCost] = useState('');
   const [productionCost, setProductionCost] = useState('');
   const [otherCost, setOtherCost] = useState('');
   const [products, setProducts] = useState<ProductLine[]>([emptyProduct()]);
 
   function reset() {
-    setReceiptDate(''); setDeliveryCost(''); setProductionCost(''); setOtherCost('');
+    setReceiptDate(new Date().toISOString().split('T')[0]); setDeliveryCost(''); setProductionCost(''); setOtherCost('');
     setProducts([emptyProduct()]);
   }
 
@@ -233,6 +253,8 @@ export function AddReceiptDialog({ open, onClose, batch }: Props) {
       if (!p.isNewProduct && !p.uom) { toast.error(`Select UOM for "${p.productName}"`); return; }
       if (p.isNewProduct && !p.newBaseUom) { toast.error(`Select base UOM for new product "${p.productName}"`); return; }
       if (!p.isNewProduct && !p.linkedItem) { toast.error(`Select existing item for "${p.productName}"`); return; }
+      const salePrice = parseFloat(p.isNewProduct ? p.newSalePrice : p.salePrice);
+      if (!salePrice || salePrice <= 0) { toast.error(`Enter sale price for "${p.productName}"`); return; }
       if (!p.materialsUsed.length) { toast.error(`Add at least one material used for "${p.productName}"`); return; }
       for (const mu of p.materialsUsed) {
         if (!mu.item) { toast.error(`Select material for all material-used rows in "${p.productName}"`); return; }
@@ -315,84 +337,76 @@ export function AddReceiptDialog({ open, onClose, batch }: Props) {
 
         <div className="overflow-y-auto flex-1 px-6 py-5 space-y-6">
 
-          {/* Section A — Receipt Info */}
-          <div>
-            <p className="text-[11px] font-semibold text-secondary uppercase tracking-wide mb-3">Receipt Info</p>
-            <div className="w-full sm:w-1/4">
-              <FormField label="Receipt Date" type="date" required value={receiptDate} onChange={(e) => setReceiptDate(e.target.value)} />
-            </div>
-          </div>
-
           {/* Section B — Products */}
           <div>
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
               <p className="text-xl font-extrabold text-secondary uppercase tracking-wide">Products Received</p>
-              <button type="button" onClick={addProduct} className="h-8 px-3 rounded-md border border-emerald text-emerald text-xs font-medium flex items-center gap-1.5 transition-colors hover:bg-emerald-50">
-                <Plus size={13} /> Add Another Product Received From Factory Production
-              </button>
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-semibold text-emerald-600 whitespace-nowrap">Receipt Date <span className="text-red-500">*</span></label>
+                <input
+                  type="date"
+                  value={receiptDate}
+                  onChange={(e) => setReceiptDate(e.target.value)}
+                  className="h-9 flex-1 sm:flex-none rounded-lg border-2 border-emerald bg-emerald-50 px-3 text-base font-semibold text-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald"
+                />
+              </div>
             </div>
 
             <div className="space-y-3">
               {products.map((p, pIdx) => {
                 const costs = costRows[pIdx];
                 return (
-                  <div key={pIdx} className={`rounded-lg overflow-hidden ${p.expanded ? 'border-2 border-emerald' : 'border border-border'} bg-white`}>
-                    {/* Product header row */}
-                    <div className={`flex items-center gap-2 px-4 py-3 border-b ${p.expanded ? 'bg-emerald-50 border-emerald' : 'bg-slate-50 border-border'}`}>
-                      <button
-                        type="button"
-                        onClick={() => updateProduct(pIdx, { expanded: !p.expanded })}
-                        className={`p-1 rounded ${p.expanded ? 'text-emerald-600 hover:text-emerald-700' : 'text-secondary hover:text-foreground'}`}
-                        aria-label={p.expanded ? 'Collapse' : 'Expand'}
-                      >
-                        {p.expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-                      </button>
-                      <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[11px] font-bold shrink-0 ${p.expanded ? 'bg-emerald text-white' : 'bg-slate-200 text-slate-600'}`}>
-                        {pIdx + 1}
-                      </span>
-                      <span className="text-sm font-medium text-foreground flex-1 truncate">
-                        {p.productName || <span className="text-muted italic">Product {pIdx + 1}</span>}
-                      </span>
-                      {costs.unitCost > 0 && (
-                        <span className="text-xs text-secondary shrink-0">Unit cost: <span className="font-semibold text-foreground">{formatCurrency(costs.unitCost)}</span></span>
-                      )}
-                      {products.length > 1 && (
-                        <button type="button" onClick={() => removeProduct(pIdx)} className="p-1 rounded text-secondary hover:text-red-500 transition-colors" aria-label="Remove product">
-                          <Trash2 size={14} />
-                        </button>
-                      )}
-                    </div>
-
-                    {p.expanded && (
-                      <div className="px-4 py-4 space-y-4">
-                        {/* Product type toggle */}
-                        <div className="flex flex-col gap-1">
-                          <span className="text-xs font-medium text-foreground">Product Type</span>
-                          <div className="flex rounded-md border border-border overflow-hidden h-9 text-sm w-full sm:w-1/2">
+                  <div key={pIdx} className="rounded-lg overflow-hidden border-2 border-emerald shadow-[0_0_0_3px_rgba(16,185,129,0.15)] bg-white">
+                    <div className="px-4 py-4 space-y-4">
+                        {/* Product type toggle with number badge and delete */}
+                        <div className="flex items-center gap-3">
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-bold shrink-0 bg-emerald text-white">
+                            {pIdx + 1}
+                          </span>
+                          <div className="flex items-center bg-slate-100 rounded-lg p-0.5 gap-0.5">
                             <button
                               type="button"
                               onClick={() => updateProduct(pIdx, { isNewProduct: true, linkedItem: '' })}
-                              className={`flex-1 transition-colors ${p.isNewProduct ? 'bg-emerald text-white' : 'text-secondary hover:bg-slate-50'}`}
+                              className={`flex items-center gap-1.5 h-7 px-3 rounded-md text-xs font-semibold transition-all ${
+                                p.isNewProduct
+                                  ? 'bg-white text-emerald shadow-sm ring-1 ring-black/5'
+                                  : 'text-slate-500 hover:text-slate-700'
+                              }`}
                             >
+                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${p.isNewProduct ? 'bg-emerald' : 'bg-slate-300'}`} />
                               New Product
                             </button>
                             <button
                               type="button"
                               onClick={() => updateProduct(pIdx, { isNewProduct: false })}
-                              className={`flex-1 transition-colors ${!p.isNewProduct ? 'bg-emerald text-white' : 'text-secondary hover:bg-slate-50'}`}
+                              className={`flex items-center gap-1.5 h-7 px-3 rounded-md text-xs font-semibold transition-all ${
+                                !p.isNewProduct
+                                  ? 'bg-white text-blue-600 shadow-sm ring-1 ring-black/5'
+                                  : 'text-slate-500 hover:text-slate-700'
+                              }`}
                             >
+                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${!p.isNewProduct ? 'bg-blue-500' : 'bg-slate-300'}`} />
                               Existing Item
                             </button>
+                          </div>
+                          <div className="ml-auto flex items-center gap-2">
+                            {products.length > 1 && (
+                              <button type="button" onClick={() => removeProduct(pIdx)} className="flex items-center gap-1.5 h-7 px-3 rounded-md bg-red-50 border border-red-200 text-red-500 hover:bg-red-100 hover:text-red-600 transition-colors text-xs font-semibold" aria-label="Remove product">
+                                <X size={13} /> Remove Product
+                              </button>
+                            )}
                           </div>
                         </div>
 
                         {/* Product Name + SKU / Existing Item ID */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <FormField
-                            label="Product Name" required placeholder="e.g. Whitening Cream 50ml"
-                            value={p.productName}
-                            onChange={(e) => updateProduct(pIdx, { productName: e.target.value })}
-                          />
+                          {p.isNewProduct && (
+                            <FormField
+                              label="Product Name" required placeholder="e.g. Whitening Cream 50ml"
+                              value={p.productName}
+                              onChange={(e) => updateProduct(pIdx, { productName: e.target.value })}
+                            />
+                          )}
                           {p.isNewProduct ? (
                             <div>
                               {!p.newSku && p.productName.trim().length >= 2 && (
@@ -410,12 +424,12 @@ export function AddReceiptDialog({ open, onClose, batch }: Props) {
 
                         {/* Materials Used */}
                         <div className="rounded-lg border border-border overflow-hidden">
-                          <div className="px-3 py-2 bg-slate-50 border-b border-border">
-                            <p className="text-xs font-semibold text-secondary uppercase tracking-wide">Materials Used</p>
+                          <div className="px-3 py-2 bg-gray-700 border-b border-border">
+                            <p className="text-xs font-semibold text-white uppercase tracking-wide">Materials Used</p>
                           </div>
 
                           <div className="p-3 space-y-1.5">
-                            <div className="hidden sm:grid grid-cols-[1fr_100px_120px_32px] gap-2 mb-1">
+                            <div className="hidden sm:grid grid-cols-[1fr_140px_80px_32px] gap-2 mb-1">
                               <span className="text-[11px] font-medium text-secondary">Material (from dispatch)</span>
                               <span className="text-[11px] font-medium text-secondary">Used Qty</span>
                               <span className="text-[11px] font-medium text-secondary">UOM</span>
@@ -426,8 +440,8 @@ export function AddReceiptDialog({ open, onClose, batch }: Props) {
                               const lineCost = (parseFloat(mu.usedQty) || 0) * (mat?.unitCost ?? 0);
                               const availableQty = mat ? availableMaterials.get(mat.id) ?? 0 : null;
                               return (
-                                <div key={mIdx} className="grid grid-cols-1 sm:grid-cols-[1fr_100px_120px_32px] gap-2 items-center bg-slate-50 rounded-md p-2">
-                                  <div className="flex flex-col gap-0.5">
+                                <div key={mIdx} className="bg-slate-50 rounded-md p-2">
+                                  <div className="grid grid-cols-1 sm:grid-cols-[1fr_140px_80px_32px] gap-2 items-center">
                                     <select
                                       value={mu.item}
                                       onChange={(e) => {
@@ -441,47 +455,58 @@ export function AddReceiptDialog({ open, onClose, batch }: Props) {
                                         <option key={d.id} value={d.id}>{d.name}</option>
                                       ))}
                                     </select>
-                                    {lineCost > 0 && (
-                                      <span className="text-[10px] text-emerald-600 font-medium px-1">Cost: {formatCurrency(lineCost)}</span>
-                                    )}
-                                    {availableQty !== null && (
-                                      <span className="text-[10px] text-secondary px-1">Available: {availableQty} {mat?.uomSymbol}</span>
-                                    )}
+                                    <input
+                                      type="number" min={0} step="any" placeholder="Qty"
+                                      value={mu.usedQty}
+                                      onChange={(e) => updateMaterial(pIdx, mIdx, { usedQty: e.target.value })}
+                                      className="h-9 w-full rounded-md border border-border bg-white px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald"
+                                    />
+                                    <select
+                                      value={mu.uom}
+                                      onChange={(e) => updateMaterial(pIdx, mIdx, { uom: e.target.value })}
+                                      className="h-9 w-full rounded-md border border-border bg-white px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald"
+                                    >
+                                      <option value="">UOM…</option>
+                                      {(mat
+                                        ? uoms.filter((u) => getRelatedUomIds(mat.uomId).includes(u._id))
+                                        : uoms
+                                      ).map((u) => <option key={u._id} value={u._id}>{u.symbol}</option>)}
+                                    </select>
+                                    <button
+                                      type="button"
+                                      onClick={() => removeMaterial(pIdx, mIdx)}
+                                      disabled={p.materialsUsed.length === 1}
+                                      className="h-9 w-8 flex items-center justify-center rounded-md text-red-500 hover:text-red-600 disabled:opacity-30 transition-colors"
+                                      aria-label="Remove material"
+                                    >
+                                      <Trash2 size={13} />
+                                    </button>
                                   </div>
-                                  <input
-                                    type="number" min={0} step="any" placeholder="Qty"
-                                    value={mu.usedQty}
-                                    onChange={(e) => updateMaterial(pIdx, mIdx, { usedQty: e.target.value })}
-                                    className="h-9 w-full rounded-md border border-border bg-white px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald"
-                                  />
-                                  <select
-                                    value={mu.uom}
-                                    onChange={(e) => updateMaterial(pIdx, mIdx, { uom: e.target.value })}
-                                    className="h-9 w-full rounded-md border border-border bg-white px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald"
-                                  >
-                                    <option value="">UOM…</option>
-                                    {uoms.map((u) => <option key={u._id} value={u._id}>{u.symbol}</option>)}
-                                  </select>
-                                  <button
-                                    type="button"
-                                    onClick={() => removeMaterial(pIdx, mIdx)}
-                                    disabled={p.materialsUsed.length === 1}
-                                    className="h-9 w-8 flex items-center justify-center rounded-md text-secondary hover:text-red-500 disabled:opacity-30 transition-colors"
-                                    aria-label="Remove material"
-                                  >
-                                    <Trash2 size={13} />
-                                  </button>
+                                  {(lineCost > 0 || availableQty !== null) && (
+                                    <div className="flex items-center gap-3 mt-1 px-1">
+                                      {lineCost > 0 && <span className="text-[10px] text-emerald-600 font-medium">Cost: {formatCurrency(lineCost)}</span>}
+                                      {availableQty !== null && <span className="text-[10px] text-secondary">Available: {availableQty} {mat?.uomSymbol}</span>}
+                                    </div>
+                                  )}
                                 </div>
                               );
                             })}
-                            <button type="button" onClick={() => addMaterial(pIdx)} className="mt-1 h-8 px-3 rounded-md border border-emerald text-emerald text-xs font-medium flex items-center gap-1.5 transition-colors hover:bg-emerald-50">
-                              <Plus size={12} /> Add Material
-                            </button>
+                            <div className="flex items-center justify-between mt-1">
+                              <button type="button" onClick={() => addMaterial(pIdx)} className="h-8 px-3 rounded-md border border-dashed border-emerald-500 text-emerald-500 text-xs font-medium flex items-center gap-1.5 transition-colors hover:bg-emerald-100">
+                                <Plus size={12} /> Add Another Material
+                              </button>
+                              {costs.materialCost > 0 && (
+                                <div className="flex items-center gap-3 text-xs text-secondary">
+                                  <span>Material: <span className="font-semibold text-emerald-700">{formatCurrency(costs.materialCost)}</span></span>
+                                  {costs.unitCost > 0 && <span>Unit cost: <span className="font-semibold text-foreground">{formatCurrency(costs.unitCost)}</span></span>}
+                                </div>
+                              )}
+                            </div>
                           </div>
 
-                          {/* Received Qty + Base UOM + Sale Price + Reorder Level — footer inside border */}
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 px-3 py-3 border-t border-border">
-                            <FormField label="Received Qty" required type="number" min={0} step="any" placeholder="0" value={p.receivedQty} onChange={(e) => updateProduct(pIdx, { receivedQty: e.target.value })} />
+                          {/* Received Qty + Base UOM + Low Stock Qty — footer inside border */}
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 px-3 py-3 border-t border-border">
+                            <FormField label="Received Production Qty" required type="number" min={0} step="any" placeholder="0" value={p.receivedQty} onChange={(e) => updateProduct(pIdx, { receivedQty: e.target.value })} />
                             {p.isNewProduct ? (
                               <SelectField label="Base UOM" required value={p.newBaseUom} onChange={(e) => updateProduct(pIdx, { newBaseUom: e.target.value })}>
                                 <option value="">Select…</option>
@@ -493,32 +518,25 @@ export function AddReceiptDialog({ open, onClose, batch }: Props) {
                                 {uoms.map((u) => <option key={u._id} value={u._id}>{u.name} ({u.symbol})</option>)}
                               </SelectField>
                             )}
-                            {p.isNewProduct ? (
-                              <FormField label="Sale Price (৳)" type="number" min={0} step="any" placeholder="0" value={p.newSalePrice} onChange={(e) => updateProduct(pIdx, { newSalePrice: e.target.value })} />
-                            ) : (
-                              <FormField label="Sale Price (৳)" type="number" min={0} step="any" placeholder="0" value={p.salePrice} onChange={(e) => updateProduct(pIdx, { salePrice: e.target.value })} />
-                            )}
-                            {p.isNewProduct ? (
-                              <FormField label="Low Stock Qty" type="number" min={0} step="any" placeholder="0" value={p.newReorderLevel} onChange={(e) => updateProduct(pIdx, { newReorderLevel: e.target.value })} />
-                            ) : (
-                              <FormField label="Low Stock Qty" type="number" min={0} step="any" placeholder="0" value={p.newReorderLevel} onChange={(e) => updateProduct(pIdx, { newReorderLevel: e.target.value })} />
-                            )}
+                            <FormField label="Low Stock Qty" type="number" min={0} step="any" placeholder="0" value={p.newReorderLevel} onChange={(e) => updateProduct(pIdx, { newReorderLevel: e.target.value })} />
                           </div>
                         </div>
                       </div>
-                    )}
                   </div>
                 );
               })}
             </div>
-            <button type="button" onClick={addProduct} className="mt-3 h-8 px-3 rounded-md border border-emerald text-emerald text-xs font-medium flex items-center gap-1.5 transition-colors hover:bg-emerald-50">
-              <Plus size={13} /> Add Another Product Received From Factory Production
+            <button type="button" onClick={addProduct} className="mt-3 h-10 px-5 rounded-md border-2 border-dashed border-gray-400 bg-transparent text-gray-600 text-sm font-semibold flex items-center gap-2 transition-colors hover:border-gray-600 hover:text-gray-800">
+              <Plus size={13} /> Add Another Product
             </button>
           </div>
 
           {/* Section C — Live Cost Summary */}
-          <div>
-            <p className="text-[11px] font-semibold text-secondary uppercase tracking-wide mb-2">Cost Summary</p>
+          <div className="rounded-lg border border-border overflow-hidden">
+            <div className="px-3 py-2 bg-gray-700">
+              <p className="text-xs font-semibold text-white uppercase tracking-wide">Cost Summary</p>
+            </div>
+            <div className="p-4">
             <div className="grid grid-cols-3 gap-3 mb-3">
               <FormField label="Delivery Cost (৳)" type="number" min={0} step="any" placeholder="0" value={deliveryCost} onChange={(e) => setDeliveryCost(e.target.value)} />
               <FormField label="Production Cost (৳)" type="number" min={0} step="any" placeholder="0" value={productionCost} onChange={(e) => setProductionCost(e.target.value)} />
@@ -528,7 +546,7 @@ export function AddReceiptDialog({ open, onClose, batch }: Props) {
                 <table className="w-full min-w-[560px] text-[13px]">
                   <thead>
                     <tr className="bg-slate-50 border-b border-border">
-                      {['Product', 'Qty', 'Material Cost', 'Shared Cost', 'Unit Cost', 'Sale Price', 'Margin'].map((h) => (
+                      {['Product', 'Qty', 'Material Cost', 'Shared Cost', 'Unit Cost', 'Sale Price (৳) *', 'Margin'].map((h) => (
                         <th key={h} className="px-3 py-2 text-left text-xs font-medium text-secondary uppercase tracking-wide whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
@@ -543,7 +561,16 @@ export function AddReceiptDialog({ open, onClose, batch }: Props) {
                           <td className="px-3 py-2">{c.materialCost > 0 ? formatCurrency(c.materialCost) : '—'}</td>
                           <td className="px-3 py-2">{c.allocatedShared > 0 ? formatCurrency(c.allocatedShared) : '—'}</td>
                           <td className="px-3 py-2 font-semibold text-foreground">{c.unitCost > 0 ? formatCurrency(c.unitCost) : '—'}</td>
-                          <td className="px-3 py-2">{c.sale > 0 ? formatCurrency(c.sale) : '—'}</td>
+                          <td className="px-2 py-1.5">
+                            <input
+                              type="number" min={0} step="any" placeholder="0" required
+                              value={p.isNewProduct ? p.newSalePrice : p.salePrice}
+                              onChange={(e) => updateProduct(i, p.isNewProduct ? { newSalePrice: e.target.value } : { salePrice: e.target.value })}
+                              className={`h-8 w-24 rounded-md border px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald ${
+                                !(p.isNewProduct ? p.newSalePrice : p.salePrice) ? 'border-red-400 bg-red-50' : 'border-border bg-white'
+                              }`}
+                            />
+                          </td>
                           <td className="px-3 py-2">
                             {c.margin !== null ? (
                               <span className={`font-semibold ${c.margin >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
@@ -559,6 +586,8 @@ export function AddReceiptDialog({ open, onClose, batch }: Props) {
               </div>
             </div>
           </div>
+
+        </div>
 
         {/* Footer */}
         <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 px-6 py-4 border-t border-border shrink-0">

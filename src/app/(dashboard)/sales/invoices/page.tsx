@@ -14,6 +14,7 @@ import { FormField, SelectField } from '@/components/forms/FormField';
 import { formatCurrency, formatDate } from '@/lib/formatters';
 import { useGetInvoicesQuery, useCreateCustomerPaymentMutation, useDeleteInvoiceMutation } from '@/features/sales/services/salesApi';
 import { useAppSelector } from '@/lib/store/hooks';
+import { printPDF } from '@/lib/printPdf';
 import type { Invoice, Dealer } from '@/features/sales/types';
 
 const STATUS_OPTIONS = ['UNPAID', 'PARTIAL', 'PAID', 'CANCELLED'];
@@ -63,7 +64,7 @@ function QuickPayDialog({ invoice, onClose }: { invoice: Invoice | null; onClose
             <span className="text-secondary">Total: <span className="font-medium text-foreground">{formatCurrency(invoice.totalAmount)}</span></span>
             <span className="text-secondary">Due: <span className="font-semibold text-red-500">{formatCurrency(invoice.dueAmount)}</span></span>
           </div>
-          <FormField label="Amount (৳)" type="number" min={0.01} step="0.01" required error={errors.amount?.message} {...register('amount')} />
+          <FormField label="Amount (৳)" type="number" min={0.01} step="0.01" required error={errors.amount?.message} onFocus={(e) => e.target.select()} {...register('amount')} />
           {Number(watched) > 0 && (
             <div className="flex justify-between text-sm px-1">
               {change > 0
@@ -136,12 +137,7 @@ export default function InvoicesPage() {
     if (!token) return;
     try {
       const base = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api/v1';
-      const res = await fetch(`${base}/sales/invoices/${invoiceId}/pdf`, { headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) throw new Error();
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const win = window.open(url);
-      win?.addEventListener('load', () => { win.print(); URL.revokeObjectURL(url); });
+      await printPDF(`${base}/sales/invoices/${invoiceId}/pdf`, token);
     } catch {
       toast.error('Failed to load PDF for printing');
     }

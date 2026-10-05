@@ -48,9 +48,9 @@ const NAV_ITEMS: NavItem[] = [
     href: '/sales', label: 'Sales', icon: TrendingUp,
     children: [
       { href: '/sales/orders/new', label: 'Create Sale', icon: Plus },
-      { href: '/sales/orders', label: 'Orders', icon: ClipboardList },
-      { href: '/sales/invoices', label: 'Invoices', icon: FileText },
-      { href: '/sales/receipts', label: 'Receipts', icon: ReceiptText },
+      // { href: '/sales/orders', label: 'Orders', icon: ClipboardList },
+      { href: '/sales/invoices', label: 'Sales Invoices', icon: FileText },
+      { href: '/sales/receipts', label: 'Sales Receipts', icon: ReceiptText },
       { href: '/sales/dealers', label: 'Dealers', icon: UserCircle },
     ],
   },

@@ -188,7 +188,11 @@ export default function FactoryBatchDetailPage() {
               </button>
             )}
             {canDispatch && (
-              <button onClick={() => setConfirmDispatch(true)} className="h-9 px-4 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium flex items-center gap-2 transition-colors">
+              <button
+                onClick={() => setConfirmDispatch(true)}
+                style={{ animation: 'dispatch-glow 1.5s ease-in-out infinite' }}
+                className="h-9 px-4 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium flex items-center gap-2 transition-colors"
+              >
                 <Truck size={15} /> Dispatch Materials
               </button>
             )}

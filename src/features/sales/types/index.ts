@@ -28,6 +28,8 @@ export interface CustomerPayment {
 export interface InvoiceSummary {
   _id: string;
   invoiceNumber: string;
+  grossAmount: number;
+  totalCommission: number;
   totalAmount: number;
   paidAmount: number;
   dueAmount: number;
@@ -42,6 +44,9 @@ export interface InvoiceSummary {
 export interface DealerDues {
   dealer: { _id: string; name: string; commissionRate: number };
   outstandingBalance: number;
+  totalGrossAmount: number;
+  totalCommission: number;
+  totalNetAmount: number;
   aging: {
     current: number;
     days1_30: number;
@@ -60,8 +65,11 @@ export interface SalesOrderItem {
   item: { _id: string; name: string; sku: string } | string;
   description?: string;
   qty: number;
+  giftQty: number;
   unitPrice: number;
-  discount: number;
+  discount?: number;
+  commissionRate: number;
+  commissionAmount: number;
   lineTotal: number;
   uom: { _id: string; name: string; symbol: string } | string;
 }
@@ -72,8 +80,9 @@ export interface SalesOrder {
   dealer: Dealer | string;
   warehouse: { _id: string; name: string } | string;
   items: SalesOrderItem[];
+  grossAmount: number;
+  totalCommission: number;
   subtotal: number;
-  discountAmount: number;
   taxPercent: number;
   taxAmount: number;
   totalAmount: number;
@@ -94,8 +103,11 @@ export interface InvoiceItem {
   item: { _id: string; name: string; sku: string } | string;
   description?: string;
   qty: number;
+  giftQty: number;
   unitPrice: number;
-  discount: number;
+  discount?: number;
+  commissionRate: number;
+  commissionAmount: number;
   lineTotal: number;
   uom: { _id: string; name: string; symbol: string } | string;
 }
@@ -106,8 +118,9 @@ export interface Invoice {
   dealer: Dealer | string;
   salesOrder?: { _id: string; orderNumber: string } | string;
   items: InvoiceItem[];
+  grossAmount: number;
+  totalCommission: number;
   subtotal: number;
-  discountAmount: number;
   taxPercent: number;
   taxAmount: number;
   totalAmount: number;

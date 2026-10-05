@@ -30,10 +30,11 @@ interface MaterialSelectProps {
   value: string;
   items: import('@/features/inventory/types').Item[];
   stockMap: Map<string, number>;
+  selectedIds: string[];
   onChange: (id: string) => void;
 }
 
-function MaterialSelect({ value, items, stockMap, onChange }: MaterialSelectProps) {
+function MaterialSelect({ value, items, stockMap, selectedIds, onChange }: MaterialSelectProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -46,11 +47,9 @@ function MaterialSelect({ value, items, stockMap, onChange }: MaterialSelectProp
   }, []);
 
   const selected = items.find((i) => i._id === value);
-  const selectedStock = value ? (stockMap.get(value) ?? 0) : null;
-  const selectedUom = selected ? (typeof selected.baseUom === 'object' ? selected.baseUom.symbol : '') : '';
 
   return (
-    <div ref={ref} className="relative flex flex-col gap-0.5">
+    <div ref={ref} className="relative">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -59,11 +58,6 @@ function MaterialSelect({ value, items, stockMap, onChange }: MaterialSelectProp
         <span className="truncate">{selected ? selected.name : <span className="text-muted">Select material…</span>}</span>
         <ChevronDown size={14} className="shrink-0 text-secondary" />
       </button>
-      {selectedStock !== null && (
-        <p className={`text-[10px] leading-tight font-medium ${selectedStock <= 0 ? 'text-red-500' : 'text-emerald-600'}`}>
-          Stock: {selectedStock} {selectedUom}
-        </p>
-      )}
       {open && (
         <div className="absolute top-full left-0 z-50 mt-1 w-max min-w-full rounded-md border border-border bg-white shadow-lg">
           <div className="max-h-64 overflow-y-auto">
@@ -76,13 +70,20 @@ function MaterialSelect({ value, items, stockMap, onChange }: MaterialSelectProp
               return (
                 <div
                   key={item._id}
-                  onMouseDown={() => { onChange(item._id); setOpen(false); }}
-                  className={`px-3 py-2 cursor-pointer hover:bg-slate-50 grid grid-cols-[1fr_80px_80px_60px] items-center gap-3 ${item._id === value ? 'bg-emerald-50' : ''}`}
+                  onMouseDown={() => { if (selectedIds.includes(item._id) && item._id !== value) return; onChange(item._id); setOpen(false); }}
+                  title={selectedIds.includes(item._id) && item._id !== value ? 'Already added in another line' : undefined}
+                  className={`px-3 py-2 flex items-center justify-between gap-3 ${
+                    selectedIds.includes(item._id) && item._id !== value
+                      ? 'opacity-40 cursor-not-allowed'
+                      : 'cursor-pointer hover:bg-slate-50'
+                  } ${item._id === value ? 'bg-emerald-50' : ''}`}
                 >
                   <span className="text-sm font-semibold text-foreground truncate">{item.name}</span>
-                  <span className={`text-xs font-bold text-right ${stock <= 0 ? 'text-red-500' : 'text-blue-600'}`}>{stock}</span>
-                  <span className="text-xs font-bold text-amber-600 text-right">{formatCurrency(item.costPrice)}</span>
-                  <span className="text-xs font-bold text-secondary text-right">{uomSymbol}</span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`text-xs font-bold ${stock <= 0 ? 'text-red-500' : 'text-blue-600'}`}>Stock: {stock} {uomSymbol}</span>
+                    <span className="text-muted">·</span>
+                    <span className="text-xs font-bold text-amber-600">{formatCurrency(item.costPrice)}/{uomSymbol}</span>
+                  </div>
                 </div>
               );
             })}
@@ -269,90 +270,94 @@ export function FactoryBatchFormDialog({ open, onClose, batch }: Props) {
                 {warehouses.map((w) => <option key={w._id} value={w._id}>{w.name}</option>)}
               </SelectField>
               <FormField label="Expected Delivery Date" type="date" value={expectedDeliveryDate} onChange={(e) => setExpectedDeliveryDate(e.target.value)} />
-            </div>
-            <div className="mt-4">
-              <TextareaField label="Notes" placeholder="Any notes about this batch…" value={notes} onChange={(e) => setNotes(e.target.value)} />
+              <div className="flex flex-col gap-1">
+                <label className="text-sm font-bold text-foreground">Notes</label>
+                <textarea
+                  placeholder="Any notes about this batch…"
+                  value={notes}
+                  rows={1}
+                  onChange={(e) => { setNotes(e.target.value); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
+                  className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm text-foreground placeholder:text-muted resize-none overflow-hidden focus:outline-none focus:ring-2 focus:ring-emerald focus:border-emerald"
+                  style={{ minHeight: '40px' }}
+                />
+              </div>
             </div>
           </div>
 
           {/* Materials to Dispatch */}
           <div className="bg-slate-50 rounded-xl p-4">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-[11px] font-semibold text-secondary uppercase tracking-wide">Materials to Dispatch</p>
-              <button
-                type="button"
-                onClick={() => setMaterials((p) => [...p, { ...EMPTY_MATERIAL }])}
-                className="h-8 px-3 rounded-md bg-emerald hover:bg-emerald-600 text-white text-xs font-medium flex items-center gap-1.5 transition-colors"
-              >
-                <Plus size={13} /> Add Material
-              </button>
-            </div>
+            <p className="text-[11px] font-semibold text-secondary uppercase tracking-wide mb-3">Materials to Dispatch</p>
 
             <div className="space-y-1">
-              <div className="hidden sm:grid grid-cols-[1fr_120px_90px_110px_36px] gap-2 px-1">
-                <span className="text-[11px] font-medium text-secondary">Material</span>
-                <span className="text-[11px] font-medium text-secondary">UOM</span>
-                <span className="text-[11px] font-medium text-secondary">Qty</span>
-                <span className="text-[11px] font-medium text-secondary text-right">Est. Cost</span>
-                <span />
-              </div>
-
               {materials.map((m, idx) => {
                 const qty = parseFloat(m.qty) || 0;
                 const cost = qty * m.costPrice;
                 return (
-                  <div key={idx} className="grid grid-cols-1 sm:grid-cols-[1fr_120px_90px_110px_36px] gap-2 items-start bg-white rounded-lg p-2">
-                    <MaterialSelect value={m.itemId} items={allItems} stockMap={stockMap} onChange={(id) => pickItem(idx, id)} />
+                  <div key={idx} className="bg-white rounded-lg p-2">
+                    <div className="grid gap-2" style={{ gridTemplateColumns: '1fr 160px 80px 36px', width: '100%' }}>
+                      <MaterialSelect value={m.itemId} items={allItems} stockMap={stockMap} selectedIds={materials.map((ml) => ml.itemId).filter(Boolean)} onChange={(id) => pickItem(idx, id)} />
 
-                    <select
-                      value={m.uomId}
-                      onChange={(e) => setMaterials((p) => p.map((ml, i) => i === idx ? { ...ml, uomId: e.target.value } : ml))}
-                      disabled={!m.itemId}
-                      className="h-9 w-full rounded-md border border-border bg-white px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald disabled:bg-slate-100 disabled:text-muted"
-                    >
-                      <option value="">UOM…</option>
-                      {uoms.map((u) => (
-                        <option key={u._id} value={u._id}>
-                          {u.symbol}{u._id === m.baseUomId ? ' (base)' : ''}
-                        </option>
-                      ))}
-                    </select>
+                      <div className="flex items-center rounded-md border border-border overflow-hidden">
+                        <input
+                          type="number" min={0} step="any" placeholder="Qty"
+                          value={m.qty}
+                          onChange={(e) => setMaterials((p) => p.map((ml, i) => i === idx ? { ...ml, qty: e.target.value } : ml))}
+                          className="h-9 w-24 px-2 text-sm text-foreground bg-white focus:outline-none"
+                        />
+                        <select
+                          value={m.uomId}
+                          disabled={!m.itemId}
+                          onChange={(e) => setMaterials((p) => p.map((ml, i) => i === idx ? { ...ml, uomId: e.target.value } : ml))}
+                          className="h-9 border-l border-border bg-slate-50 px-1 text-xs font-semibold text-secondary focus:outline-none disabled:text-muted cursor-pointer"
+                        >
+                          {uoms.map((u) => (
+                            <option key={u._id} value={u._id}>{u.symbol}</option>
+                          ))}
+                        </select>
+                      </div>
 
-                    <input
-                      type="number" min={0} step="any" placeholder="Qty"
-                      value={m.qty}
-                      onChange={(e) => setMaterials((p) => p.map((ml, i) => i === idx ? { ...ml, qty: e.target.value } : ml))}
-                      className="h-9 w-full rounded-md border border-border bg-white px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald"
-                    />
+                      <span className="h-9 flex items-center text-sm font-medium text-emerald w-20 justify-end">
+                        {cost > 0 ? formatCurrency(cost) : ''}
+                      </span>
 
-                    <div className="h-9 flex items-center justify-end px-2 rounded-md border border-border bg-white text-sm font-medium text-foreground">
-                      {cost > 0 ? formatCurrency(cost) : <span className="text-muted">—</span>}
+                      <button
+                        type="button"
+                        onClick={() => setMaterials((p) => p.filter((_, i) => i !== idx))}
+                        className="h-9 w-9 flex items-center justify-center rounded-md text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                        aria-label="Remove material"
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setMaterials((p) => p.filter((_, i) => i !== idx))}
-                      className="h-9 w-9 flex items-center justify-center rounded-md text-secondary hover:bg-red-50 hover:text-red-500 transition-colors"
-                      aria-label="Remove material"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    {m.itemId && (
+                      <p className={`text-[10px] font-medium mt-0.5 ${(stockMap.get(m.itemId) ?? 0) <= 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                        Stock: {stockMap.get(m.itemId) ?? 0} {m.baseUomSymbol}
+                      </p>
+                    )}
                   </div>
                 );
               })}
             </div>
 
-            <div className="mt-3">
-              <TextareaField label="Dispatch Notes" placeholder="Any notes for this dispatch…" value={dispatchNotes} onChange={(e) => setDispatchNotes(e.target.value)} />
-            </div>
-          </div>
+            <button
+              type="button"
+              onClick={() => setMaterials((p) => [...p, { ...EMPTY_MATERIAL }])}
+              className="mt-2 h-8 px-3 rounded-md border border-dashed border-emerald text-emerald text-xs font-medium flex items-center gap-1.5 hover:bg-emerald-50 transition-colors"
+            >
+              <Plus size={13} /> Add Another Material
+            </button>
 
-          {/* Cost Summary */}
-          <div className="rounded-lg border border-border bg-slate-50 px-4 py-3">
-            <p className="text-[11px] font-semibold text-secondary uppercase tracking-wide mb-2">Estimated Dispatch Cost</p>
-            <div className="flex justify-between text-sm">
-              <span className="text-secondary">Total Material Value</span>
-              <span className="font-bold text-emerald">{formatCurrency(totalMaterialCost)}</span>
+            <div className="mt-3 flex items-stretch gap-4">
+              <div className="flex-1">
+                <TextareaField label="Dispatch Notes" placeholder="Any notes for this dispatch…" value={dispatchNotes} onChange={(e) => setDispatchNotes(e.target.value)} />
+              </div>
+              <div className="flex flex-col gap-1 shrink-0">
+                <span className="text-sm font-bold text-foreground">Estimated Dispatch Cost</span>
+                <div className="flex-1 rounded-lg border border-border bg-white px-4 flex items-center justify-between gap-6 text-sm">
+                  <span className="text-secondary">Total Material Value</span>
+                  <span className="font-bold text-emerald">{formatCurrency(totalMaterialCost)}</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>

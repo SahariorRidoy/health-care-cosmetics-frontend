@@ -2,7 +2,7 @@ import { forwardRef } from 'react';
 import { cn } from '@/lib/formatters';
 
 interface FormFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  label: string;
+  label?: string;
   error?: string;
   required?: boolean;
   hint?: string;
@@ -10,13 +10,15 @@ interface FormFieldProps extends React.InputHTMLAttributes<HTMLInputElement> {
 
 export const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
   ({ label, error, required, hint, className, id, ...props }, ref) => {
-    const fieldId = id ?? label.toLowerCase().replace(/\s+/g, '-');
+    const fieldId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
     return (
       <div className="flex flex-col gap-1">
-        <label htmlFor={fieldId} className="text-sm font-bold text-foreground">
-          {label}
-          {required && <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>}
-        </label>
+        {label && (
+          <label htmlFor={fieldId} className="text-sm font-bold text-foreground">
+            {label}
+            {required && <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>}
+          </label>
+        )}
         <input
           ref={ref}
           id={fieldId}
@@ -45,7 +47,7 @@ export const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
 FormField.displayName = 'FormField';
 
 interface SelectFieldProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
-  label: string;
+  label?: string;
   error?: string;
   required?: boolean;
   children: React.ReactNode;
@@ -53,13 +55,15 @@ interface SelectFieldProps extends React.SelectHTMLAttributes<HTMLSelectElement>
 
 export const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(
   ({ label, error, required, children, className, id, ...props }, ref) => {
-    const fieldId = id ?? label.toLowerCase().replace(/\s+/g, '-');
+    const fieldId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
     return (
       <div className="flex flex-col gap-1">
-        <label htmlFor={fieldId} className="text-sm font-bold text-foreground">
-          {label}
-          {required && <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>}
-        </label>
+        {label && (
+          <label htmlFor={fieldId} className="text-sm font-bold text-foreground">
+            {label}
+            {required && <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>}
+          </label>
+        )}
         <select
           ref={ref}
           id={fieldId}

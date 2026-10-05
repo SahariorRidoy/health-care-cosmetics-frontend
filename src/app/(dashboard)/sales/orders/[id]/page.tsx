@@ -371,7 +371,7 @@ export default function SalesOrderDetailPage() {
                     <td className="px-4 py-3 font-medium">{itemName}</td>
                     <td className="px-4 py-3">{line.qty}</td>
                     <td className="px-4 py-3">{formatCurrency(line.unitPrice)}</td>
-                    <td className="px-4 py-3">{line.discount}%</td>
+                    <td className="px-4 py-3">{line.discount ?? 0}%</td>
                     <td className="px-4 py-3">{formatCurrency(line.lineTotal)}</td>
                   </tr>
                 );

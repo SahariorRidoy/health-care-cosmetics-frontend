@@ -10,7 +10,7 @@ import { ArrowLeft, Loader2, X, CreditCard, FileDown, Printer, Pencil } from 'lu
 import { PageHeader } from '@/components/layout/PageHeader';
 import { LoadingSpinner, ErrorState, StatusBadge } from '@/components/feedback';
 import { DataTable, type Column } from '@/components/tables/DataTable';
-import { FormField, SelectField, TextareaField } from '@/components/forms/FormField';
+import { FormField, SelectField } from '@/components/forms/FormField';
 import { formatCurrency, formatDate } from '@/lib/formatters';
 import {
   useGetInvoiceQuery,
@@ -18,6 +18,7 @@ import {
   useCreateCustomerPaymentMutation,
 } from '@/features/sales/services/salesApi';
 import { useAppSelector } from '@/lib/store/hooks';
+import { printPDF } from '@/lib/printPdf';
 import type { InvoiceItem, CustomerPayment } from '@/features/sales/types';
 import { InvoiceEditDialog } from '@/features/sales/components/SalesRecordEditDialogs';
 
@@ -45,9 +46,10 @@ function RecordReceiptDialog({
 }) {
   const [createPayment, { isLoading }] = useCreateCustomerPaymentMutation();
 
+  const today = new Date().toISOString().split('T')[0];
   const { register, handleSubmit, reset, formState: { errors } } = useForm<ReceiptForm>({
     resolver: zodResolver(receiptSchema),
-    defaultValues: { amount: maxAmount, method: 'CASH' },
+    defaultValues: { amount: maxAmount, method: 'CASH', paymentDate: today },
   });
 
   async function onSubmit(values: ReceiptForm) {
@@ -75,32 +77,26 @@ function RecordReceiptDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
       <div className="fixed inset-0 bg-black/40" onClick={onClose} aria-hidden="true" />
-      <div role="dialog" aria-modal="true" className="relative w-full sm:max-w-md bg-white rounded-none sm:rounded-xl shadow-lg z-10 flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="text-base font-semibold">Record Payment</h2>
-          <button onClick={onClose} className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[36px] min-h-[36px] flex items-center justify-center" aria-label="Close"><X size={18} /></button>
+      <div role="dialog" aria-modal="true" className="relative w-full sm:max-w-sm bg-white rounded-none sm:rounded-xl shadow-lg z-10">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <h2 className="text-sm font-semibold">Record Payment</h2>
+          <button onClick={onClose} className="p-1 rounded-md text-secondary hover:bg-slate-100" aria-label="Close"><X size={16} /></button>
         </div>
-        <form onSubmit={handleSubmit(onSubmit)} noValidate className="px-6 py-4 flex flex-col gap-4">
-          <FormField
-            label="Amount (৳)"
-            type="number"
-            min={0.01}
-            max={maxAmount}
-            step="0.01"
-            required
-            error={errors.amount?.message}
-            {...register('amount')}
-          />
-          <SelectField label="Payment Method" required error={errors.method?.message} {...register('method')}>
-            {PAYMENT_METHODS.map((m) => <option key={m} value={m}>{m.replace('_', ' ')}</option>)}
-          </SelectField>
-          <FormField label="Payment Date" type="date" error={errors.paymentDate?.message} {...register('paymentDate')} />
-          <FormField label="Reference" placeholder="Cheque no. / transaction ID…" error={errors.reference?.message} {...register('reference')} />
-          <TextareaField label="Notes" placeholder="Optional notes…" {...register('notes')} />
-          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
-            <button type="button" onClick={onClose} disabled={isLoading} className="h-10 px-4 rounded-md border border-border text-sm text-foreground hover:bg-slate-50 disabled:opacity-50 transition-colors">Cancel</button>
-            <button type="submit" disabled={isLoading} className="h-10 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium disabled:opacity-60 transition-colors flex items-center justify-center gap-2">
-              {isLoading && <Loader2 size={14} className="animate-spin" aria-hidden="true" />}
+        <form onSubmit={handleSubmit(onSubmit)} noValidate className="px-4 py-3 flex flex-col gap-3">
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Amount (৳)" type="number" min={0.01} max={maxAmount} step="0.01" required error={errors.amount?.message} onFocus={(e) => e.target.select()} {...register('amount')} />
+            <FormField label="Date" type="date" error={errors.paymentDate?.message} {...register('paymentDate')} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <SelectField label="Method" required error={errors.method?.message} {...register('method')}>
+              {PAYMENT_METHODS.map((m) => <option key={m} value={m}>{m.replace('_', ' ')}</option>)}
+            </SelectField>
+            <FormField label="Reference" placeholder="Cheque / txn ID…" error={errors.reference?.message} {...register('reference')} />
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <button type="button" onClick={onClose} disabled={isLoading} className="h-9 px-3 rounded-md border border-border text-sm hover:bg-slate-50 disabled:opacity-50">Cancel</button>
+            <button type="submit" disabled={isLoading} className="h-9 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium disabled:opacity-60 flex items-center gap-2">
+              {isLoading && <Loader2 size={13} className="animate-spin" />}
               Record Payment
             </button>
           </div>
@@ -143,18 +139,7 @@ export default function InvoiceDetailPage() {
     if (!token) return;
     try {
       const base = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api/v1';
-      const res = await fetch(`${base}/sales/payments/${paymentId}/pdf`, { headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) throw new Error();
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const iframe = document.createElement('iframe');
-      iframe.style.cssText = 'position:fixed;width:0;height:0;border:0;opacity:0';
-      iframe.src = url;
-      document.body.appendChild(iframe);
-      iframe.onload = () => {
-        iframe.contentWindow?.print();
-        setTimeout(() => { document.body.removeChild(iframe); URL.revokeObjectURL(url); }, 1000);
-      };
+      await printPDF(`${base}/sales/payments/${paymentId}/pdf`, token);
     } catch {
       toast.error('Failed to print receipt');
     }
@@ -203,20 +188,7 @@ export default function InvoiceDetailPage() {
     if (!token) return;
     try {
       const base = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api/v1';
-      const res = await fetch(`${base}/sales/invoices/${id}/pdf`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error('Failed');
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const iframe = document.createElement('iframe');
-      iframe.style.cssText = 'position:fixed;width:0;height:0;border:0;opacity:0';
-      iframe.src = url;
-      document.body.appendChild(iframe);
-      iframe.onload = () => {
-        iframe.contentWindow?.print();
-        setTimeout(() => { document.body.removeChild(iframe); URL.revokeObjectURL(url); }, 1000);
-      };
+      await printPDF(`${base}/sales/invoices/${id}/pdf`, token);
     } catch {
       toast.error('Failed to load PDF for printing');
     }
@@ -373,7 +345,7 @@ export default function InvoiceDetailPage() {
                     <td className="px-4 py-3 font-medium">{itemName}</td>
                     <td className="px-4 py-3">{line.qty}</td>
                     <td className="px-4 py-3">{formatCurrency(line.unitPrice)}</td>
-                    <td className="px-4 py-3">{line.discount}%</td>
+                    <td className="px-4 py-3">{line.discount ?? 0}%</td>
                     <td className="px-4 py-3">{formatCurrency(line.lineTotal)}</td>
                   </tr>
                 );

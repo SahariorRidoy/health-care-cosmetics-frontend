@@ -73,7 +73,7 @@ export const salesApi = api.injectEndpoints({
     }),
     createSalesOrder: build.mutation<SalesOrderResponse, {
       dealer: string; warehouse: string;
-      items: { item: string; description?: string; qty: number; unitPrice: number; discount: number; uom: string }[];
+      items: { item: string; description?: string; qty: number; giftQty?: number; unitPrice: number; commissionRate: number; uom: string }[];
       taxPercent: number; commissionRate: number; notes?: string;
       payment?: { amount: number; method: string; reference?: string; notes?: string };
     }>({
@@ -82,11 +82,7 @@ export const salesApi = api.injectEndpoints({
     }),
     updateSalesOrder: build.mutation<SalesOrderResponse, {
       id: string;
-      body: {
-        dealer: string; warehouse: string;
-        items: { item: string; description?: string; qty: number; unitPrice: number; discount: number; uom: string }[];
-        taxPercent: number; commissionRate?: number; notes?: string;
-      };
+      body: { notes?: string };
     }>({
       query: ({ id, body }) => ({ url: `/sales/orders/${id}`, method: 'PATCH', body }),
       invalidatesTags: (_r, _e, { id }) => ['SalesOrder', { type: 'SalesOrder', id }, 'Invoice', 'CustomerPayment', 'Stock'],

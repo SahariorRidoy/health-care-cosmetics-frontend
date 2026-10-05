@@ -10,6 +10,7 @@ import { EmptyState, ErrorState, ConfirmDialog } from '@/components/feedback';
 import { formatCurrency, formatDate } from '@/lib/formatters';
 import { useGetAllPaymentsQuery, useDeletePaymentMutation } from '@/features/sales/services/salesApi';
 import { useAppSelector } from '@/lib/store/hooks';
+import { printPDF } from '@/lib/printPdf';
 import type { CustomerPayment, Dealer } from '@/features/sales/types';
 import { ReceiptEditDialog } from '@/features/sales/components/SalesRecordEditDialogs';
 
@@ -64,16 +65,8 @@ export default function ReceiptsPage() {
   async function handlePrint(receiptId: string) {
     if (!token) return;
     try {
-      const blob = await fetchPDF(receiptId);
-      const url = URL.createObjectURL(blob);
-      const iframe = document.createElement('iframe');
-      iframe.style.cssText = 'position:fixed;width:0;height:0;border:0;opacity:0';
-      iframe.src = url;
-      document.body.appendChild(iframe);
-      iframe.onload = () => {
-        iframe.contentWindow?.print();
-        setTimeout(() => { document.body.removeChild(iframe); URL.revokeObjectURL(url); }, 1000);
-      };
+      const base = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api/v1';
+      await printPDF(`${base}/sales/payments/${receiptId}/pdf`, token);
     } catch {
       toast.error('Failed to load PDF for printing');
     }

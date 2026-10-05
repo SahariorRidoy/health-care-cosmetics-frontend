@@ -100,7 +100,11 @@ export default function DealerDetailPage() {
   const invoiceColumns: Column<InvoiceSummary>[] = [
     { key: 'invoiceNumber', header: 'Invoice #', priority: 'P1', render: (row) => <span className="font-medium">{row.invoiceNumber}</span> },
     { key: 'createdAt', header: 'Date', priority: 'P2', render: (row) => formatDate(row.createdAt) },
-    { key: 'totalAmount', header: 'Total', priority: 'P1', render: (row) => formatCurrency(row.totalAmount) },
+    { key: 'grossAmount', header: 'Gross TP', priority: 'P3', render: (row) => formatCurrency(row.grossAmount ?? row.totalAmount) },
+    { key: 'totalCommission', header: 'Commission', priority: 'P3', render: (row) => (
+      <span className="text-violet-600 font-medium">{formatCurrency(row.totalCommission ?? row.commissionAmount)}</span>
+    )},
+    { key: 'totalAmount', header: 'Net Bill', priority: 'P1', render: (row) => formatCurrency(row.totalAmount) },
     { key: 'paidAmount', header: 'Paid', priority: 'P2', render: (row) => formatCurrency(row.paidAmount) },
     {
       key: 'dueAmount', header: 'Due / Change', priority: 'P1',
@@ -210,11 +214,19 @@ export default function DealerDetailPage() {
 
       {dues && (
         <>
-          <div className="grid grid-cols-1 gap-4 mb-6">
-            <div className="bg-white rounded-lg border border-border p-4">
-              <p className="text-xs font-medium text-muted uppercase tracking-wide">Outstanding</p>
-              <p className="text-lg font-semibold text-foreground mt-1">{formatCurrency(dues.outstandingBalance)}</p>
-            </div>
+          {/* Commission + financial summary */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {[
+              { label: 'Gross TP Sales', value: dues.totalGrossAmount ?? 0, color: 'text-foreground' },
+              { label: 'Total Commission', value: dues.totalCommission ?? 0, color: 'text-violet-600' },
+              { label: 'Net Sales', value: dues.totalNetAmount ?? 0, color: 'text-emerald-600' },
+              { label: 'Outstanding Due', value: dues.outstandingBalance, color: dues.outstandingBalance > 0 ? 'text-amber-600' : 'text-emerald-600' },
+            ].map(({ label, value, color }) => (
+              <div key={label} className="bg-white rounded-lg border border-border p-4">
+                <p className="text-xs font-medium text-muted uppercase tracking-wide mb-1">{label}</p>
+                <p className={`text-lg font-semibold ${color}`}>{formatCurrency(value)}</p>
+              </div>
+            ))}
           </div>
 
           <div className="bg-white rounded-lg border border-border mb-6">

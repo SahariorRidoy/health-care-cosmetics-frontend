@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Plus, Search, Pencil, Trash2, Truck, PackagePlus,
   Factory, Package, ReceiptText, Calendar, AlertTriangle, Inbox,
-  Filter, ChevronDown, X, PackageCheck, XCircle, RotateCcw, ChevronRight,
+  Filter, ChevronDown, X, PackageCheck, XCircle, RotateCcw, ChevronRight, ExternalLink,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -55,8 +56,18 @@ function StatusPill({ status }: { status: string }) {
 
 // ── Left panel: batch list item ───────────────────────────────────────────────
 
-function BatchListItem({ batch, selected, onClick }: { batch: FactoryBatch; selected: boolean; onClick: () => void }) {
+const STATUS_SELECTED_BG: Record<string, string> = {
+  DRAFT:              'bg-slate-700',
+  DISPATCHED:         'bg-slate-700',
+  IN_PRODUCTION:      'bg-slate-700',
+  PARTIALLY_RECEIVED: 'bg-slate-700',
+  COMPLETED:          'bg-slate-700',
+  CANCELLED:          'bg-slate-700',
+};
+
+function BatchListItem({ batch, selected, index, onClick }: { batch: FactoryBatch; selected: boolean; index: number; onClick: () => void }) {
   const cfg = STATUS_CONFIG[batch.status] ?? STATUS_CONFIG.DRAFT;
+  const bg = STATUS_SELECTED_BG[batch.status] ?? 'bg-slate-50';
   const batchName = batch.batchName.charAt(0).toUpperCase() + batch.batchName.slice(1);
 
   return (
@@ -64,27 +75,40 @@ function BatchListItem({ batch, selected, onClick }: { batch: FactoryBatch; sele
       onClick={onClick}
       className={`w-full text-left border-b border-slate-100 transition-all relative ${
         selected
-          ? 'bg-slate-50 border-l-2 border-l-slate-900 pl-3 pr-4 py-3'
+          ? `${bg} border-l-2 pl-3 pr-4 py-3`
           : 'bg-white hover:bg-slate-50/70 pl-4 pr-4 py-3 border-l-2 border-l-transparent'
       }`}
+      style={selected ? { borderLeftColor: 'transparent' } : undefined}
     >
-      <div className="flex items-center justify-between gap-2">
-        <p className={`text-[13px] truncate leading-tight ${
-          selected ? 'font-bold text-slate-900' : 'font-medium text-foreground'
+      {selected && (
+        <span className={`absolute left-0 top-0 bottom-0 w-1 ${cfg.track}`} />
+      )}
+      <div className="flex items-center gap-2">
+        <span className={`shrink-0 text-[10px] font-bold w-5 text-center ${
+          selected ? 'text-slate-300' : 'text-slate-400'
         }`}>
-          {batchName}
-        </p>
-        <span className={`shrink-0 text-[10px] font-medium ${
-          selected ? 'text-slate-500' : 'text-slate-400'
-        }`}>
-          {cfg.label}
+          {index}
         </span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-1">
+            <p className={`text-[13px] truncate leading-tight ${
+              selected ? 'font-bold text-white' : 'font-medium text-foreground'
+            }`}>
+              {batchName}
+            </p>
+            <span className={`shrink-0 text-[10px] font-medium ${
+              selected ? 'text-slate-300' : 'text-slate-400'
+            }`}>
+              {cfg.label}
+            </span>
+          </div>
+          <p className={`text-[11px] font-mono mt-0.5 ${
+            selected ? 'text-slate-400' : 'text-muted'
+          }`}>
+            {batch.fbNumber}
+          </p>
+        </div>
       </div>
-      <p className={`text-[11px] font-mono mt-0.5 ${
-        selected ? 'text-slate-500' : 'text-muted'
-      }`}>
-        {batch.fbNumber}
-      </p>
     </button>
   );
 }
@@ -179,8 +203,8 @@ function FactoryStockPanel({ batch }: { batch: FactoryBatch }) {
 
   return (
     <div className="bg-white rounded-lg border border-border overflow-hidden">
-      <div className="px-4 py-3 border-b border-border">
-        <h3 className="text-sm font-semibold text-foreground">Factory Stock</h3>
+      <div className="px-4 py-3 border-b border-border bg-slate-700">
+        <h3 className="text-sm font-semibold text-white">Factory Stock</h3>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[480px] text-[13px]">
@@ -214,11 +238,13 @@ function FactoryStockPanel({ batch }: { batch: FactoryBatch }) {
 
 // ── Right panel: batch detail ─────────────────────────────────────────────────
 
-function BatchDetail({ batchId, onEdit, onDeleted }: {
+function BatchDetail({ batchId, onEdit, onDeleted, onBack }: {
   batchId: string;
   onEdit: (b: FactoryBatch) => void;
   onDeleted: () => void;
+  onBack?: () => void;
 }) {
+  const router = useRouter();
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
   const [restockOpen, setRestockOpen] = useState(false);
@@ -299,6 +325,11 @@ function BatchDetail({ batchId, onEdit, onDeleted }: {
     <div className="flex flex-col h-full overflow-hidden">
       {/* Detail header */}
       <div className="shrink-0 px-5 py-4 border-b border-slate-200 bg-white">
+        {onBack && (
+          <button onClick={onBack} className="sm:hidden flex items-center gap-1.5 text-xs text-slate-500 hover:text-foreground mb-3">
+            <ChevronDown size={13} className="rotate-90" /> Back to list
+          </button>
+        )}
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="min-w-0">
             <h2 className="text-base font-bold text-foreground truncate mb-1">
@@ -330,7 +361,11 @@ function BatchDetail({ batchId, onEdit, onDeleted }: {
         {/* Action buttons */}
         <div className="flex items-center gap-2 flex-wrap">
           {canDispatch && (
-            <button onClick={() => setConfirmDispatch(true)} className="h-8 px-3 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors">
+            <button
+              onClick={() => setConfirmDispatch(true)}
+              style={{ animation: 'dispatch-glow 1.5s ease-in-out infinite' }}
+              className="h-8 px-3 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors"
+            >
               <Truck size={13} /> Dispatch
             </button>
           )}
@@ -360,6 +395,9 @@ function BatchDetail({ batchId, onEdit, onDeleted }: {
             </button>
           )}
           <div className="ml-auto flex items-center gap-1.5">
+            <button onClick={() => router.push(`/factory-production/${batch._id}`)} className="h-8 px-3 rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-semibold flex items-center gap-1.5 transition-colors">
+              <ExternalLink size={13} /> View Detail
+            </button>
             {canCancel && (
               <button onClick={() => setConfirmCancel(true)} className="h-8 px-3 rounded-md border border-red-200 text-red-600 hover:bg-red-50 text-xs font-semibold flex items-center gap-1.5 transition-colors">
                 <XCircle size={13} /> Cancel
@@ -410,10 +448,10 @@ function BatchDetail({ batchId, onEdit, onDeleted }: {
 
         {/* Dispatch Info */}
         <div className="bg-white rounded-lg border border-border">
-          <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-foreground">Dispatch Info</h3>
+          <div className="px-4 py-3 border-b border-border bg-slate-700 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-white">Dispatch Info</h3>
             {batch.dispatch.dispatchedDate && (
-              <span className="text-xs text-secondary flex items-center gap-1"><Calendar size={11} />{formatDate(batch.dispatch.dispatchedDate)}</span>
+              <span className="text-xs text-slate-400 flex items-center gap-1"><Calendar size={11} />{formatDate(batch.dispatch.dispatchedDate)}</span>
             )}
           </div>
           <div className="overflow-x-auto">
@@ -468,9 +506,9 @@ function BatchDetail({ batchId, onEdit, onDeleted }: {
 
         {/* Receipts */}
         <div className="bg-white rounded-lg border border-border">
-          <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-foreground">Production Receipts</h3>
-            <span className="text-xs text-muted">{batch.receipts.length} receipt{batch.receipts.length !== 1 ? 's' : ''}</span>
+          <div className="px-4 py-3 border-b border-border bg-slate-700 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-white">Production Receipts</h3>
+            <span className="text-xs text-slate-400">{batch.receipts.length} receipt{batch.receipts.length !== 1 ? 's' : ''}</span>
           </div>
           {batch.receipts.length === 0 ? (
             <p className="px-4 py-6 text-center text-muted text-sm">No receipts yet.</p>
@@ -664,6 +702,7 @@ export default function FactoryProductionPage() {
   const [open, setOpen] = useState(false);
   const [editBatch, setEditBatch] = useState<FactoryBatch | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [mobileView, setMobileView] = useState<'list' | 'detail'>('list');
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -677,11 +716,15 @@ export default function FactoryProductionPage() {
   const batches = data?.data?.factoryBatches ?? [];
   const pagination = data?.pagination;
 
-  // Auto-select first batch when list loads
   const firstId = batches[0]?._id;
   const effectiveSelected = selectedId ?? firstId ?? null;
 
   function openCreate() { setEditBatch(null); setOpen(true); }
+
+  function handleSelectBatch(id: string) {
+    setSelectedId(id);
+    setMobileView('detail');
+  }
 
   return (
     <>
@@ -702,8 +745,10 @@ export default function FactoryProductionPage() {
       {/* ── Split layout ── */}
       <div className="flex gap-0 border border-slate-200 rounded-xl overflow-hidden bg-slate-50" style={{ height: 'calc(100vh - 160px)' }}>
 
-        {/* Left: batch list */}
-        <div className="w-72 shrink-0 flex flex-col border-r border-slate-200 bg-white">
+        {/* Left: batch list — hidden on mobile when detail is shown */}
+        <div className={`w-full sm:w-72 shrink-0 flex flex-col border-r border-slate-200 bg-white ${
+          mobileView === 'detail' ? 'hidden sm:flex' : 'flex'
+        }`}>
           <LeftToolbar
             search={search}
             onSearch={(v) => { setSearch(v); setPage(1); }}
@@ -746,18 +791,18 @@ export default function FactoryProductionPage() {
                 )}
               </div>
             ) : (
-              batches.map((batch) => (
+              batches.map((batch, i) => (
                 <BatchListItem
                   key={batch._id}
                   batch={batch}
+                  index={(page - 1) * 20 + i + 1}
                   selected={effectiveSelected === batch._id}
-                  onClick={() => setSelectedId(batch._id)}
+                  onClick={() => handleSelectBatch(batch._id)}
                 />
               ))
             )}
           </div>
 
-          {/* Pagination */}
           {pagination && pagination.pages > 1 && (
             <div className="shrink-0 flex items-center justify-between px-3 py-2 border-t border-slate-200 bg-white">
               <span className="text-[10px] text-muted">{pagination.page}/{pagination.pages}</span>
@@ -781,14 +826,17 @@ export default function FactoryProductionPage() {
           )}
         </div>
 
-        {/* Right: detail panel */}
-        <div className="flex-1 flex flex-col min-w-0 bg-slate-50">
+        {/* Right: detail panel — hidden on mobile when list is shown */}
+        <div className={`flex-1 flex flex-col min-w-0 bg-slate-50 ${
+          mobileView === 'list' ? 'hidden sm:flex' : 'flex'
+        }`}>
           {effectiveSelected ? (
             <BatchDetail
               key={effectiveSelected}
               batchId={effectiveSelected}
               onEdit={(b) => { setEditBatch(b); setOpen(true); }}
-              onDeleted={() => setSelectedId(null)}
+              onDeleted={() => { setSelectedId(null); setMobileView('list'); }}
+              onBack={() => setMobileView('list')}
             />
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-8">
@@ -802,7 +850,6 @@ export default function FactoryProductionPage() {
         </div>
       </div>
 
-      {/* Dialogs */}
       <FactoryBatchFormDialog open={open} onClose={() => setOpen(false)} batch={editBatch} />
     </>
   );
