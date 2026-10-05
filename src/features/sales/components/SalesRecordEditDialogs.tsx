@@ -160,7 +160,7 @@ export function SalesOrderEditDialog({ order, open, onClose }: { order: SalesOrd
         <EditLineItems register={register} control={control} lineErrors={errors.items as Array<Record<string, { message?: string } | undefined>> | undefined} items={items} fallbackItems={order.items.flatMap((line) => typeof line.item === 'string' ? [] : [{ _id: line.item._id, name: line.item.name, sku: line.item.sku }])} setValue={setValue} watchedItems={watchedItems} />
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <SelectField label="Dealer" required error={errors.dealer?.message} {...register('dealer')}>
-            {!dealers.some((d) => d._id === idOf(order.dealer)) && <option value={idOf(order.dealer)}>{typeof order.dealer === 'string' ? 'Current dealer' : order.dealer.name}</option>}
+            {!dealers.some((d) => d._id === idOf(order.dealer)) && <option value={idOf(order.dealer)}>{typeof order.dealer === 'string' ? 'Current dealer' : (order.dealer?.name ?? 'Current dealer')}</option>}
             {dealers.map((d) => <option key={d._id} value={d._id}>{d.name}</option>)}
           </SelectField>
           <SelectField label="Warehouse" required error={errors.warehouse?.message} {...register('warehouse')}>

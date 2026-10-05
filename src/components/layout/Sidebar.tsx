@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Package, Factory, TrendingUp,
   DollarSign, Users, BarChart2, Settings, X, ChevronLeft, ChevronRight,
   ChevronDown, UserCircle, ClipboardList, FileText, ShoppingCart,
-  Warehouse, ReceiptText, Building2, Plus, Truck,
+  Warehouse, ReceiptText, Building2, Plus, Truck, CreditCard,
 } from 'lucide-react';
 import { cn } from '@/lib/formatters';
 
@@ -24,14 +24,15 @@ const NAV_ITEMS: NavItem[] = [
       { href: '/procurement/suppliers', label: 'Suppliers List', icon: Building2 },
       { href: '/materials/purchase-orders/new', label: 'Create Purchase', icon: Plus },
       { href: '/procurement/orders', label: 'Purchase Orders', icon: ShoppingCart },
-      { href: '/procurement/receipts', label: 'Goods Receipts', icon: ReceiptText },
+      { href: '/procurement/payments', label: 'Payments Receipts', icon: CreditCard },
     ],
   },
   {
     href: '/materials', label: 'Materials', icon: Package,
     children: [
       { href: '/materials', label: 'Materials List', icon: Package },
-      { href: '/materials/stock', label: 'Materials Stock', icon: Warehouse },
+      { href: '/materials/stock', label: 'Stock Balance', icon: Warehouse },
+      { href: '/materials/movement', label: 'Movement History', icon: BarChart2 },
     ],
   },
   {

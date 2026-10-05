@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { Loader2, ArrowLeft, Plus, Trash2, Search, AlertCircle, Package, ShoppingCart, ChevronDown } from 'lucide-react';
+import { Loader2, ArrowLeft, Plus, Trash2, Search, AlertCircle, Package, ShoppingCart, ChevronDown, X } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { formatCurrency } from '@/lib/formatters';
 import { useGetItemsQuery, useGetWarehousesQuery, useGetUOMsQuery, useGenerateSkuQuery, useBulkPurchaseItemsMutation } from '@/features/inventory/services/inventoryApi';
@@ -156,7 +156,7 @@ export default function NewPurchaseOrderPage() {
       }
 
       toast.success(`Purchase recorded — ${lines.length} item${lines.length > 1 ? 's' : ''} stock updated`);
-      router.push('/materials/purchase-orders');
+      router.push('/procurement/orders');
     } catch (err: unknown) {
       toast.error((err as { data?: { message?: string } })?.data?.message ?? 'Operation failed');
     }
@@ -176,59 +176,10 @@ export default function NewPurchaseOrderPage() {
       />
 
       <form onSubmit={handleSubmit} noValidate>
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_260px] gap-6 items-start">
+        <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-6 items-start">
 
-          {/* Left */}
+          {/* Left — Items only */}
           <div className="flex flex-col gap-5">
-
-            {/* Supplier & Warehouse */}
-            <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
-              <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-border bg-slate-50/60">
-                <ShoppingCart size={14} className="text-emerald shrink-0" />
-                <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Order Details</p>
-              </div>
-              <div className="p-5 grid grid-cols-1 xl:grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1">
-                  <label className="text-sm font-bold text-foreground">Supplier <span className="text-red-500">*</span></label>
-                  <div className="flex gap-2">
-                    <select
-                      value={supplierId}
-                      onChange={(e) => setSupplierId(e.target.value)}
-                      className="flex-1 h-10 rounded-md border border-border bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald"
-                    >
-                      <option value="">Select supplier…</option>
-                      {suppliers.map((s) => <option key={s._id} value={s._id}>{s.name}</option>)}
-                    </select>
-                    <button type="button" onClick={() => setSupplierDialogOpen(true)} className="h-10 w-10 rounded-md bg-emerald hover:bg-emerald-600 text-white flex items-center justify-center shrink-0 transition-colors" title="Add new supplier">
-                      <Plus size={16} />
-                    </button>
-                  </div>
-                  {supplierId && supplierDue > 0 && (
-                    <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-amber-50 border border-amber-200 text-xs text-amber-700">
-                      <AlertCircle size={12} className="shrink-0" />
-                      Outstanding due: <span className="font-semibold">{formatCurrency(supplierDue)}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <label className="text-sm font-bold text-foreground">Warehouse <span className="text-red-500">*</span></label>
-                  <select
-                    value={warehouseId}
-                    onChange={(e) => setWarehouseId(e.target.value)}
-                    className="h-10 rounded-md border border-border bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald"
-                  >
-                    <option value="">Select warehouse…</option>
-                    {warehouses.map((w) => <option key={w._id} value={w._id}>{w.name}</option>)}
-                  </select>
-                </div>
-
-                <div className="xl:col-span-2">
-                  <label className="text-sm font-bold text-foreground block mb-1">Notes</label>
-                  <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes…" rows={2} className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm text-foreground placeholder:text-muted resize-none focus:outline-none focus:ring-2 focus:ring-emerald" />
-                </div>
-              </div>
-            </div>
 
             {/* Line items */}
             <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
@@ -293,12 +244,16 @@ export default function NewPurchaseOrderPage() {
                                 <input
                                   type="text"
                                   value={line.search}
+                                  readOnly={!!line.item}
                                   onChange={(e) => { setItemSearch(e.target.value); updateLine(line.id, { search: e.target.value, item: null, dropdownOpen: true } as Partial<ExistingLine>); }}
-                                  onFocus={() => { setItemSearch(line.search); updateLine(line.id, { dropdownOpen: true } as Partial<ExistingLine>); }}
+                                  onFocus={() => { if (!line.item) { setItemSearch(line.search); updateLine(line.id, { dropdownOpen: true } as Partial<ExistingLine>); } }}
                                   placeholder="Search by name or SKU…"
-                                  className={`w-full h-10 rounded-md border bg-white pl-9 pr-9 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-emerald ${line.item ? 'border-emerald-300' : 'border-border'}`}
+                                  className={`w-full h-10 rounded-md border pl-9 pr-9 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-emerald ${line.item ? 'border-emerald-300 bg-emerald-50/60 cursor-default' : 'bg-white border-border'}`}
                                 />
-                                <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+                                {line.item
+                                  ? <button type="button" onClick={() => updateLine(line.id, { item: null, search: '', dropdownOpen: false, unitPrice: 0, quantity: 1, reorderLevel: 0 } as Partial<ExistingLine>)} className="absolute right-3 top-1/2 -translate-y-1/2 text-red-500 hover:text-red-700 transition-colors"><X size={16} strokeWidth={3} /></button>
+                                  : <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+                                }
                               </div>
                               {line.dropdownOpen && existingItems.length > 0 && (
                                 <div className="border border-border rounded-md bg-white shadow-lg max-h-48 overflow-y-auto z-20">
@@ -395,20 +350,20 @@ export default function NewPurchaseOrderPage() {
                 ))}
 
                 {/* Add another buttons */}
-                <div className="flex items-center gap-3 pt-1">
+                <div className="flex items-center gap-2 pt-1">
                   <button
                     type="button"
                     onClick={() => setLines((prev) => [...prev, makeExistingLine()])}
-                    className="flex-1 h-10 rounded-lg border-2 border-emerald bg-emerald-50 text-emerald-700 text-sm font-semibold flex items-center justify-center gap-2 hover:bg-emerald-100 transition-colors"
+                    className="h-8 px-3 rounded-md border border-emerald bg-emerald-50 text-emerald-700 text-xs font-semibold flex items-center gap-1.5 hover:bg-emerald-100 transition-colors"
                   >
-                    <Plus size={15} /> Add Existing Item
+                    <Plus size={12} /> Add Existing Item
                   </button>
                   <button
                     type="button"
                     onClick={() => setLines((prev) => [...prev, makeNewLine()])}
-                    className="flex-1 h-10 rounded-lg border-2 border-violet-400 bg-violet-50 text-violet-700 text-sm font-semibold flex items-center justify-center gap-2 hover:bg-violet-100 transition-colors"
+                    className="h-8 px-3 rounded-md border border-violet-400 bg-violet-50 text-violet-700 text-xs font-semibold flex items-center gap-1.5 hover:bg-violet-100 transition-colors"
                   >
-                    <Plus size={15} /> Add New Item
+                    <Plus size={12} /> Add New Item
                   </button>
                 </div>
 
@@ -419,31 +374,81 @@ export default function NewPurchaseOrderPage() {
           {/* Right — sticky summary */}
           <div className="flex flex-col gap-4 xl:sticky xl:top-6">
             <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
-              <div className="px-5 py-3.5 border-b border-border bg-slate-50/60">
+              <div className="flex items-center gap-2.5 px-4 py-3 border-b border-border bg-slate-50/60">
+                <ShoppingCart size={13} className="text-emerald shrink-0" />
                 <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Order Summary</p>
               </div>
-              <div className="p-5 flex flex-col gap-3">
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-foreground">Paid Now (৳)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={paidAmount || ''}
-                    onChange={(e) => setPaidAmount(Number(e.target.value))}
-                    placeholder="0.00 — leave blank if unpaid"
-                    className="h-10 rounded-md border border-border bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald"
-                  />
+              <div className="p-4 flex flex-col gap-4">
+
+                {/* Supplier + Warehouse */}
+                <div className="flex flex-col xl:flex-row gap-3">
+                  <div className="flex flex-col gap-1.5 flex-1">
+                    <label className="text-sm font-bold text-foreground">Supplier <span className="text-red-500">*</span></label>
+                    <div className="flex gap-1.5">
+                      <select
+                        value={supplierId}
+                        onChange={(e) => setSupplierId(e.target.value)}
+                        className={`flex-1 h-9 rounded-md border px-2 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-emerald ${supplierId ? 'border-emerald-300 bg-emerald-50' : 'border-border bg-white'}`}
+                      >
+                        <option value="">Select supplier…</option>
+                        {suppliers.map((s) => <option key={s._id} value={s._id}>{s.name}</option>)}
+                      </select>
+                      <button type="button" onClick={() => setSupplierDialogOpen(true)} className="h-9 w-9 rounded-md bg-emerald hover:bg-emerald-600 text-white flex items-center justify-center shrink-0 transition-colors" title="Add new supplier">
+                        <Plus size={14} />
+                      </button>
+                    </div>
+                    {supplierId && supplierDue > 0 && (
+                      <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-amber-50 border border-amber-200 text-[11px] text-amber-700">
+                        <AlertCircle size={11} className="shrink-0" />
+                        Due: <span className="font-semibold">{formatCurrency(supplierDue)}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col gap-1.5 flex-1">
+                    <label className="text-sm font-bold text-foreground">Warehouse <span className="text-red-500">*</span></label>
+                    <select
+                      value={warehouseId}
+                      onChange={(e) => setWarehouseId(e.target.value)}
+                      className={`h-9 rounded-md border px-2 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-emerald ${warehouseId ? 'border-emerald-300 bg-emerald-50' : 'border-border bg-white'}`}
+                    >
+                      <option value="">Select warehouse…</option>
+                      {warehouses.map((w) => <option key={w._id} value={w._id}>{w.name}</option>)}
+                    </select>
+                  </div>
                 </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-foreground">Payment Method</label>
-                  <select
-                    value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="h-10 rounded-md border border-border bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald"
-                  >
-                    {PAYMENT_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
-                  </select>
+
+                {/* Notes */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-bold text-foreground">Notes</label>
+                  <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes…" rows={2} className="w-full rounded-md border border-border bg-white px-2 py-1.5 text-sm text-foreground placeholder:text-muted resize-none focus:outline-none focus:ring-2 focus:ring-emerald" />
+                </div>
+
+                <div className="border-t border-border pt-3 flex flex-col gap-3">
+                  <div className="flex flex-col xl:flex-row gap-3">
+                    <div className="flex flex-col gap-1.5 flex-1">
+                      <label className="text-sm font-bold text-foreground">Paid Now (৳)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={paidAmount || ''}
+                        onChange={(e) => setPaidAmount(Number(e.target.value))}
+                        placeholder="0.00"
+                        className={`h-9 rounded-md border px-2 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-emerald ${paidAmount > 0 ? 'border-emerald-300 bg-emerald-50' : 'border-border bg-white'}`}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5 flex-1">
+                      <label className="text-sm font-bold text-foreground">Payment Method</label>
+                      <select
+                        value={paymentMethod}
+                        onChange={(e) => setPaymentMethod(e.target.value)}
+                        className="h-9 rounded-md border border-emerald-300 bg-emerald-50 px-2 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-emerald"
+                      >
+                        {PAYMENT_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="border-t border-border pt-3 flex flex-col gap-2">

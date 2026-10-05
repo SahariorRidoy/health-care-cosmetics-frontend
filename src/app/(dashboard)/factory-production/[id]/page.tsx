@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Truck, PackageCheck, XCircle, Pencil, RotateCcw, Factory } from 'lucide-react';
+import { ArrowLeft, Truck, PackageCheck, XCircle, Pencil, RotateCcw, Factory, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { LoadingSpinner, ErrorState, ConfirmDialog } from '@/components/feedback';
@@ -16,6 +16,7 @@ import {
   useDispatchFactoryBatchMutation,
   useCancelFactoryBatchMutation,
   useUpdateFactoryBatchStatusMutation,
+  useDeleteFactoryBatchMutation,
 } from '@/features/factory-production/services/factoryProductionApi';
 import type { FactoryBatch, FactoryDispatchMaterial, FactoryReceipt, FactoryMaterialReturn, FactoryRestockEntry, FactoryReceiptProduct, FactoryReceiptMaterialUsed } from '@/features/factory-production/types';
 
@@ -100,11 +101,13 @@ export default function FactoryBatchDetailPage() {
   const [confirmDispatch, setConfirmDispatch] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [confirmInProduction, setConfirmInProduction] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const { data, isLoading, isError, refetch } = useGetFactoryBatchQuery(id);
   const [dispatchBatch, { isLoading: dispatching }] = useDispatchFactoryBatchMutation();
   const [cancelBatch, { isLoading: cancelling }] = useCancelFactoryBatchMutation();
   const [updateStatus, { isLoading: updatingStatus }] = useUpdateFactoryBatchStatusMutation();
+  const [deleteBatch, { isLoading: deleting }] = useDeleteFactoryBatchMutation();
 
   if (isLoading) return <LoadingSpinner />;
   if (isError || !data?.data?.factoryBatch) return <ErrorState onRetry={refetch} />;
@@ -151,6 +154,18 @@ export default function FactoryBatchDetailPage() {
       toast.error((err as { data?: { message?: string } })?.data?.message ?? 'Failed to cancel');
     } finally {
       setConfirmCancel(false);
+    }
+  }
+
+  async function handleDelete() {
+    try {
+      await deleteBatch(batch._id).unwrap();
+      toast.success('Factory batch deleted — remaining materials restocked');
+      router.push('/factory-production');
+    } catch (err: unknown) {
+      toast.error((err as { data?: { message?: string } })?.data?.message ?? 'Failed to delete');
+    } finally {
+      setConfirmDelete(false);
     }
   }
 
@@ -202,6 +217,9 @@ export default function FactoryBatchDetailPage() {
                 <XCircle size={14} /> Cancel
               </button>
             )}
+            <button onClick={() => setConfirmDelete(true)} className="h-9 px-3 rounded-md border border-red-300 bg-red-50 text-red-600 hover:bg-red-100 text-sm flex items-center gap-2 transition-colors">
+              <Trash2 size={14} /> Delete
+            </button>
           </div>
         }
       />
@@ -467,6 +485,16 @@ export default function FactoryBatchDetailPage() {
         loading={cancelling}
         onConfirm={handleCancel}
         onCancel={() => setConfirmCancel(false)}
+      />
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete Factory Batch"
+        description="This will permanently delete this batch. Any remaining materials still at the factory will be restocked back to your warehouse."
+        confirmLabel="Delete"
+        variant="danger"
+        loading={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmDelete(false)}
       />
     </>
   );

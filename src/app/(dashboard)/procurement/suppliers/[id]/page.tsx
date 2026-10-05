@@ -14,7 +14,7 @@ import {
   useGetPurchaseOrdersQuery,
 } from '@/features/procurement/services/procurementApi';
 import { SupplierFormDialog } from '@/features/procurement/components/SupplierFormDialog';
-import { SupplierPaymentDialog } from '@/features/procurement/components/SupplierPaymentDialog';
+import { SupplierFIFOPaymentDialog } from '@/features/procurement/components/SupplierFIFOPaymentDialog';
 import type { SupplierPayment, GoodsReceipt, PurchaseOrder } from '@/features/procurement/types';
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -72,7 +72,7 @@ export default function SupplierDetailPage() {
       render: (row) => (
         <button
           onClick={() => router.push(`/procurement/receipts/${row._id}`)}
-          className="font-medium text-emerald hover:underline"
+          className="font-medium text-emerald underline hover:no-underline"
         >
           {row.grNumber}
         </button>
@@ -84,7 +84,7 @@ export default function SupplierDetailPage() {
         const po = row.purchaseOrder as { _id: string; poNumber: string } | string | undefined;
         if (!po || typeof po === 'string') return '—';
         return (
-          <button onClick={() => router.push(`/procurement/orders/${po._id}`)} className="text-emerald hover:underline">
+          <button onClick={() => router.push(`/procurement/orders/${po._id}`)} className="text-emerald underline hover:no-underline">
             {po.poNumber}
           </button>
         );
@@ -103,7 +103,7 @@ export default function SupplierDetailPage() {
         );
       },
     },
-    { key: 'receivedDate', header: 'Date', priority: 'P1', render: (row) => formatDate(row.receivedDate) },
+    { key: 'receivedDate', header: 'Date', priority: 'P1', render: (row) => formatDate(row.receivedDate, 'dd MMM yyyy, hh:mm a') },
     { key: 'totalAmount', header: 'Amount', priority: 'P1', render: (row) => formatCurrency(row.totalAmount) },
     {
       key: 'paidAmount', header: 'Paid Amount', priority: 'P1',
@@ -123,8 +123,8 @@ export default function SupplierDetailPage() {
   ];
 
   const paymentColumns: Column<SupplierPayment>[] = [
-    { key: 'paymentNumber', header: 'Payment #', priority: 'P1', render: (row) => <span className="font-medium">{row.paymentNumber}</span> },
-    { key: 'paymentDate', header: 'Date', priority: 'P1', render: (row) => formatDate(row.paymentDate) },
+    { key: 'paymentNumber', header: 'Payment #', priority: 'P1', render: (row) => <button onClick={() => router.push(`/procurement/payments/${row._id}`)} className="font-medium text-emerald underline hover:no-underline">{row.paymentNumber}</button> },
+    { key: 'paymentDate', header: 'Date', priority: 'P1', render: (row) => formatDate(row.paymentDate, 'dd MMM yyyy, hh:mm a') },
     { key: 'amount', header: 'Amount', priority: 'P1', render: (row) => formatCurrency(row.amount) },
     { key: 'method', header: 'Method', priority: 'P2' },
     { key: 'reference', header: 'Reference', priority: 'P3', render: (row) => row.reference ?? '—' },
@@ -324,7 +324,7 @@ export default function SupplierDetailPage() {
       </div>
 
       <SupplierFormDialog open={editOpen} supplier={supplier} onClose={() => setEditOpen(false)} />
-      <SupplierPaymentDialog
+      <SupplierFIFOPaymentDialog
         open={paymentOpen}
         supplierId={supplier._id}
         supplierName={supplier.name}

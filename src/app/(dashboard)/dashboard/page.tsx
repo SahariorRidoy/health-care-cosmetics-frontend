@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { LoadingSpinner } from '@/components/feedback';
 import { useGetFinanceSummaryQuery } from '@/features/finance/services/financeApi';
@@ -14,6 +15,7 @@ import {
 import { useGetItemsQuery } from '@/features/inventory/services/inventoryApi';
 import { useGetEmployeesQuery } from '@/features/hr/services/hrApi';
 import { useGetLeavesQuery } from '@/features/hr/services/hrApi';
+import { DashboardFilter, type DateRange } from '@/features/dashboard/components/DashboardFilter';
 
 import { DashboardKpiRow } from '@/features/dashboard/components/DashboardKpiRow';
 import { DashboardFinancePanel } from '@/features/dashboard/components/DashboardFinancePanel';
@@ -24,12 +26,20 @@ import { DashboardHRPanel } from '@/features/dashboard/components/DashboardHRPan
 import { DashboardLowStockPanel } from '@/features/dashboard/components/DashboardLowStockPanel';
 
 export default function DashboardPage() {
-  const { data: finData,      isLoading: finLoading }      = useGetFinanceSummaryQuery({});
-  const { data: salesData,    isLoading: salesLoading }    = useGetSalesSummaryQuery({});
-  const { data: prodData,     isLoading: prodLoading }     = useGetProductionSummaryQuery({});
+  const [filter, setFilter] = useState<DateRange>({
+    from:  '',
+    to:    '',
+    label: 'All Time',
+  });
+
+  const dateParams = filter.from && filter.to ? { from: filter.from, to: filter.to } : {};
+
+  const { data: finData,      isLoading: finLoading }      = useGetFinanceSummaryQuery(dateParams);
+  const { data: salesData,    isLoading: salesLoading }    = useGetSalesSummaryQuery(dateParams);
+  const { data: prodData,     isLoading: prodLoading }     = useGetProductionSummaryQuery(dateParams);
   const { data: stockData,    isLoading: stockLoading }    = useGetStockBalanceReportQuery({ lowStock: true, page: 1 });
-  const { data: purchaseData, isLoading: purchaseLoading } = useGetPurchaseSummaryQuery({});
-  const { data: attendData }  = useGetAttendanceSummaryReportQuery({});
+  const { data: purchaseData, isLoading: purchaseLoading } = useGetPurchaseSummaryQuery(dateParams);
+  const { data: attendData }  = useGetAttendanceSummaryReportQuery(dateParams);
   const { data: payrollData } = useGetPayrollSummaryReportQuery({});
   const { data: rawMatsData } = useGetItemsQuery({ type: 'RAW_MATERIAL,PACKAGING' });
   const { data: fgData }      = useGetItemsQuery({ type: 'FINISHED_GOOD' });
@@ -70,6 +80,7 @@ export default function DashboardPage() {
       <PageHeader
         title="Dashboard"
         description="Health Care Cosmetics Ltd. — ERP Command Center"
+        actions={<DashboardFilter value={filter} onChange={setFilter} />}
       />
 
       {/* Row 1: KPI Cards */}
@@ -80,8 +91,8 @@ export default function DashboardPage() {
         expenseCount={expenseCount}
         payables={fin?.payables.total ?? 0}
         supplierCount={fin?.payables.supplierCount ?? 0}
-        receivables={fin?.receivables.total ?? 0}
-        customerCount={fin?.receivables.customerCount ?? 0}
+        commission={fin?.commission.total ?? 0}
+        dealerCount={fin?.commission.dealerCount ?? 0}
         netProfit={netProfit}
         inProgress={inProgress}
         lowStockCount={lowStockItems.length}

@@ -33,6 +33,7 @@ export interface FinanceSummary {
     byCategory: { _id: string; categoryName: string; total: number; count: number }[];
   };
   payables: { total: number; supplierCount: number };
+  commission: { total: number; dealerCount: number };
   receivables: { total: number; customerCount: number };
   period: { from: string | null; to: string | null };
 }

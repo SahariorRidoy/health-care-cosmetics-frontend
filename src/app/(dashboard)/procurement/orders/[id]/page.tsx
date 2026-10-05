@@ -17,10 +17,11 @@ import {
   useUpdatePOStatusMutation,
   useCreateGoodsReceiptMutation,
   useGetGoodsReceiptsQuery,
+  useGetSupplierPaymentsQuery,
 } from '@/features/procurement/services/procurementApi';
 import { useGetWarehousesQuery } from '@/features/inventory/services/inventoryApi';
 import { SupplierPaymentDialog } from '@/features/procurement/components/SupplierPaymentDialog';
-import type { POItem, GoodsReceipt } from '@/features/procurement/types';
+import type { POItem, GoodsReceipt, SupplierPayment } from '@/features/procurement/types';
 
 // ── GR Form ───────────────────────────────────────────────────────────────────
 
@@ -150,6 +151,14 @@ export default function PODetailPage() {
   const { data: grData, isLoading: grLoading } = useGetGoodsReceiptsQuery({ purchaseOrder: id }, { skip: !id });
   const [updateStatus, { isLoading: statusLoading }] = useUpdatePOStatusMutation();
 
+  const supplierId = typeof data?.data?.purchaseOrder?.supplier === 'string'
+    ? data.data.purchaseOrder.supplier
+    : data?.data?.purchaseOrder?.supplier?._id;
+  const { data: paymentsData, isLoading: paymentsLoading } = useGetSupplierPaymentsQuery(
+    { supplierId: supplierId! },
+    { skip: !supplierId },
+  );
+
   if (isLoading) return <LoadingSpinner />;
   if (isError || !data?.data?.purchaseOrder) return <ErrorState onRetry={refetch} />;
 
@@ -168,6 +177,16 @@ export default function PODetailPage() {
       setConfirmStatus(null);
     }
   }
+
+  const paymentColumns: Column<SupplierPayment>[] = [
+    { key: 'paymentNumber', header: 'Payment #', priority: 'P1', render: (row) => (
+      <button onClick={() => router.push(`/procurement/payments/${row._id}`)} className="font-medium text-emerald underline hover:no-underline">{row.paymentNumber}</button>
+    )},
+    { key: 'paymentDate', header: 'Date', priority: 'P1', render: (row) => formatDate(row.paymentDate, 'dd MMM yyyy, hh:mm a') },
+    { key: 'amount', header: 'Amount', priority: 'P1', render: (row) => formatCurrency(row.amount) },
+    { key: 'method', header: 'Method', priority: 'P2' },
+    { key: 'reference', header: 'Reference', priority: 'P3', render: (row) => row.reference ?? '—' },
+  ];
 
   const grColumns: Column<GoodsReceipt>[] = [
     { key: 'grNumber', header: 'GR Number', priority: 'P1', render: (row) => (
@@ -203,7 +222,12 @@ export default function PODetailPage() {
               </button>
             )}
             {po.status === 'RECEIVED' && (
-              <button onClick={() => setConfirmStatus('CLOSED')} className="h-9 px-4 rounded-md border border-border text-sm text-foreground hover:bg-slate-50 flex items-center gap-2 transition-colors">
+              <button
+                onClick={() => setConfirmStatus('CLOSED')}
+                disabled={dueAmount > 0}
+                title={dueAmount > 0 ? 'Clear due amount before closing' : undefined}
+                className="h-9 px-4 rounded-md border border-border text-sm text-foreground hover:bg-slate-50 flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 Close PO
               </button>
             )}
@@ -291,43 +315,60 @@ export default function PODetailPage() {
       </div>
 
       {/* Info */}
-      <div className="print:hidden bg-white rounded-lg border border-border p-6 grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
-        {[
-          { label: 'PO Number', value: po.poNumber },
-          { label: 'Supplier', value: supplier?.name },
-          { label: 'Status', value: <StatusBadge status={po.status} /> },
-          { label: 'Date', value: formatDate(po.createdAt, 'dd/MM/yyyy, hh:mm a') },
-          { label: 'Payment Status', value: <StatusBadge status={po.paymentStatus ?? 'UNPAID'} /> },
-        ].map(({ label, value }) => (
-          <div key={label} className="flex flex-col gap-0.5">
-            <span className="text-xs font-medium text-muted uppercase tracking-wide">{label}</span>
-            <span className="text-sm text-foreground">{value ?? '—'}</span>
+      <div className="print:hidden bg-white rounded-lg border border-border mb-6 overflow-hidden">
+        {/* Identity */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-slate-700">
+          <div className="flex items-center gap-4">
+            <div>
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-1">Purchase Order</p>
+              <p className="text-2xl font-bold text-white tracking-tight">{po.poNumber}</p>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <StatusBadge status={po.status} />
+              <StatusBadge status={po.paymentStatus ?? 'UNPAID'} />
+            </div>
+            <p className="text-sm font-medium text-slate-300">{formatDate(po.createdAt, 'dd MMM yyyy, hh:mm a')}</p>
           </div>
-        ))}
+        </div>
+
+        {/* Meta + financials */}
+        <div className="grid grid-cols-2 md:grid-cols-5 divide-x divide-y md:divide-y-0 divide-border">
+          <div className="px-5 py-4 flex flex-col gap-0.5">
+            <p className="text-xs font-bold text-slate-700 uppercase tracking-wide">Supplier</p>
+            {supplier ? (
+              <button onClick={() => router.push(`/procurement/suppliers/${supplier._id}`)} className="text-sm font-semibold text-emerald underline hover:no-underline text-left">{supplier.name}</button>
+            ) : <p className="text-sm text-foreground">—</p>}
+          </div>
+          <div className="px-5 py-4 flex flex-col gap-0.5">
+            <p className="text-xs font-bold text-slate-700 uppercase tracking-wide">Lines</p>
+            <p className="text-sm font-semibold text-foreground">{po.items.length} item{po.items.length !== 1 ? 's' : ''}</p>
+          </div>
+          <div className="px-5 py-4 flex flex-col gap-0.5">
+            <p className="text-xs font-bold text-blue-600 uppercase tracking-wide">Total Amount</p>
+            <p className="text-lg font-bold text-slate-700">{formatCurrency(po.totalAmount)}</p>
+          </div>
+          <div className="px-5 py-4 flex flex-col gap-0.5">
+            <p className="text-xs font-bold text-emerald-600 uppercase tracking-wide">Paid</p>
+            <p className="text-lg font-bold text-emerald-600">{formatCurrency(po.paidAmount ?? 0)}</p>
+          </div>
+          <div className="px-5 py-4 flex flex-col gap-0.5">
+            <p className="text-xs font-bold text-amber-500 uppercase tracking-wide">Due</p>
+            <p className={`text-lg font-bold ${dueAmount > 0 ? 'text-amber-500' : 'text-emerald-600'}`}>{formatCurrency(dueAmount)}</p>
+          </div>
+        </div>
+
         {po.notes && (
-          <div className="col-span-full flex flex-col gap-0.5">
-            <span className="text-xs font-medium text-muted uppercase tracking-wide">Notes</span>
-            <span className="text-sm text-foreground">{po.notes}</span>
+          <div className="px-6 py-3 bg-slate-50 border-t border-border">
+            <p className="text-[10px] font-semibold text-muted uppercase tracking-widest mb-0.5">Notes</p>
+            <p className="text-sm text-foreground">{po.notes}</p>
           </div>
         )}
-        <div className="flex flex-col gap-0.5">
-          <span className="text-xs font-medium text-muted uppercase tracking-wide">Total Amount</span>
-          <span className="text-sm font-semibold text-blue-600">{formatCurrency(po.totalAmount)}</span>
-        </div>
-        <div className="flex flex-col gap-0.5">
-          <span className="text-xs font-medium text-muted uppercase tracking-wide">Paid Amount</span>
-          <span className="text-sm font-semibold text-emerald-600">{formatCurrency(po.paidAmount ?? 0)}</span>
-        </div>
-        <div className="flex flex-col gap-0.5">
-          <span className="text-xs font-medium text-muted uppercase tracking-wide">Due Amount</span>
-          <span className="text-sm font-semibold text-orange-500">{formatCurrency(dueAmount)}</span>
-        </div>
       </div>
 
       {/* Line items */}
       <div className="print:hidden bg-white rounded-lg border border-border mb-6">
-        <div className="px-4 py-3 border-b border-border">
-          <h2 className="text-sm font-semibold">Line Items</h2>
+        <div className="px-4 py-3 border-b border-border bg-slate-700">
+          <h2 className="text-sm font-semibold text-white">Line Items</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-[13px]">
@@ -361,17 +402,31 @@ export default function PODetailPage() {
       </div>
 
       {/* Goods receipts */}
-      <div className="print:hidden bg-white rounded-lg border border-border">
-        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-          <h2 className="text-sm font-semibold">Goods Receipts</h2>
+      <div className="print:hidden bg-white rounded-lg border border-border mb-6">
+        <div className="px-4 py-3 border-b border-border bg-slate-700 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-white">Goods Receipts</h2>
           {po.status === 'CONFIRMED' && (
-            <button onClick={() => setGrOpen(true)} className="h-8 px-3 rounded-md border border-border text-xs text-foreground hover:bg-slate-50 flex items-center gap-1.5 transition-colors">
+            <button onClick={() => setGrOpen(true)} className="h-8 px-3 rounded-md border border-slate-500 text-xs text-white hover:bg-slate-600 flex items-center gap-1.5 transition-colors">
               <Plus size={13} aria-hidden="true" /> Add Receipt
             </button>
           )}
         </div>
         <div className="p-4">
           <DataTable columns={grColumns} data={grData?.data?.goodsReceipts ?? []} keyField="_id" isLoading={grLoading} emptyMessage="No goods receipts yet." />
+        </div>
+      </div>
+
+      {/* Payment receipts */}
+      <div className="print:hidden bg-white rounded-lg border border-border">
+        <div className="px-4 py-3 border-b border-border bg-slate-700">
+          <h2 className="text-sm font-semibold text-white">Payment Receipts</h2>
+        </div>
+        <div className="p-4">
+          <DataTable columns={paymentColumns} data={(paymentsData?.data?.payments ?? []).filter((p) =>
+            p.purchaseOrders?.some((po) =>
+              (typeof po.purchaseOrder === 'string' ? po.purchaseOrder : po.purchaseOrder?._id) === id
+            ) || (typeof p.purchaseOrder === 'string' ? p.purchaseOrder : (p.purchaseOrder as { _id: string } | undefined)?._id) === id
+          )} keyField="_id" isLoading={paymentsLoading} emptyMessage="No payments recorded yet." />
         </div>
       </div>
 

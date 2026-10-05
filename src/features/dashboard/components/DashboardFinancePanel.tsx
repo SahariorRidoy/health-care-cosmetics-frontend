@@ -168,9 +168,9 @@ export function DashboardFinancePanel({ fin, sales, totalRevenue }: Props) {
                 </div>
                 <div className="grid grid-cols-2 gap-2 pt-1">
                   <div className="bg-slate-50 rounded-lg p-3 text-center">
-                    <p className="text-base font-bold text-foreground">{formatCurrency(fin?.receivables.total ?? 0)}</p>
-                    <p className="text-[10px] text-secondary uppercase tracking-wide">Receivables</p>
-                    <p className="text-[10px] text-muted">{fin?.receivables.customerCount ?? 0} customers</p>
+                    <p className="text-base font-bold text-foreground">{formatCurrency(fin?.commission.total ?? 0)}</p>
+                    <p className="text-[10px] text-secondary uppercase tracking-wide">Commission</p>
+                    <p className="text-[10px] text-muted">{fin?.commission.dealerCount ?? 0} dealers</p>
                   </div>
                   <div className="bg-slate-50 rounded-lg p-3 text-center">
                     <p className="text-base font-bold text-foreground">{formatCurrency(fin?.payables.total ?? 0)}</p>

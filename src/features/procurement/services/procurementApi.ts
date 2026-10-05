@@ -1,7 +1,7 @@
 import { api } from '@/lib/store/api';
 import type {
   SuppliersResponse, SupplierResponse, CreateSupplierPayload,
-  SupplierPaymentsResponse, SupplierDuesResponse,
+  SupplierPaymentsResponse, SupplierPaymentResponse, SupplierPaymentsAllResponse, SupplierDuesResponse,
   POsResponse, POResponse, GRsResponse, GRResponse, PaymentStatus,
 } from '../types';
 
@@ -31,12 +31,30 @@ export const procurementApi = api.injectEndpoints({
       query: ({ supplierId, ...params }) => ({ url: `/procurement/suppliers/${supplierId}/payments`, params }),
       providesTags: ['SupplierPayment'],
     }),
+    getAllSupplierPayments: build.query<SupplierPaymentsAllResponse, { page?: number; limit?: number; search?: string; supplier?: string; method?: string }>({
+      query: (params) => ({ url: '/procurement/payments', params }),
+      providesTags: ['SupplierPayment'],
+    }),
+    getSupplierPayment: build.query<SupplierPaymentResponse, string>({
+      query: (id) => `/procurement/payments/${id}`,
+      providesTags: (_r, _e, id) => [{ type: 'SupplierPayment', id }],
+    }),
     getSupplierDues: build.query<SupplierDuesResponse, string>({
       query: (supplierId) => `/procurement/suppliers/${supplierId}/dues`,
       providesTags: (_r, _e, id) => [{ type: 'Supplier', id }, 'SupplierPayment'],
     }),
     createSupplierPayment: build.mutation<{ success: boolean }, { supplier: string; purchaseOrder?: string; amount: number; paymentDate: string; method: string; reference?: string; notes?: string }>({
       query: (body) => ({ url: '/procurement/payments', method: 'POST', body }),
+      invalidatesTags: (_r, _e, { supplier }) => [
+        'SupplierPayment',
+        { type: 'Supplier', id: supplier },
+        'Supplier',
+        'PurchaseOrder',
+        'GoodsReceipt',
+      ],
+    }),
+    createSupplierPaymentFifo: build.mutation<{ success: boolean }, { supplier: string; amount: number; paymentDate: string; method: string; reference?: string; notes?: string }>({
+      query: (body) => ({ url: '/procurement/payments/fifo', method: 'POST', body }),
       invalidatesTags: (_r, _e, { supplier }) => [
         'SupplierPayment',
         { type: 'Supplier', id: supplier },
@@ -93,6 +111,10 @@ export const procurementApi = api.injectEndpoints({
       query: (body) => ({ url: '/procurement/receipts', method: 'POST', body }),
       invalidatesTags: ['GoodsReceipt', 'PurchaseOrder', 'Stock'],
     }),
+    deleteSupplierPayment: build.mutation<{ success: boolean; message: string }, string>({
+      query: (id) => ({ url: `/procurement/payments/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['SupplierPayment', 'Supplier', 'PurchaseOrder'],
+    }),
     deleteGoodsReceipt: build.mutation<{ success: boolean; message: string }, string>({
       query: (id) => ({ url: `/procurement/receipts/${id}`, method: 'DELETE' }),
       invalidatesTags: ['GoodsReceipt', 'PurchaseOrder'],
@@ -107,8 +129,11 @@ export const {
   useUpdateSupplierMutation,
   useDeleteSupplierMutation,
   useGetSupplierPaymentsQuery,
+  useGetAllSupplierPaymentsQuery,
+  useGetSupplierPaymentQuery,
   useGetSupplierDuesQuery,
   useCreateSupplierPaymentMutation,
+  useCreateSupplierPaymentFifoMutation,
   useGetPurchaseOrdersQuery,
   useGetPurchaseOrderQuery,
   useCreatePurchaseOrderMutation,
@@ -118,5 +143,6 @@ export const {
   useGetGoodsReceiptsQuery,
   useGetGoodsReceiptQuery,
   useCreateGoodsReceiptMutation,
+  useDeleteSupplierPaymentMutation,
   useDeleteGoodsReceiptMutation,
 } = procurementApi;

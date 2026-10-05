@@ -26,27 +26,24 @@ const colorMap: Record<Color, { bg: string; icon: string; bar: string }> = {
   cyan:    { bg: 'bg-cyan-50',    icon: 'text-cyan-600',    bar: 'bg-cyan-500'    },
 };
 
-function KpiCard({ label, value, sub, icon: Icon, color, href, trend }: KpiItem) {
+function KpiCard({ label, value, sub, icon: _Icon, color, href, trend, large }: KpiItem & { large?: boolean }) {
   const c = colorMap[color];
   const inner = (
-    <div className="bg-white rounded-xl border border-border p-6 hover:shadow-md hover:border-slate-300 transition-all duration-200 group">
-      <div className="flex items-start justify-between mb-4">
-        <div className={`w-11 h-11 rounded-xl ${c.bg} flex items-center justify-center`}>
-          <Icon size={22} className={c.icon} />
-        </div>
+    <div className={`bg-white rounded-xl border border-border hover:shadow-md hover:border-slate-300 transition-all duration-200 group h-full flex flex-col ${large ? 'p-8' : 'p-6'}`}>
+      <div className="flex items-start justify-between mb-4 min-h-[28px]">
         {trend && (
           <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${trend.positive ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
             {trend.label}
           </span>
         )}
       </div>
-      <p className="text-xs font-semibold text-secondary uppercase tracking-wider mb-1">{label}</p>
-      <p className="text-2xl font-bold text-foreground leading-tight">{value}</p>
-      <p className="text-sm text-muted mt-1">{sub}</p>
-      <div className={`mt-4 h-0.5 w-12 ${c.bar} rounded-full opacity-60 group-hover:w-full transition-all duration-500`} />
+      <p className={`font-semibold text-secondary uppercase tracking-wider mb-1 ${large ? 'text-sm' : 'text-xs'}`}>{label}</p>
+      <p className={`font-bold text-foreground leading-tight ${large ? 'text-4xl mt-2' : 'text-2xl'}`}>{value}</p>
+      {!large && <p className="text-sm text-muted mt-1">{sub}</p>}
+      <div className={`mt-auto pt-4 h-0.5 w-12 ${c.bar} rounded-full opacity-60 group-hover:w-full transition-all duration-500`} />
     </div>
   );
-  return href ? <Link href={href} className="block">{inner}</Link> : <div>{inner}</div>;
+  return href ? <Link href={href} className="block h-full">{inner}</Link> : <div className="h-full">{inner}</div>;
 }
 
 export interface DashboardKpiRowProps {
@@ -56,8 +53,8 @@ export interface DashboardKpiRowProps {
   expenseCount: number;
   payables: number;
   supplierCount: number;
-  receivables: number;
-  customerCount: number;
+  commission: number;
+  dealerCount: number;
   netProfit: number;
   inProgress: number;
   lowStockCount: number;
@@ -66,7 +63,7 @@ export interface DashboardKpiRowProps {
 
 export function DashboardKpiRow({
   totalRevenue, totalOrders, totalExpenses, expenseCount,
-  payables, supplierCount, receivables, customerCount,
+  payables, supplierCount, commission, dealerCount,
   netProfit, inProgress, lowStockCount, totalEmployees,
 }: DashboardKpiRowProps) {
   const netPositive = netProfit >= 0;
@@ -106,12 +103,12 @@ export function DashboardKpiRow({
       href: '/procurement/suppliers',
     },
     {
-      label: 'Customer Receivables',
-      value: formatCurrency(receivables),
-      sub: `${customerCount} customers`,
+      label: 'Dealer Commission',
+      value: formatCurrency(commission),
+      sub: `${dealerCount} dealers`,
       icon: DollarSign,
       color: 'blue',
-      href: '/sales/customers',
+      href: '/sales/dealers',
     },
     {
       label: 'Active Work Orders',
@@ -141,11 +138,22 @@ export function DashboardKpiRow({
     },
   ];
 
+  const [revenue, expenses, netProfitLoss, ...rest] = items;
+  const rightCards = [expenses, ...rest];
+
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-      {items.map((item) => (
-        <KpiCard key={item.label} {...item} />
-      ))}
+    <div className="flex gap-4 mb-8">
+      {/* Left: 1/3 width — Revenue & Net Profit/Loss stacked */}
+      <div className="flex flex-col gap-4 w-1/3">
+        <KpiCard {...revenue} large />
+        <KpiCard {...netProfitLoss} large />
+      </div>
+      {/* Right: 2/3 width — 6 cards in 3x2 grid */}
+      <div className="grid grid-cols-3 grid-rows-2 gap-4 w-2/3">
+        {rightCards.map((item) => (
+          <KpiCard key={item.label} {...item} />
+        ))}
+      </div>
     </div>
   );
 }

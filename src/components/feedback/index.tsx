@@ -175,6 +175,7 @@ const STATUS_STYLES: Record<string, string> = {
   INACTIVE: 'bg-slate-100 text-slate-600',
   CANCELLED: 'bg-slate-100 text-slate-600',
   OVERDUE: 'bg-red-100 text-red-600',
+  WARNING: 'bg-red-100 text-red-600',
   UNPAID: 'bg-amber-100 text-amber-700',
   PARTIAL: 'bg-orange-100 text-orange-700',
   PRESENT: 'bg-emerald-100 text-emerald-700',

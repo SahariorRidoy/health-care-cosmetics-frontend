@@ -15,7 +15,8 @@ export interface SupplierPayment {
   _id: string;
   paymentNumber: string;
   supplier: Supplier | string;
-  purchaseOrder?: string;
+  purchaseOrder?: string | { _id: string; poNumber: string; totalAmount: number; paidAmount: number; paymentStatus: string };
+  purchaseOrders: { purchaseOrder: { _id: string; poNumber: string; totalAmount: number; paidAmount: number; paymentStatus: string; createdAt: string } | string; appliedAmount: number }[];
   amount: number;
   paymentDate: string;
   method: string;
@@ -45,6 +46,17 @@ export interface SupplierResponse {
 }
 
 export interface SupplierPaymentsResponse {
+  success: boolean;
+  data: { payments: SupplierPayment[] };
+  pagination: { page: number; pages: number; total: number; limit: number };
+}
+
+export interface SupplierPaymentResponse {
+  success: boolean;
+  data: { payment: SupplierPayment };
+}
+
+export interface SupplierPaymentsAllResponse {
   success: boolean;
   data: { payments: SupplierPayment[] };
   pagination: { page: number; pages: number; total: number; limit: number };

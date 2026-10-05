@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Pencil, ArrowLeft, AlertTriangle } from 'lucide-react';
+import { Pencil, ArrowLeft, AlertTriangle, ShoppingCart } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { LoadingSpinner, ErrorState, StatusBadge } from '@/components/feedback';
 import { DataTable, type Column } from '@/components/tables/DataTable';
@@ -10,6 +10,7 @@ import { formatCurrency, formatDate } from '@/lib/formatters';
 import { useGetItemQuery } from '@/features/inventory/services/inventoryApi';
 import { useGetGoodsReceiptsQuery } from '@/features/procurement/services/procurementApi';
 import { ItemFormDialog } from '@/features/inventory/components/ItemFormDialog';
+import { RepurchaseDialog } from '@/features/inventory/components/RepurchaseDialog';
 import type { UOM, Supplier } from '@/features/inventory/types';
 import type { GoodsReceipt } from '@/features/procurement/types';
 
@@ -33,6 +34,7 @@ export default function ItemDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
+  const [repurchaseOpen, setRepurchaseOpen] = useState(false);
   const [grPage, setGrPage] = useState(1);
 
   const { data, isLoading, isError, refetch } = useGetItemQuery(id, { skip: !id });
@@ -115,7 +117,10 @@ export default function ItemDetailPage() {
             <button onClick={() => router.back()} className="h-9 px-3 rounded-md border border-border text-sm text-foreground hover:bg-slate-50 flex items-center gap-2 transition-colors">
               <ArrowLeft size={15} aria-hidden="true" /> Back
             </button>
-            <button onClick={() => setEditOpen(true)} className="h-9 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium flex items-center gap-2 transition-colors">
+            <button onClick={() => setRepurchaseOpen(true)} className="h-9 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium flex items-center gap-2 transition-colors">
+              <ShoppingCart size={15} aria-hidden="true" /> Repurchase
+            </button>
+            <button onClick={() => setEditOpen(true)} className="h-9 px-4 rounded-md border border-border text-sm text-foreground hover:bg-slate-50 flex items-center gap-2 transition-colors">
               <Pencil size={15} aria-hidden="true" /> Edit
             </button>
           </div>
@@ -168,6 +173,7 @@ export default function ItemDetailPage() {
       </div>
 
       <ItemFormDialog open={editOpen} item={item} onClose={() => setEditOpen(false)} />
+      <RepurchaseDialog open={repurchaseOpen} preselectedItem={item} onClose={() => setRepurchaseOpen(false)} />
     </>
   );
 }

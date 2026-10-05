@@ -75,7 +75,7 @@ export interface StockBalance {
 export type MovementType =
   | 'PURCHASE_RECEIPT' | 'PRODUCTION_ISSUE' | 'PRODUCTION_OUTPUT'
   | 'SALES_DISPATCH' | 'ADJUSTMENT' | 'TRANSFER'
-  | 'RETURN_SUPPLIER' | 'RETURN_CUSTOMER';
+  | 'RETURN_SUPPLIER' | 'RETURN_CUSTOMER' | 'ITEM_DELETED';
 
 export interface StockMovement {
   _id: string;

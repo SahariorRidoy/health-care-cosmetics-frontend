@@ -61,11 +61,11 @@ export const inventoryApi = api.injectEndpoints({
       query: (id) => ({ url: `/uom/${id}`, method: 'DELETE' }),
       invalidatesTags: ['UOM'],
     }),
-    getStockBalances: build.query<StockBalancesResponse, { page?: number; item?: string; warehouse?: string; lowStock?: boolean; search?: string }>({
+    getStockBalances: build.query<StockBalancesResponse, { page?: number; item?: string; warehouse?: string; lowStock?: boolean; search?: string; archived?: boolean }>({
       query: (params) => ({ url: '/stock/balance', params }),
       providesTags: ['Stock'],
     }),
-    getStockMovements: build.query<StockMovementsResponse, { page?: number; limit?: number; item?: string; warehouse?: string; type?: string; reference?: string; activeOnly?: boolean }>({
+    getStockMovements: build.query<StockMovementsResponse, { page?: number; limit?: number; item?: string; warehouse?: string; type?: string; reference?: string; archived?: boolean }>({
       query: (params) => ({ url: '/stock/movements', params }),
       providesTags: ['Stock'],
     }),

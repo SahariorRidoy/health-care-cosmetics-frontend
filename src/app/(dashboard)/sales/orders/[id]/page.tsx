@@ -176,7 +176,7 @@ export default function SalesOrderDetailPage() {
 
   const { data, isLoading, isError, refetch } = useGetSalesOrderQuery(id);
   const dealerId = data?.data?.salesOrder
-    ? (typeof data.data.salesOrder.dealer === 'string' ? data.data.salesOrder.dealer : data.data.salesOrder.dealer._id)
+    ? (typeof data.data.salesOrder.dealer === 'string' ? data.data.salesOrder.dealer : data.data.salesOrder.dealer?._id)
     : undefined;
   const { data: invoicesData, isLoading: invLoading } = useGetInvoicesQuery(
     { dealer: dealerId },
