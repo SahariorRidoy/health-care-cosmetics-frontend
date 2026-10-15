@@ -107,7 +107,16 @@ function BatchListItem({ batch, selected, index, onClick }: { batch: FactoryBatc
           }`}>
             {batch.fbNumber}
           </p>
+          <p className={`text-[9px] mt-0.5 sm2:hidden ${
+            selected ? 'text-slate-400' : 'text-muted'
+          }`}>Tap to view details</p>
         </div>
+        <ChevronDown
+          size={13}
+          className={`sm2:hidden shrink-0 transition-transform ${
+            selected ? 'text-slate-300 rotate-180' : 'text-slate-400'
+          }`}
+        />
       </div>
     </button>
   );
@@ -322,11 +331,11 @@ function BatchDetail({ batchId, onEdit, onDeleted, onBack }: {
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col sm2:h-full">
       {/* Detail header */}
       <div className="shrink-0 px-5 py-4 border-b border-slate-200 bg-white">
         {onBack && (
-          <button onClick={onBack} className="sm:hidden flex items-center gap-1.5 text-xs text-slate-500 hover:text-foreground mb-3">
+          <button onClick={onBack} className="sm2:hidden flex items-center gap-1.5 text-xs text-slate-500 hover:text-foreground mb-3">
             <ChevronDown size={13} className="rotate-90" /> Back to list
           </button>
         )}
@@ -359,7 +368,7 @@ function BatchDetail({ batchId, onEdit, onDeleted, onBack }: {
         </div>
 
         {/* Action buttons */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex flex-wrap items-center gap-2">
           {canDispatch && (
             <button
               onClick={() => setConfirmDispatch(true)}
@@ -394,24 +403,23 @@ function BatchDetail({ batchId, onEdit, onDeleted, onBack }: {
               <Pencil size={13} /> Edit
             </button>
           )}
-          <div className="ml-auto flex items-center gap-1.5">
+          <div className="ml-auto flex items-center gap-1.5 flex-wrap">
             <button onClick={() => router.push(`/factory-production/${batch._id}`)} className="h-8 px-3 rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-semibold flex items-center gap-1.5 transition-colors">
-              <ExternalLink size={13} /> View Detail
+              <ExternalLink size={13} /> <span className="hidden sm2:inline">View Detail</span>
             </button>
             {canCancel && (
               <button onClick={() => setConfirmCancel(true)} className="h-8 px-3 rounded-md border border-red-200 text-red-600 hover:bg-red-50 text-xs font-semibold flex items-center gap-1.5 transition-colors">
-                <XCircle size={13} /> Cancel
+                <XCircle size={13} /> <span className="hidden sm2:inline">Cancel</span>
               </button>
             )}
             <button onClick={() => setConfirmDelete(true)} className="h-8 px-3 rounded-md bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-xs font-semibold flex items-center gap-1.5 transition-colors">
-              <Trash2 size={13} /> Delete
+              <Trash2 size={13} /> <span className="hidden sm2:inline">Delete</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* Scrollable detail body */}
-      <div className="flex-1 overflow-y-auto p-5 space-y-4">
+      <div className="sm2:flex-1 sm2:min-h-0 sm2:overflow-y-auto p-5 space-y-4">
 
         {/* Status timeline */}
         <div className="bg-white rounded-lg border border-border p-4">
@@ -430,7 +438,7 @@ function BatchDetail({ batchId, onEdit, onDeleted, onBack }: {
                     }`}>
                       {done ? '✓' : i + 1}
                     </div>
-                    <span className={`text-[10px] mt-1 text-center leading-tight max-w-[64px] ${active ? 'font-semibold text-foreground' : 'text-muted'}`}>
+                    <span className={`hidden sm2:block text-[10px] mt-1 text-center leading-tight max-w-[64px] ${active ? 'font-semibold text-foreground' : 'text-muted'}`}>
                       {step.replace(/_/g, ' ')}
                     </span>
                   </div>
@@ -703,6 +711,7 @@ export default function FactoryProductionPage() {
   const [editBatch, setEditBatch] = useState<FactoryBatch | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mobileView, setMobileView] = useState<'list' | 'detail'>('list');
+  const [listCollapsed, setListCollapsed] = useState(false);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -743,92 +752,129 @@ export default function FactoryProductionPage() {
       />
 
       {/* ── Split layout ── */}
-      <div className="flex gap-0 border border-slate-200 rounded-xl overflow-hidden bg-slate-50" style={{ height: 'calc(100vh - 160px)' }}>
+      <div className="flex gap-0 border border-slate-200 rounded-xl overflow-hidden bg-slate-50 sm2:h-[calc(100vh-160px)]">
 
         {/* Left: batch list — hidden on mobile when detail is shown */}
-        <div className={`w-full sm:w-72 shrink-0 flex flex-col border-r border-slate-200 bg-white ${
-          mobileView === 'detail' ? 'hidden sm:flex' : 'flex'
+        <div className={`shrink-0 flex flex-col border-r border-slate-200 bg-white transition-all duration-200 ${
+          mobileView === 'detail' ? 'hidden sm2:flex' : 'flex'
+        } ${
+          listCollapsed ? 'w-full sm2:w-8' : 'w-full sm2:w-44 lg:w-56'
         }`}>
-          <LeftToolbar
-            search={search}
-            onSearch={(v) => { setSearch(v); setPage(1); }}
-            statusFilter={statusFilter}
-            onStatusFilter={(v) => { setStatusFilter(v); setPage(1); }}
-            total={pagination?.total}
-            onClear={() => { setSearch(''); setStatusFilter(''); setPage(1); }}
-          />
 
-          <div className="flex-1 overflow-y-auto">
-            {isError ? (
-              <div className="flex flex-col items-center justify-center py-10 gap-2 px-4 text-center">
-                <AlertTriangle size={20} className="text-red-400" />
-                <p className="text-xs text-muted">Failed to load</p>
-                <button onClick={refetch} className="text-xs text-blue-600 hover:underline">Retry</button>
-              </div>
-            ) : isLoading ? (
-              <div className="space-y-0">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="px-3 py-3 border-b border-slate-100 animate-pulse">
-                    <div className="flex justify-between mb-1.5">
-                      <div className="h-3 w-28 bg-slate-100 rounded" />
-                      <div className="h-4 w-16 bg-slate-100 rounded-full" />
-                    </div>
-                    <div className="h-2.5 w-20 bg-slate-100 rounded mb-1" />
-                    <div className="h-2.5 w-24 bg-slate-100 rounded" />
-                  </div>
-                ))}
-              </div>
-            ) : batches.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-                <Inbox size={22} className="text-slate-300 mb-2" />
-                <p className="text-xs text-muted">
-                  {search || statusFilter ? 'No batches match filters' : 'No factory batches yet'}
-                </p>
-                {!search && !statusFilter && (
-                  <button onClick={openCreate} className="mt-3 text-xs text-blue-600 hover:underline flex items-center gap-1">
-                    <Plus size={11} /> Create one
-                  </button>
-                )}
-              </div>
-            ) : (
-              batches.map((batch, i) => (
-                <BatchListItem
-                  key={batch._id}
-                  batch={batch}
-                  index={(page - 1) * 20 + i + 1}
-                  selected={effectiveSelected === batch._id}
-                  onClick={() => handleSelectBatch(batch._id)}
-                />
-              ))
+          {/* Collapse toggle — desktop only */}
+          <div className="hidden sm2:flex items-center justify-between px-2 py-1.5 border-b border-slate-200 bg-slate-50 shrink-0">
+            {!listCollapsed && (
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Batches</span>
             )}
+            <button
+              onClick={() => setListCollapsed((c) => !c)}
+              title={listCollapsed ? 'Expand list' : 'Collapse list'}
+              className={`flex items-center gap-1 rounded-md px-1.5 py-1 transition-colors ${
+                listCollapsed
+                  ? 'mx-auto bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm'
+                  : 'ml-auto text-slate-500 hover:text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              <ChevronRight size={12} className={`transition-transform duration-200 ${listCollapsed ? '' : 'rotate-180'}`} />
+              {!listCollapsed && <span className="text-[10px] font-medium">Collapse</span>}
+            </button>
           </div>
 
-          {pagination && pagination.pages > 1 && (
-            <div className="shrink-0 flex items-center justify-between px-3 py-2 border-t border-slate-200 bg-white">
-              <span className="text-[10px] text-muted">{pagination.page}/{pagination.pages}</span>
-              <div className="flex gap-1">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={pagination.page <= 1}
-                  className="h-6 w-6 rounded border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 flex items-center justify-center transition-colors"
-                >
-                  <ChevronDown size={11} className="rotate-90" />
-                </button>
-                <button
-                  onClick={() => setPage((p) => Math.min(pagination.pages, p + 1))}
-                  disabled={pagination.page >= pagination.pages}
-                  className="h-6 w-6 rounded border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 flex items-center justify-center transition-colors"
-                >
-                  <ChevronRight size={11} />
-                </button>
-              </div>
+          {/* Collapsed vertical label */}
+          {listCollapsed && (
+            <div className="hidden sm2:flex flex-col items-center gap-3 py-4 flex-1">
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.15em] [writing-mode:vertical-rl] rotate-180">Batches</span>
+              {effectiveSelected && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+              )}
             </div>
+          )}
+
+          {/* List content — hidden when collapsed */}
+          {!listCollapsed && (
+            <>
+              <LeftToolbar
+                search={search}
+                onSearch={(v) => { setSearch(v); setPage(1); }}
+                statusFilter={statusFilter}
+                onStatusFilter={(v) => { setStatusFilter(v); setPage(1); }}
+                total={pagination?.total}
+                onClear={() => { setSearch(''); setStatusFilter(''); setPage(1); }}
+              />
+
+              <div className="flex-1 overflow-y-auto">
+                {isError ? (
+                  <div className="flex flex-col items-center justify-center py-10 gap-2 px-4 text-center">
+                    <AlertTriangle size={20} className="text-red-400" />
+                    <p className="text-xs text-muted">Failed to load</p>
+                    <button onClick={refetch} className="text-xs text-blue-600 hover:underline">Retry</button>
+                  </div>
+                ) : isLoading ? (
+                  <div className="space-y-0">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <div key={i} className="px-3 py-3 border-b border-slate-100 animate-pulse">
+                        <div className="flex justify-between mb-1.5">
+                          <div className="h-3 w-28 bg-slate-100 rounded" />
+                          <div className="h-4 w-16 bg-slate-100 rounded-full" />
+                        </div>
+                        <div className="h-2.5 w-20 bg-slate-100 rounded mb-1" />
+                        <div className="h-2.5 w-24 bg-slate-100 rounded" />
+                      </div>
+                    ))}
+                  </div>
+                ) : batches.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                    <Inbox size={22} className="text-slate-300 mb-2" />
+                    <p className="text-xs text-muted">
+                      {search || statusFilter ? 'No batches match filters' : 'No factory batches yet'}
+                    </p>
+                    {!search && !statusFilter && (
+                      <button onClick={openCreate} className="mt-3 text-xs text-blue-600 hover:underline flex items-center gap-1">
+                        <Plus size={11} /> Create one
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  batches.map((batch, i) => (
+                    <BatchListItem
+                      key={batch._id}
+                      batch={batch}
+                      index={(page - 1) * 20 + i + 1}
+                      selected={effectiveSelected === batch._id}
+                      onClick={() => handleSelectBatch(batch._id)}
+                    />
+                  ))
+                )}
+              </div>
+
+              {pagination && pagination.pages > 1 && (
+                <div className="shrink-0 flex items-center justify-between px-3 py-2 border-t border-slate-200 bg-white">
+                  <span className="text-[10px] text-muted">{pagination.page}/{pagination.pages}</span>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={pagination.page <= 1}
+                      className="h-6 w-6 rounded border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 flex items-center justify-center transition-colors"
+                    >
+                      <ChevronDown size={11} className="rotate-90" />
+                    </button>
+                    <button
+                      onClick={() => setPage((p) => Math.min(pagination.pages, p + 1))}
+                      disabled={pagination.page >= pagination.pages}
+                      className="h-6 w-6 rounded border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 flex items-center justify-center transition-colors"
+                    >
+                      <ChevronRight size={11} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
 
         {/* Right: detail panel — hidden on mobile when list is shown */}
         <div className={`flex-1 flex flex-col min-w-0 bg-slate-50 ${
-          mobileView === 'list' ? 'hidden sm:flex' : 'flex'
+          mobileView === 'list' ? 'hidden sm2:flex' : 'flex'
         }`}>
           {effectiveSelected ? (
             <BatchDetail

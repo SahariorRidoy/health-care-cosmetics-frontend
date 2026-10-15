@@ -38,7 +38,7 @@ function KpiCard({ label, value, sub, icon: _Icon, color, href, trend, large }: 
         )}
       </div>
       <p className={`font-semibold text-secondary uppercase tracking-wider mb-1 ${large ? 'text-sm' : 'text-xs'}`}>{label}</p>
-      <p className={`font-bold text-foreground leading-tight ${large ? 'text-4xl mt-2' : 'text-2xl'}`}>{value}</p>
+      <p className={`font-bold text-foreground leading-tight ${large ? 'text-2xl sm:text-3xl lg:text-4xl mt-2' : 'text-xl sm:text-2xl'}`}>{value}</p>
       {!large && <p className="text-sm text-muted mt-1">{sub}</p>}
       <div className={`mt-auto pt-4 h-0.5 w-12 ${c.bar} rounded-full opacity-60 group-hover:w-full transition-all duration-500`} />
     </div>
@@ -142,14 +142,18 @@ export function DashboardKpiRow({
   const rightCards = [expenses, ...rest];
 
   return (
-    <div className="flex gap-4 mb-8">
-      {/* Left: 1/3 width — Revenue & Net Profit/Loss stacked */}
-      <div className="flex flex-col gap-4 w-1/3">
-        <KpiCard {...revenue} large />
-        <KpiCard {...netProfitLoss} large />
+    <div className="flex flex-col lg:flex-row gap-4 mb-8">
+      {/* Left: Revenue & Net Profit/Loss stacked */}
+      <div className="flex flex-row lg:flex-col gap-4 lg:w-1/3">
+        <div className="flex-1 lg:flex-none">
+          <KpiCard {...revenue} large />
+        </div>
+        <div className="flex-1 lg:flex-none">
+          <KpiCard {...netProfitLoss} large />
+        </div>
       </div>
-      {/* Right: 2/3 width — 6 cards in 3x2 grid */}
-      <div className="grid grid-cols-3 grid-rows-2 gap-4 w-2/3">
+      {/* Right: 6 cards grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 lg:w-2/3">
         {rightCards.map((item) => (
           <KpiCard key={item.label} {...item} />
         ))}

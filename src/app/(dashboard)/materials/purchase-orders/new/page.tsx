@@ -176,7 +176,7 @@ export default function NewPurchaseOrderPage() {
       />
 
       <form onSubmit={handleSubmit} noValidate>
-        <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-6 items-start">
+        <div className="grid grid-cols-1 sm2:grid-cols-[2fr_1fr] gap-6 items-start">
 
           {/* Left — Items only */}
           <div className="flex flex-col gap-5">
@@ -188,7 +188,7 @@ export default function NewPurchaseOrderPage() {
                 <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Items</p>
               </div>
 
-              <div className="p-5 flex flex-col gap-4">
+              <div className="p-3 flex flex-col gap-3">
 
                 {lines.map((line, idx) => (
                   <div key={line.id} className={`rounded-lg border-2 overflow-hidden ${
@@ -232,12 +232,12 @@ export default function NewPurchaseOrderPage() {
                       </button>
                     </div>
 
-                    <div className="p-4 flex flex-col gap-3">
+                    <div className="p-3 flex flex-col gap-2.5">
                       {line.mode === 'existing' ? (
                         <>
                           {/* Row: material + qty + unit price */}
-                          <div className="flex flex-col xl:grid xl:grid-cols-[2fr_1fr_1fr] gap-3">
-                            <div className="flex flex-col gap-1" ref={(el) => { dropdownRefs.current[line.id] = el; }}>
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <div className="col-span-2 flex flex-col gap-1" ref={(el) => { dropdownRefs.current[line.id] = el; }}>
                               <label className="text-sm font-bold text-foreground">Material <span className="text-red-500">*</span></label>
                               <div className="relative">
                                 <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
@@ -292,8 +292,8 @@ export default function NewPurchaseOrderPage() {
                         <>
                           <SkuAutoFill trigger={line.skuTrigger} onSku={(sku) => updateLine(line.id, { sku } as Partial<NewLine>)} />
                           {/* Row 1: name + SKU + type */}
-                          <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr_1fr] gap-3">
-                            <div className="flex flex-col gap-1">
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <div className="col-span-2 flex flex-col gap-1">
                               <label className="text-sm font-bold text-foreground">Item Name <span className="text-red-500">*</span></label>
                               <input type="text" value={line.name} onChange={(e) => { const v = e.target.value; clearTimeout((window as unknown as Record<string, ReturnType<typeof setTimeout>>)._skuTimer); (window as unknown as Record<string, ReturnType<typeof setTimeout>>)._skuTimer = setTimeout(() => updateLine(line.id, { skuTrigger: v } as Partial<NewLine>), 500); updateLine(line.id, { name: v } as Partial<NewLine>); }} placeholder="e.g. Aloe Vera Gel" className="h-10 rounded-md border border-border bg-white px-3 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-emerald" />
                             </div>
@@ -309,7 +309,7 @@ export default function NewPurchaseOrderPage() {
                             </div>
                           </div>
                           {/* Row 2: base UOM + qty + unit price + low stock qty */}
-                          <div className="grid grid-cols-2 xl:grid-cols-[2fr_1fr_1fr_1fr] gap-3">
+                          <div className="grid grid-cols-2 gap-2.5">
                             <div className="flex flex-col gap-1">
                               <label className="text-sm font-bold text-foreground">Base UOM <span className="text-red-500">*</span></label>
                               <select value={line.baseUom} onChange={(e) => updateLine(line.id, { baseUom: e.target.value } as Partial<NewLine>)} className="h-10 rounded-md border border-border bg-white px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-emerald">
@@ -350,7 +350,7 @@ export default function NewPurchaseOrderPage() {
                 ))}
 
                 {/* Add another buttons */}
-                <div className="flex items-center gap-2 pt-1">
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setLines((prev) => [...prev, makeExistingLine()])}
@@ -372,7 +372,7 @@ export default function NewPurchaseOrderPage() {
           </div>
 
           {/* Right — sticky summary */}
-          <div className="flex flex-col gap-4 xl:sticky xl:top-6">
+          <div className="flex flex-col gap-4 sm2:sticky sm2:top-6">
             <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
               <div className="flex items-center gap-2.5 px-4 py-3 border-b border-border bg-slate-50/60">
                 <ShoppingCart size={13} className="text-emerald shrink-0" />
@@ -381,7 +381,7 @@ export default function NewPurchaseOrderPage() {
               <div className="p-4 flex flex-col gap-4">
 
                 {/* Supplier + Warehouse */}
-                <div className="flex flex-col xl:flex-row gap-3">
+                <div className="flex flex-col gap-3">
                   <div className="flex flex-col gap-1.5 flex-1">
                     <label className="text-sm font-bold text-foreground">Supplier <span className="text-red-500">*</span></label>
                     <div className="flex gap-1.5">
@@ -425,7 +425,7 @@ export default function NewPurchaseOrderPage() {
                 </div>
 
                 <div className="border-t border-border pt-3 flex flex-col gap-3">
-                  <div className="flex flex-col xl:flex-row gap-3">
+                  <div className="flex flex-col gap-3">
                     <div className="flex flex-col gap-1.5 flex-1">
                       <label className="text-sm font-bold text-foreground">Paid Now (৳)</label>
                       <input

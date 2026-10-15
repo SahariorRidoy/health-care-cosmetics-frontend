@@ -5,10 +5,14 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Package, Factory, TrendingUp,
-  DollarSign, Users, BarChart2, Settings, X, ChevronLeft, ChevronRight,
+  DollarSign, Users, BarChart2, Settings, X,
   ChevronDown, UserCircle, ClipboardList, FileText, ShoppingCart,
-  Warehouse, ReceiptText, Building2, Plus, Truck, CreditCard,
+  Warehouse, ReceiptText, Building2, Plus, Truck, CreditCard, LogOut,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useAppDispatch } from '@/lib/store/hooks';
+import { clearCredentials } from '@/lib/store/authSlice';
+import { useLogoutMutation } from '@/lib/auth/authApi';
 import { cn } from '@/lib/formatters';
 
 type NavChild = { href: string; label: string; icon: React.ElementType };
@@ -83,8 +87,17 @@ interface SidebarProps {
   onMobileClose: () => void;
 }
 
-export function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose }: SidebarProps) {
+export function Sidebar({ collapsed, mobileOpen, onCollapse: _onCollapse, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const dispatch = useAppDispatch();
+  const [logout] = useLogoutMutation();
+
+  async function handleLogout() {
+    try { await logout().unwrap(); } catch { /* ignore */ }
+    dispatch(clearCredentials());
+    router.push('/login');
+  }
 
   // Determine which group is active based on current path
   function isGroupActive(item: NavItem) {
@@ -115,14 +128,14 @@ export function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose }: Si
   }
 
   const navContent = (
-    <nav className="flex flex-col h-full">
-      {/* Logo */}
-      <div className="flex items-center gap-3 px-4 h-14 border-b border-navy-800 shrink-0">
+    <nav className="flex flex-col h-full overflow-hidden">
+      {/* Logo + collapse toggle */}
+      <div className="relative flex items-center h-14 border-b border-navy-800 shrink-0 px-3 gap-3">
         <div className="w-7 h-7 rounded-md bg-emerald flex items-center justify-center shrink-0">
           <span className="text-white text-xs font-bold">H</span>
         </div>
         {!collapsed && (
-          <span className="text-white font-semibold text-sm truncate">HCC ERP</span>
+          <span className="text-white font-semibold text-sm truncate flex-1">HCC ERP</span>
         )}
       </div>
 
@@ -227,14 +240,18 @@ export function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose }: Si
         })}
       </ul>
 
-      {/* Collapse toggle — desktop only */}
-      <div className="hidden lg:flex px-2 pb-3">
+      {/* Logout */}
+      <div className="px-2 pb-3 border-t border-navy-800 pt-2">
         <button
-          onClick={() => onCollapse(!collapsed)}
-          className="flex items-center gap-2 w-full px-3 py-2 rounded-md text-slate-400 hover:bg-navy-800 hover:text-white text-sm transition-colors"
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          onClick={handleLogout}
+          className={cn(
+            'flex items-center gap-3 w-full px-3 py-2 rounded-md text-sm transition-colors text-red-400 hover:bg-red-500/10 hover:text-red-300',
+            collapsed && 'justify-center',
+          )}
+          aria-label="Log out"
         >
-          {collapsed ? <ChevronRight size={18} /> : <><ChevronLeft size={18} /><span>Collapse</span></>}
+          <LogOut size={18} className="shrink-0" />
+          {!collapsed && <span>Logout</span>}
         </button>
       </div>
     </nav>
@@ -245,7 +262,7 @@ export function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose }: Si
       {/* Desktop sidebar */}
       <aside
         className={cn(
-          'hidden lg:flex flex-col fixed inset-y-0 left-0 z-30 bg-navy transition-all duration-200 print:hidden',
+          'hidden sm2:flex flex-col fixed inset-y-0 left-0 z-30 bg-navy transition-all duration-200 print:hidden',
           collapsed ? 'w-16' : 'w-60',
         )}
       >
@@ -254,7 +271,7 @@ export function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose }: Si
 
       {/* Mobile drawer overlay */}
       {mobileOpen && (
-        <div className="lg:hidden fixed inset-0 z-40 flex">
+        <div className="sm2:hidden fixed inset-0 z-40 flex">
           <div
             className="fixed inset-0 bg-black/50"
             onClick={onMobileClose}

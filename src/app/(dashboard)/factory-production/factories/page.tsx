@@ -76,23 +76,23 @@ export default function FactoryLedgerPage() {
           ) : (
             <div className="divide-y divide-border">
               {activeBatches.map((b) => (
-                <div key={b._id} className="flex items-center justify-between px-4 py-3 hover:bg-slate-50">
-                  <div className="flex items-center gap-3">
+                <div key={b._id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 hover:bg-slate-50">
+                  <div className="flex flex-wrap items-center gap-2 min-w-0">
                     <span className="font-mono text-xs font-semibold text-foreground">{b.fbNumber}</span>
                     <span className="text-sm text-foreground">{b.batchName}</span>
                     <StatusBadge status={b.status} />
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     {b.dispatch.dispatchedDate && (
                       <span className="text-xs text-secondary hidden sm:block">Dispatched: {formatDate(b.dispatch.dispatchedDate)}</span>
                     )}
                     {RECEIPT_STATUSES.includes(b.status) && (
                       <button
                         onClick={() => setReceiptBatchId(b._id)}
-                        className="h-9 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium flex items-center gap-2 transition-colors"
+                        className="h-8 px-3 rounded-md bg-emerald hover:bg-emerald-600 text-white text-xs font-medium flex items-center gap-1.5 transition-colors"
                         aria-label="Add receipt"
                       >
-                        <ClipboardList size={15} /> Add Receipt
+                        <ClipboardList size={13} /> Add Receipt
                       </button>
                     )}
                     <button

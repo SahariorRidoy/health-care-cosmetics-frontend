@@ -9,6 +9,9 @@ module.exports = {
   ],
   theme: {
     extend: {
+      screens: {
+        'sm2': '800px',
+      },
       colors: {
         // Brand
         navy: {

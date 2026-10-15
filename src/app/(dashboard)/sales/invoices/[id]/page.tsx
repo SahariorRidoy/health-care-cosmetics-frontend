@@ -254,33 +254,26 @@ export default function InvoiceDetailPage() {
         description={`Dealer: ${dealer?.name ?? '—'}`}
         breadcrumbs={[{ label: 'Sales' }, { label: 'Invoices', href: '/sales/invoices' }, { label: invoice.invoiceNumber }]}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button onClick={() => router.back()} className="h-9 px-3 rounded-md border border-border text-sm text-foreground hover:bg-slate-50 flex items-center gap-2 transition-colors">
-              <ArrowLeft size={15} aria-hidden="true" /> Back
+              <ArrowLeft size={15} aria-hidden="true" /> <span className="hidden sm:inline">Back</span>
             </button>
             {invoice.status !== 'CANCELLED' && (
               <button onClick={() => setEditInvoiceOpen(true)} className="h-9 px-3 rounded-md border border-border text-sm text-foreground hover:bg-slate-50 flex items-center gap-2 transition-colors">
-                <Pencil size={14} aria-hidden="true" /> Edit Invoice
+                <Pencil size={14} aria-hidden="true" /> <span className="hidden sm:inline">Edit Invoice</span>
               </button>
             )}
             {canPay && (
-              <button onClick={() => setReceiptOpen(true)} className="h-9 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium flex items-center gap-2 transition-colors">
-                <CreditCard size={15} aria-hidden="true" /> Record Payment
+              <button onClick={() => setReceiptOpen(true)} className="h-9 px-3 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium flex items-center gap-2 transition-colors">
+                <CreditCard size={15} aria-hidden="true" /> <span className="hidden sm:inline">Record Payment</span>
               </button>
             )}
-            <button
-              onClick={handlePrint}
-              className="h-9 px-4 rounded-md border border-border text-sm font-medium flex items-center gap-2 hover:bg-slate-50 transition-colors"
-            >
-              <Printer size={15} aria-hidden="true" /> Print
+            <button onClick={handlePrint} className="h-9 px-3 rounded-md border border-border text-sm font-medium flex items-center gap-2 hover:bg-slate-50 transition-colors">
+              <Printer size={15} aria-hidden="true" /> <span className="hidden sm:inline">Print</span>
             </button>
-            <button
-              onClick={handleDownload}
-              disabled={downloading}
-              className="h-9 px-4 rounded-md border border-border text-sm font-medium flex items-center gap-2 hover:bg-slate-50 transition-colors disabled:opacity-60"
-            >
+            <button onClick={handleDownload} disabled={downloading} className="h-9 px-3 rounded-md border border-border text-sm font-medium flex items-center gap-2 hover:bg-slate-50 transition-colors disabled:opacity-60">
               {downloading ? <Loader2 size={15} className="animate-spin" /> : <FileDown size={15} aria-hidden="true" />}
-              Download PDF
+              <span className="hidden sm:inline">Download PDF</span>
             </button>
           </div>
         }
@@ -328,7 +321,7 @@ export default function InvoiceDetailPage() {
         <div className="px-4 py-3 border-b border-border">
           <h2 className="text-sm font-semibold">Line Items</h2>
         </div>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto scrollbar-visible">
           <table className="w-full min-w-[640px] text-[13px]">
             <thead>
               <tr className="bg-slate-50 border-b border-border">

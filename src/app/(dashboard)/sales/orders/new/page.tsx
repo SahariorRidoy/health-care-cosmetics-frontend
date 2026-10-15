@@ -142,13 +142,13 @@ export default function NewSalesOrderPage() {
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-6">
 
-        {/* Main grid: 4-col on 2xl, 3-col on lg/xl, 2-col on md, 1-col on mobile */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
+        {/* Main grid: 2-col on sm2+, right col fixed width on xl */}
+        <div className="grid grid-cols-1 sm2:grid-cols-[1fr_220px] xl:grid-cols-[1fr_260px] gap-6">
 
-          {/* LEFT COLUMN — Line Items + Order Details (spans 2 on md+, 2 on lg, 3 on 2xl) */}
-          <div className="col-span-1 md:col-span-1 lg:col-span-2 2xl:col-span-3 flex flex-col gap-6">
+          {/* LEFT COLUMN — Line Items + Order Details */}
+          <div className="col-span-1 flex flex-col gap-6">
 
-        {/* Line items table */}
+        {/* Line items */}
         <div className="bg-white rounded-lg border border-border overflow-hidden">
           <div className="px-4 py-3 border-b border-border flex items-center justify-between bg-slate-700">
             <div className="flex items-center gap-2.5">
@@ -157,12 +157,91 @@ export default function NewSalesOrderPage() {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[700px] text-sm">
+          {/* ── Mobile cards (< sm2) ── */}
+          <div className="sm2:hidden divide-y divide-border">
+            {fields.map((field, i) => {
+              const lineGross = (Number(watchedItems?.[i]?.qty) || 0) * (Number(watchedItems?.[i]?.unitPrice) || 0);
+              const lineCommission = lineGross * ((Number(watchedItems?.[i]?.commissionRate) || 0) / 100);
+              const lineNet = lineGross - lineCommission;
+              const uomSymbol = (() => {
+                const it = items.find((x) => x._id === watchedItems?.[i]?.item);
+                return typeof it?.baseUom === 'object' ? it.baseUom.symbol : '';
+              })();
+              const stockItem = items.find((x) => x._id === watchedItems?.[i]?.item);
+              const isLow = stockItem && (stockItem.currentStock === 0 || (stockItem.reorderLevel != null && stockItem.currentStock <= stockItem.reorderLevel));
+              const selectedIds = new Set(watchedItems?.map((l, idx) => idx !== i ? l.item : '').filter(Boolean));
+              return (
+                <div key={field.id} className="p-3 flex flex-col gap-3">
+                  {/* Row header */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Item {i + 1}</span>
+                    <button type="button" onClick={() => remove(i)} disabled={fields.length === 1}
+                      className="h-7 w-7 rounded-md text-secondary hover:bg-red-50 hover:text-red-500 flex items-center justify-center transition-colors disabled:opacity-0">
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                  {/* Product select */}
+                  <SelectField error={errors.items?.[i]?.item?.message} {...register(`items.${i}.item`)} onChange={(e) => handleItemChange(i, e.target.value)}>
+                    <option value="">Select product…</option>
+                    {items.map((it) => (
+                      <option key={it._id} value={it._id} disabled={selectedIds.has(it._id)}>{it.name}</option>
+                    ))}
+                  </SelectField>
+                  {/* Stock badge */}
+                  {stockItem && (
+                    <span className={`text-xs font-semibold ${isLow ? 'text-red-500' : 'text-emerald-600'}`}>
+                      Stock: {stockItem.currentStock} {uomSymbol}
+                    </span>
+                  )}
+                  {/* 2-col grid for numbers */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="flex items-end gap-1">
+                      <div className="flex-1">
+                        <FormField label={`Qty${uomSymbol ? ` (${uomSymbol})` : ''}`} type="number" min={1} step="1"
+                          error={errors.items?.[i]?.qty?.message} className="no-spinner"
+                          onFocus={(e) => e.target.select()}
+                          onKeyDown={(e) => { if (!/[0-9]|Backspace|Delete|ArrowLeft|ArrowRight|Tab/.test(e.key)) e.preventDefault(); }}
+                          {...register(`items.${i}.qty`)} />
+                      </div>
+                    </div>
+                    <FormField label="Free/Gift" type="number" min={0} step="1" placeholder="0"
+                      error={errors.items?.[i]?.giftQty?.message} className="no-spinner"
+                      onFocus={(e) => e.target.select()}
+                      onKeyDown={(e) => { if (!/[0-9]|Backspace|Delete|ArrowLeft|ArrowRight|Tab/.test(e.key)) e.preventDefault(); }}
+                      {...register(`items.${i}.giftQty`)} />
+                    <FormField label="TP Price (৳)" type="number" min={0} step="0.01"
+                      error={errors.items?.[i]?.unitPrice?.message} className="no-spinner"
+                      onFocus={(e) => e.target.select()}
+                      onKeyDown={(e) => { if (!/[0-9.]|Backspace|Delete|ArrowLeft|ArrowRight|Tab/.test(e.key)) e.preventDefault(); }}
+                      {...register(`items.${i}.unitPrice`)} />
+                    <FormField label="Commission %" type="number" min={0} max={100} step="0.5" placeholder="0"
+                      error={errors.items?.[i]?.commissionRate?.message} className="no-spinner"
+                      onFocus={(e) => e.target.select()}
+                      onKeyDown={(e) => { if (!/[0-9.]|Backspace|Delete|ArrowLeft|ArrowRight|Tab/.test(e.key)) e.preventDefault(); }}
+                      {...register(`items.${i}.commissionRate`)} />
+                  </div>
+                  {/* Net amount */}
+                  <div className="flex items-center justify-between bg-slate-50 rounded-md px-3 py-2">
+                    <span className="text-xs text-muted">Net Amount</span>
+                    <div className="text-right">
+                      <span className="text-sm font-bold text-foreground">{formatCurrency(lineNet)}</span>
+                      {lineCommission > 0 && (
+                        <p className="text-[11px] text-violet-500">-{formatCurrency(lineCommission)} comm.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* ── Desktop table (sm2+) ── */}
+          <div className="hidden sm2:block overflow-x-auto">
+            <table className="w-full text-sm">
               <thead>
                 <tr className="bg-slate-50 border-b border-border">
-                  {['Product', 'Stock', 'Qty', 'Free/Gift', 'TP Price (৳)', 'Commission %', 'Net Amount', ''].map((h) => (
-                    <th key={h} className="px-3 py-2 text-left text-xs font-medium text-secondary uppercase tracking-wide whitespace-nowrap">{h}</th>
+                  {['Product', 'Qty', 'Free', 'TP Price (৳)', 'Comm %', 'Net', ''].map((h) => (
+                    <th key={h} className="px-2 py-2 text-left text-xs font-medium text-secondary uppercase tracking-wide whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -175,61 +254,71 @@ export default function NewSalesOrderPage() {
                     const it = items.find((x) => x._id === watchedItems?.[i]?.item);
                     return typeof it?.baseUom === 'object' ? it.baseUom.symbol : '';
                   })();
+                  const selectedIds = new Set(watchedItems?.map((l, idx) => idx !== i ? l.item : '').filter(Boolean));
                   return (
                     <tr key={field.id} className="hover:bg-slate-50/50">
-                      <td className="px-3 py-2">
-                        {(() => {
-                          const selectedIds = new Set(watchedItems?.map((l, idx) => idx !== i ? l.item : '').filter(Boolean));
-                          return (
-                            <SelectField error={errors.items?.[i]?.item?.message} {...register(`items.${i}.item`)} onChange={(e) => handleItemChange(i, e.target.value)}>
-                              <option value="">Select product…</option>
-                              {items.map((it) => (
-                                <option key={it._id} value={it._id} disabled={selectedIds.has(it._id)}>{it.name}</option>
-                              ))}
-                            </SelectField>
-                          );
-                        })()}
+                      <td className="px-2 py-1">
+                        <select
+                          className="h-8 w-full rounded-md border border-border bg-white px-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-emerald focus:border-emerald"
+                          {...register(`items.${i}.item`)}
+                          onChange={(e) => handleItemChange(i, e.target.value)}
+                        >
+                          <option value="">Select…</option>
+                          {items.map((it) => {
+                            const isLow = it.currentStock === 0 || (it.reorderLevel != null && it.currentStock <= it.reorderLevel);
+                            return (
+                              <option key={it._id} value={it._id} disabled={selectedIds.has(it._id)}>
+                                {it.name} — {isLow ? '⚠ ' : ''}{it.currentStock}{uomSymbol ? ` ${uomSymbol}` : ''}
+                              </option>
+                            );
+                          })}
+                        </select>
+                        {errors.items?.[i]?.item?.message && (
+                          <p className="text-[10px] text-red-500 mt-0.5">{errors.items[i]?.item?.message}</p>
+                        )}
                       </td>
-                      <td className="px-3 py-2 w-[80px]">
-                        {(() => {
-                          const it = items.find((x) => x._id === watchedItems?.[i]?.item);
-                          if (!it) return <span className="text-xs text-muted">—</span>;
-                          const isLow = it.currentStock === 0 || (it.reorderLevel != null && it.currentStock <= it.reorderLevel);
-                          return (
-                            <span className={`text-xs font-semibold ${isLow ? 'text-red-500' : 'text-emerald-600'}`}>
-                              {it.currentStock}
-                            </span>
-                          );
-                        })()}
-                      </td>
-                      <td className="px-3 py-2 w-[130px]">
+                      <td className="px-2 py-1 w-[90px]">
                         <div className="flex items-center gap-1">
-                          <div className="min-w-0 flex-1">
-                            <FormField type="number" min={1} step="1" error={errors.items?.[i]?.qty?.message} className="no-spinner" onFocus={(e) => e.target.select()} onKeyDown={(e) => { if (!/[0-9]|Backspace|Delete|ArrowLeft|ArrowRight|Tab/.test(e.key)) e.preventDefault(); }} {...register(`items.${i}.qty`)} />
-                          </div>
-                          {uomSymbol && <span className="text-xs text-muted shrink-0">{uomSymbol}</span>}
+                          <input type="number" min={1} step="1"
+                            className="h-8 w-full rounded-md border border-border bg-white px-2 text-xs text-foreground no-spinner focus:outline-none focus:ring-2 focus:ring-emerald"
+                            onFocus={(e) => e.target.select()}
+                            onKeyDown={(e) => { if (!/[0-9]|Backspace|Delete|ArrowLeft|ArrowRight|Tab/.test(e.key)) e.preventDefault(); }}
+                            {...register(`items.${i}.qty`)} />
+                          {uomSymbol && <span className="text-[10px] text-muted shrink-0">{uomSymbol}</span>}
                         </div>
                       </td>
-                      <td className="px-3 py-2 w-[75px]">
-                        <FormField type="number" min={0} step="1" placeholder="0" error={errors.items?.[i]?.giftQty?.message} className="no-spinner" onFocus={(e) => e.target.select()} onKeyDown={(e) => { if (!/[0-9]|Backspace|Delete|ArrowLeft|ArrowRight|Tab/.test(e.key)) e.preventDefault(); }} {...register(`items.${i}.giftQty`)} />
+                      <td className="px-2 py-1 w-[65px]">
+                        <input type="number" min={0} step="1" placeholder="0"
+                          className="h-8 w-full rounded-md border border-border bg-white px-2 text-xs text-foreground no-spinner focus:outline-none focus:ring-2 focus:ring-emerald"
+                          onFocus={(e) => e.target.select()}
+                          onKeyDown={(e) => { if (!/[0-9]|Backspace|Delete|ArrowLeft|ArrowRight|Tab/.test(e.key)) e.preventDefault(); }}
+                          {...register(`items.${i}.giftQty`)} />
                       </td>
-                      <td className="px-3 py-2 w-[130px]">
-                        <FormField type="number" min={0} step="0.01" error={errors.items?.[i]?.unitPrice?.message} className="no-spinner" onFocus={(e) => e.target.select()} onKeyDown={(e) => { if (!/[0-9.]|Backspace|Delete|ArrowLeft|ArrowRight|Tab/.test(e.key)) e.preventDefault(); }} {...register(`items.${i}.unitPrice`)} />
+                      <td className="px-2 py-1 w-[100px]">
+                        <input type="number" min={0} step="0.01"
+                          className="h-8 w-full rounded-md border border-border bg-white px-2 text-xs text-foreground no-spinner focus:outline-none focus:ring-2 focus:ring-emerald"
+                          onFocus={(e) => e.target.select()}
+                          onKeyDown={(e) => { if (!/[0-9.]|Backspace|Delete|ArrowLeft|ArrowRight|Tab/.test(e.key)) e.preventDefault(); }}
+                          {...register(`items.${i}.unitPrice`)} />
                       </td>
-                      <td className="px-3 py-2 w-[80px]">
-                        <FormField type="number" min={0} max={100} step="0.5" placeholder="0" error={errors.items?.[i]?.commissionRate?.message} className="no-spinner" onFocus={(e) => e.target.select()} onKeyDown={(e) => { if (!/[0-9.]|Backspace|Delete|ArrowLeft|ArrowRight|Tab/.test(e.key)) e.preventDefault(); }} {...register(`items.${i}.commissionRate`)} />
+                      <td className="px-2 py-1 w-[65px]">
+                        <input type="number" min={0} max={100} step="0.5" placeholder="0"
+                          className="h-8 w-full rounded-md border border-border bg-white px-2 text-xs text-foreground no-spinner focus:outline-none focus:ring-2 focus:ring-emerald"
+                          onFocus={(e) => e.target.select()}
+                          onKeyDown={(e) => { if (!/[0-9.]|Backspace|Delete|ArrowLeft|ArrowRight|Tab/.test(e.key)) e.preventDefault(); }}
+                          {...register(`items.${i}.commissionRate`)} />
                       </td>
-                      <td className="px-3 py-2 w-[110px]">
+                      <td className="px-2 py-1 w-[90px]">
                         <div className="flex flex-col">
-                          <span className="font-semibold text-foreground">{formatCurrency(lineNet)}</span>
+                          <span className="font-semibold text-foreground text-xs">{formatCurrency(lineNet)}</span>
                           {lineCommission > 0 && (
-                            <span className="text-[11px] text-violet-500">-{formatCurrency(lineCommission)} comm.</span>
+                            <span className="text-[10px] text-violet-500">-{formatCurrency(lineCommission)}</span>
                           )}
                         </div>
                       </td>
-                      <td className="px-3 py-2 w-[40px]">
-                        <button type="button" onClick={() => remove(i)} disabled={fields.length === 1} className="h-8 w-8 rounded-md text-secondary hover:bg-red-50 hover:text-red-500 flex items-center justify-center transition-colors disabled:opacity-0 disabled:pointer-events-none">
-                          <Trash2 size={14} />
+                      <td className="px-1 py-1 w-[30px]">
+                        <button type="button" onClick={() => remove(i)} disabled={fields.length === 1} className="h-7 w-7 rounded-md text-secondary hover:bg-red-50 hover:text-red-500 flex items-center justify-center transition-colors disabled:opacity-0 disabled:pointer-events-none">
+                          <Trash2 size={13} />
                         </button>
                       </td>
                     </tr>
@@ -238,6 +327,7 @@ export default function NewSalesOrderPage() {
               </tbody>
             </table>
           </div>
+
           {errors.items?.root && <p className="px-4 pb-3 text-[11px] text-red-500">{errors.items.root.message}</p>}
           <div className="px-4 py-3 border-t border-border">
             <button
@@ -256,7 +346,7 @@ export default function NewSalesOrderPage() {
               <ShoppingCart size={14} className="text-emerald shrink-0" />
               <p className="text-xs font-semibold text-white uppercase tracking-wide">Order Details</p>
             </div>
-            <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 sm2:grid-cols-3 gap-4">
               <SelectField label="Warehouse" required error={errors.warehouse?.message} {...register('warehouse')}>
                 {warehouses.map((w) => <option key={w._id} value={w._id}>{w.name}</option>)}
               </SelectField>
@@ -274,7 +364,6 @@ export default function NewSalesOrderPage() {
                         const d = dealers.find((x) => x._id === e.target.value);
                         if (d) {
                           setValue('commissionRate', d.commissionRate ?? 0);
-                          // Apply dealer default commission to all lines
                           fields.forEach((_, i) => setValue(`items.${i}.commissionRate`, d.commissionRate ?? 0));
                         }
                       }}>
@@ -299,7 +388,7 @@ export default function NewSalesOrderPage() {
           </div>{/* end left column */}
 
           {/* RIGHT COLUMN — Summary + Payment */}
-          <div className="col-span-1 md:col-span-1 lg:col-span-1 2xl:col-span-1 flex flex-col gap-4">
+          <div className="col-span-1 flex flex-col gap-4">
             {/* Summary */}
             <div className="bg-white rounded-lg border border-border divide-y divide-border">
               <div className="flex items-center gap-2.5 px-4 py-3 border-b border-border bg-slate-700 rounded-t-lg">

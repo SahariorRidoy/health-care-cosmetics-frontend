@@ -19,13 +19,14 @@ function DateTime() {
     return () => clearInterval(t);
   }, []);
   return (
-    <span className="text-sm font-semibold text-muted whitespace-nowrap">
-      <span className="hidden lg:inline">
+    <div className="hidden sm:flex flex-col items-center">
+      <span className="text-xs text-muted">
         {now.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-        {' · '}
       </span>
-      {now.toLocaleTimeString()}
-    </span>
+      <span className="text-sm font-semibold text-foreground">
+        {now.toLocaleTimeString()}
+      </span>
+    </div>
   );
 }
 
@@ -62,7 +63,7 @@ export function Header({ onMenuClick }: HeaderProps) {
           <span className="text-xs font-bold text-white bg-emerald px-1.5 py-0.5 rounded shrink-0">ERP</span>
         </div>
         <div className="hidden sm:block w-px h-6 bg-border shrink-0" />
-        <div className="hidden sm:block"><DateTime /></div>
+        <DateTime />
       </div>
 
       <NotificationBell />

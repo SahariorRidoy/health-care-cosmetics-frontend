@@ -83,18 +83,19 @@ export default function ReceiptDetailPage() {
           { label: payment.receiptNumber },
         ]}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button onClick={() => router.back()} className="h-9 px-3 rounded-md border border-border text-sm text-foreground hover:bg-slate-50 flex items-center gap-2 transition-colors">
-              <ArrowLeft size={15} /> Back
+              <ArrowLeft size={15} /> <span className="hidden sm:inline">Back</span>
             </button>
             <button onClick={() => setEditOpen(true)} className="h-9 px-3 rounded-md border border-border text-sm text-foreground hover:bg-slate-50 flex items-center gap-2 transition-colors">
-              <Pencil size={14} /> Edit Receipt
+              <Pencil size={14} /> <span className="hidden sm:inline">Edit Receipt</span>
             </button>
-            <button onClick={handlePrint} className="h-9 px-4 rounded-md border border-border text-sm font-medium flex items-center gap-2 hover:bg-slate-50 transition-colors">
-              <Printer size={15} /> Print
+            <button onClick={handlePrint} className="h-9 px-3 rounded-md border border-border text-sm font-medium flex items-center gap-2 hover:bg-slate-50 transition-colors">
+              <Printer size={15} /> <span className="hidden sm:inline">Print</span>
             </button>
-            <button onClick={handleDownload} disabled={downloading} className="h-9 px-4 rounded-md border border-border text-sm font-medium flex items-center gap-2 hover:bg-slate-50 transition-colors disabled:opacity-60">
-              {downloading ? <Loader2 size={15} className="animate-spin" /> : <FileDown size={15} />} Download PDF
+            <button onClick={handleDownload} disabled={downloading} className="h-9 px-3 rounded-md border border-border text-sm font-medium flex items-center gap-2 hover:bg-slate-50 transition-colors disabled:opacity-60">
+              {downloading ? <Loader2 size={15} className="animate-spin" /> : <FileDown size={15} />}
+              <span className="hidden sm:inline">Download PDF</span>
             </button>
           </div>
         }

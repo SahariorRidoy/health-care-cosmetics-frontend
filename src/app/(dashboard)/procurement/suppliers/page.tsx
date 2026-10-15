@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Plus, Search, Pencil, Trash2, Eye, CreditCard, ShoppingCart,
-  MoreVertical, Building2, Phone, Mail, MapPin, TrendingDown, TrendingUp, Printer,
+  MoreVertical, Building2, Phone, Mail, MapPin, TrendingDown, TrendingUp, Printer, ChevronDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -119,9 +119,9 @@ function SupplierLedger({ supplier, onPay, onEdit }: { supplier: Supplier; onPay
   const isLoading = duesLoading || paymentsLoading || posLoading;
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col sm2:h-full">
       {/* Supplier header */}
-      <div className="px-5 py-4 border-b border-border shrink-0 print:hidden">
+      <div className="px-3 py-3 border-b border-border shrink-0 print:hidden">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-2">
             <div>
@@ -165,7 +165,7 @@ function SupplierLedger({ supplier, onPay, onEdit }: { supplier: Supplier; onPay
               className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border text-xs font-medium text-foreground hover:bg-slate-50 transition-colors print:hidden"
               title="Print"
             >
-              <Printer size={12} /><span className="hidden lg:inline">Print</span>
+              <Printer size={12} /><span className="hidden xl:inline">Print</span>
             </button>
             <span className={`text-xs font-semibold px-2.5 py-1.5 rounded-full ${supplier.balance > 0 ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>
               {supplier.balance > 0 ? `Due: ${formatCurrency(supplier.balance)}` : 'Cleared'}
@@ -182,15 +182,15 @@ function SupplierLedger({ supplier, onPay, onEdit }: { supplier: Supplier; onPay
 
         {/* Summary stats */}
         {dues && (
-          <div className="grid grid-cols-3 gap-3 mt-4">
+          <div className="grid grid-cols-3 gap-2 mt-3">
             {[
               { label: 'Total Purchased', value: formatCurrency(dues.totalOrdered), color: 'text-foreground' },
               { label: 'Total Paid', value: formatCurrency(dues.totalPaid), color: 'text-emerald-600' },
               { label: 'Outstanding Balance', value: formatCurrency(dues.outstandingBalance), color: dues.outstandingBalance > 0 ? 'text-amber-600' : 'text-emerald-600' },
             ].map((s) => (
-              <div key={s.label} className="bg-slate-50 rounded-lg px-3 py-2 border border-border">
-                <p className="text-[10px] font-medium text-muted uppercase tracking-wide">{s.label}</p>
-                <p className={`text-sm font-bold mt-0.5 ${s.color}`}>{s.value}</p>
+              <div key={s.label} className="bg-slate-50 rounded-lg px-2 py-1.5 border border-border">
+                <p className="text-[9px] font-medium text-muted uppercase tracking-wide">{s.label}</p>
+                <p className={`text-xs font-bold mt-0.5 ${s.color}`}>{s.value}</p>
               </div>
             ))}
           </div>
@@ -198,16 +198,16 @@ function SupplierLedger({ supplier, onPay, onEdit }: { supplier: Supplier; onPay
       </div>
 
       {/* Ledger table — screen only */}
-      <div className="flex-1 overflow-y-auto flex flex-col print:hidden px-5">
-        <table className="w-full text-sm flex-1">
+      <div className="sm2:flex-1 sm2:min-h-0 overflow-auto print:hidden px-3 sm2:px-5">
+        <table className="w-full min-w-[480px] text-sm">
           <thead className="sticky top-0 bg-slate-50 border-b border-border z-10">
             <tr>
-              <th className="text-left px-2 py-2.5 text-xs font-semibold text-muted uppercase tracking-wide">Date & Time</th>
-              <th className="text-left px-2 py-2.5 text-xs font-semibold text-muted uppercase tracking-wide">Reference</th>
-              <th className="text-left px-2 py-2.5 text-xs font-semibold text-muted uppercase tracking-wide">Type</th>
-              <th className="text-right px-2 py-2.5 text-xs font-semibold text-red-500 uppercase tracking-wide">Purchase (৳)</th>
-              <th className="text-right px-2 py-2.5 text-xs font-semibold text-emerald-600 uppercase tracking-wide">Payment (৳)</th>
-              <th className="text-right px-2 py-2.5 text-xs font-semibold text-muted uppercase tracking-wide">Balance</th>
+              <th className="text-left px-1.5 py-2 text-[10px] font-semibold text-muted uppercase tracking-wide">Date</th>
+              <th className="text-left px-1.5 py-2 text-[10px] font-semibold text-muted uppercase tracking-wide">Ref</th>
+              <th className="text-left px-1.5 py-2 text-[10px] font-semibold text-muted uppercase tracking-wide">Type</th>
+              <th className="text-right px-1.5 py-2 text-[10px] font-semibold text-red-500 uppercase tracking-wide">Purchase (৳)</th>
+              <th className="text-right px-1.5 py-2 text-[10px] font-semibold text-emerald-600 uppercase tracking-wide">Payment (৳)</th>
+              <th className="text-right px-1.5 py-2 text-[10px] font-semibold text-muted uppercase tracking-wide">Balance</th>
             </tr>
           </thead>
           <tbody>
@@ -218,38 +218,38 @@ function SupplierLedger({ supplier, onPay, onEdit }: { supplier: Supplier; onPay
             ) : (
               ledger.map((entry, i) => (
                 <tr key={i} className="border-b border-border/60 hover:bg-slate-50/60 transition-colors">
-                  <td className="px-2 py-2.5 text-xs text-muted whitespace-nowrap">{formatDate(entry.date, 'dd MMM yyyy, hh:mm a')}</td>
-                  <td className="px-2 py-2.5">
+                  <td className="px-1.5 py-2 text-[10px] text-muted whitespace-nowrap">{formatDate(entry.date, 'dd MMM yy')}</td>
+                  <td className="px-1.5 py-2">
                     {entry.kind === 'purchase' ? (
                       <button onClick={() => router.push(`/procurement/orders/${entry.id}`)}
-                        className="text-xs font-medium text-red-600 underline">
+                        className="text-[10px] font-medium text-red-600 underline">
                         {entry.ref}
                       </button>
                     ) : (
                       <button onClick={() => router.push(`/procurement/payments/${entry.id}`)}
-                        className="text-xs font-medium text-emerald-600 underline">
+                        className="text-[10px] font-medium text-emerald-600 underline">
                         {entry.ref}
                       </button>
                     )}
                   </td>
-                  <td className="px-2 py-2.5">
-                    <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
+                  <td className="px-1.5 py-2">
+                    <span className={`inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
                       entry.kind === 'purchase'
                         ? 'bg-red-50 text-red-600'
                         : 'bg-emerald-50 text-emerald-700'
                     }`}>
                       {entry.kind === 'purchase'
-                        ? <><TrendingDown size={10} /> Purchase</>
-                        : <><TrendingUp size={10} /> Payment</>}
+                        ? <><TrendingDown size={9} /> Buy</>
+                        : <><TrendingUp size={9} /> Pay</>}
                     </span>
                   </td>
-                  <td className="px-2 py-2.5 text-right text-xs font-medium text-red-600">
+                  <td className="px-1.5 py-2 text-right text-[10px] font-medium text-red-600">
                     {entry.kind === 'purchase' ? formatCurrency(entry.amount) : '—'}
                   </td>
-                  <td className="px-2 py-2.5 text-right text-xs font-medium text-emerald-600">
+                  <td className="px-1.5 py-2 text-right text-[10px] font-medium text-emerald-600">
                     {entry.kind === 'payment' ? formatCurrency(entry.amount) : '—'}
                   </td>
-                  <td className={`px-2 py-2.5 text-right text-xs font-semibold ${entry.balance > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                  <td className={`px-1.5 py-2 text-right text-[10px] font-semibold ${entry.balance > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
                     {formatCurrency(entry.balance)}
                   </td>
                 </tr>
@@ -259,25 +259,16 @@ function SupplierLedger({ supplier, onPay, onEdit }: { supplier: Supplier; onPay
           {!isLoading && ledger.length > 0 && (
             <tfoot className="sticky bottom-0 bg-white border-t-2 border-border">
               <tr>
-                <td colSpan={3} className="px-2 py-3 text-xs font-bold text-foreground uppercase tracking-wide">Total</td>
-                <td className="px-2 py-3 text-right">
-                  <span className="flex items-center justify-end gap-1.5">
-                    <span className="text-xs font-medium text-muted">Purchase:</span>
-                    <span className="text-xs font-bold text-red-600">{formatCurrency(ledger.reduce((s, e) => e.kind === 'purchase' ? s + e.amount : s, 0))}</span>
-                  </span>
+                <td colSpan={3} className="px-1.5 py-2 text-[10px] font-bold text-foreground uppercase tracking-wide">Total</td>
+                <td className="px-1.5 py-2 text-right">
+                  <span className="text-[10px] font-bold text-red-600">{formatCurrency(ledger.reduce((s, e) => e.kind === 'purchase' ? s + e.amount : s, 0))}</span>
                 </td>
-                <td className="px-2 py-3 text-right">
-                  <span className="flex items-center justify-end gap-1.5">
-                    <span className="text-xs font-medium text-muted">Paid:</span>
-                    <span className="text-xs font-bold text-emerald-600">{formatCurrency(ledger.reduce((s, e) => e.kind === 'payment' ? s + e.amount : s, 0))}</span>
-                  </span>
+                <td className="px-1.5 py-2 text-right">
+                  <span className="text-[10px] font-bold text-emerald-600">{formatCurrency(ledger.reduce((s, e) => e.kind === 'payment' ? s + e.amount : s, 0))}</span>
                 </td>
-                <td className="px-2 py-3 text-right">
-                  <span className="flex items-center justify-end gap-1.5">
-                    <span className="text-xs font-medium text-muted">Due:</span>
-                    <span className={`text-sm font-bold ${(ledger[ledger.length - 1]?.balance ?? 0) > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                      {formatCurrency(ledger[ledger.length - 1]?.balance ?? 0)}
-                    </span>
+                <td className="px-1.5 py-2 text-right">
+                  <span className={`text-xs font-bold ${(ledger[ledger.length - 1]?.balance ?? 0) > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                    {formatCurrency(ledger[ledger.length - 1]?.balance ?? 0)}
                   </span>
                 </td>
               </tr>
@@ -352,6 +343,7 @@ export default function SuppliersPage() {
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showLedger, setShowLedger] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editSupplier, setEditSupplier] = useState<Supplier | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -363,7 +355,7 @@ export default function SuppliersPage() {
   const suppliers = useMemo(() => data?.data?.suppliers ?? [], [data]);
   const selected = suppliers.find((s) => s._id === selectedId) ?? null;
 
-  // Auto-select first supplier
+  // Auto-select first supplier on desktop
   useEffect(() => {
     if (!selectedId && suppliers.length > 0) setSelectedId(suppliers[0]._id);
   }, [suppliers, selectedId]);
@@ -371,12 +363,17 @@ export default function SuppliersPage() {
   function openCreate() { setEditSupplier(null); setDialogOpen(true); }
   function openEdit(s: Supplier) { setEditSupplier(s); setDialogOpen(true); }
 
+  function selectSupplier(id: string) {
+    setSelectedId(id);
+    setShowLedger(true);
+  }
+
   async function handleDelete() {
     if (!deleteId) return;
     try {
       await deleteSupplier(deleteId).unwrap();
       toast.success('Supplier deactivated');
-      if (selectedId === deleteId) setSelectedId(null);
+      if (selectedId === deleteId) { setSelectedId(null); setShowLedger(false); }
     } catch {
       toast.error('Failed to delete supplier');
     } finally {
@@ -385,11 +382,10 @@ export default function SuppliersPage() {
   }
 
   return (
-    <div className="flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
+    <div className="flex flex-col sm2:h-[calc(100vh-120px)]">
       <div className="shrink-0">
         <PageHeader
           title="Suppliers"
-          // description="Manage supplier profiles and balances"
           breadcrumbs={[{ label: 'Procurement' }, { label: 'Suppliers' }]}
           actions={
             <button onClick={openCreate} className="h-9 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium flex items-center gap-2 transition-colors">
@@ -398,11 +394,13 @@ export default function SuppliersPage() {
           }
         />
       </div>
-      <div className="flex-1 min-h-0">
-      <div className="flex h-full rounded-xl border border-border bg-white shadow-sm overflow-hidden">
+      <div className="flex-1 sm2:min-h-0">
+      <div className="flex sm2:h-full rounded-xl border border-border bg-white shadow-sm overflow-hidden">
 
-        {/* Left — supplier list */}
-        <div className="w-64 shrink-0 flex flex-col border-r border-border print:hidden">
+        {/* Left — supplier list (hidden on mobile when ledger is open) */}
+        <div className={`flex flex-col border-r border-border print:hidden w-full sm2:w-48 sm2:shrink-0 ${
+          showLedger ? 'hidden sm2:flex' : 'flex'
+        }`}>
           {/* Search */}
           <div className="p-3 border-b border-border shrink-0">
             <div className="relative">
@@ -435,36 +433,58 @@ export default function SuppliersPage() {
             {suppliers.map((s) => (
               <li
                 key={s._id}
-                onClick={() => setSelectedId(s._id)}
+                onClick={() => selectSupplier(s._id)}
                 className={`flex items-center justify-between gap-2 px-3 py-2.5 cursor-pointer border-b border-border/50 transition-colors ${
                   selectedId === s._id ? 'bg-emerald-50 border-l-2 border-l-emerald' : 'hover:bg-slate-50'
                 }`}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                    <Building2 size={13} className="text-emerald-700" />
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
+                    selectedId === s._id ? 'bg-emerald-500' : 'bg-emerald-100'
+                  }`}>
+                    <Building2 size={13} className={selectedId === s._id ? 'text-white' : 'text-emerald-700'} />
                   </div>
                   <div className="min-w-0">
                     <p className={`text-xs font-semibold truncate ${selectedId === s._id ? 'text-emerald-800' : 'text-foreground'}`}>{s.name}</p>
                     <p className={`text-[10px] font-medium ${s.balance > 0 ? 'text-amber-600' : 'text-muted'}`}>
                       {s.balance > 0 ? formatCurrency(s.balance) : 'No due'}
                     </p>
+                    <p className="text-[9px] text-muted sm2:hidden mt-0.5">Tap to view ledger</p>
                   </div>
                 </div>
-                <ThreeDotMenu
-                  supplier={s}
-                  onEdit={() => openEdit(s)}
-                  onDelete={() => setDeleteId(s._id)}
-                  onPay={() => setPaySupplier(s)}
-                  router={router}
-                />
+                <div className="flex items-center gap-1 shrink-0">
+                  <ChevronDown
+                    size={14}
+                    className={`sm2:hidden transition-transform ${
+                      selectedId === s._id ? 'text-emerald-500 rotate-180' : 'text-muted'
+                    }`}
+                  />
+                  <ThreeDotMenu
+                    supplier={s}
+                    onEdit={() => openEdit(s)}
+                    onDelete={() => setDeleteId(s._id)}
+                    onPay={() => setPaySupplier(s)}
+                    router={router}
+                  />
+                </div>
               </li>
             ))}
           </ul>
         </div>
 
-        {/* Right — ledger */}
-        <div className="flex-1 min-w-0">
+        {/* Right — ledger (full screen on mobile when open) */}
+        <div className={`flex-1 min-w-0 ${
+          showLedger ? 'flex flex-col' : 'hidden sm2:flex sm2:flex-col'
+        }`}>
+          {/* Mobile back button */}
+          {showLedger && (
+            <button
+              onClick={() => setShowLedger(false)}
+              className="sm2:hidden flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium text-secondary border-b border-border hover:bg-slate-50 shrink-0"
+            >
+              ← Back to Suppliers
+            </button>
+          )}
           {selected ? (
             <SupplierLedger key={selected._id} supplier={selected} onPay={() => setPaySupplier(selected)} onEdit={() => openEdit(selected)} />
           ) : (

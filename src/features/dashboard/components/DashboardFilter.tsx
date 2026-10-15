@@ -107,9 +107,9 @@ export function DashboardFilter({ value, onChange }: Props) {
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       {/* Quick preset pills */}
-      <div className="flex items-center gap-1 bg-white border border-border rounded-lg p-1">
+      <div className="flex flex-wrap items-center gap-1 bg-white border border-border rounded-lg p-1">
         <button
           onClick={() => onChange({ from: '', to: '', label: 'All Time' })}
           className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
