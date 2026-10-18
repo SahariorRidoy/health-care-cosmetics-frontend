@@ -93,7 +93,7 @@ export default function ItemsPage() {
           <button
             onClick={() => router.push(`/materials/${row._id}`)}
             className={`text-sm font-bold leading-snug whitespace-normal break-words text-left hover:underline capitalize ${
-              isLow ? 'text-red-700' : 'text-blue-900'
+              isLow ? 'text-red-700' : 'text-blue-600'
             }`}
           >
             {row.name}
@@ -128,7 +128,11 @@ export default function ItemsPage() {
       key: 'supplier', header: 'Supplier', priority: 'P2',
       render: (row) => {
         const s = row.supplier as Supplier | undefined;
-        return s ? <span className="font-bold text-foreground">{s.name}</span> : <span className="text-muted">—</span>;
+        return s ? (
+          <button onClick={() => router.push(`/procurement/suppliers/${s._id}`)} className="font-bold text-blue-600 hover:underline">
+            {s.name}
+          </button>
+        ) : <span className="text-muted">—</span>;
       },
     },
     {

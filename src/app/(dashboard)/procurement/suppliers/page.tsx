@@ -342,23 +342,39 @@ function SupplierLedger({ supplier, onPay, onEdit }: { supplier: Supplier; onPay
 export default function SuppliersPage() {
   const router = useRouter();
   const [search, setSearch] = useState('');
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showLedger, setShowLedger] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editSupplier, setEditSupplier] = useState<Supplier | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [paySupplier, setPaySupplier] = useState<Supplier | null>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
 
-  const { data, isLoading, isError, refetch } = useGetSuppliersQuery({ limit: 200, search: search || undefined });
+  const { data, isLoading, isError, refetch } = useGetSuppliersQuery({ limit: 200 });
+  const { data: searchData } = useGetSuppliersQuery({ limit: 200, search: search || undefined }, { skip: !search });
   const [deleteSupplier, { isLoading: deleting }] = useDeleteSupplierMutation();
 
   const suppliers = useMemo(() => data?.data?.suppliers ?? [], [data]);
+  const dropdownSuppliers = useMemo(() => {
+    if (!search) return suppliers;
+    return (searchData?.data?.suppliers ?? suppliers).filter((s) =>
+      s.name.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [search, suppliers, searchData]);
   const selected = suppliers.find((s) => s._id === selectedId) ?? null;
 
-  // Auto-select first supplier on desktop
   useEffect(() => {
     if (!selectedId && suppliers.length > 0) setSelectedId(suppliers[0]._id);
   }, [suppliers, selectedId]);
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) setDropdownOpen(false);
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   function openCreate() { setEditSupplier(null); setDialogOpen(true); }
   function openEdit(s: Supplier) { setEditSupplier(s); setDialogOpen(true); }
@@ -366,6 +382,8 @@ export default function SuppliersPage() {
   function selectSupplier(id: string) {
     setSelectedId(id);
     setShowLedger(true);
+    setDropdownOpen(false);
+    setSearch('');
   }
 
   async function handleDelete() {
@@ -397,25 +415,55 @@ export default function SuppliersPage() {
       <div className="flex-1 sm2:min-h-0">
       <div className="flex sm2:h-full rounded-xl border border-border bg-white shadow-sm overflow-hidden">
 
-        {/* Left — supplier list (hidden on mobile when ledger is open) */}
+        {/* Left — supplier list */}
         <div className={`flex flex-col border-r border-border print:hidden w-full sm2:w-48 sm2:shrink-0 ${
           showLedger ? 'hidden sm2:flex' : 'flex'
         }`}>
-          {/* Search */}
-          <div className="p-3 border-b border-border shrink-0">
+          {/* Search with dropdown */}
+          <div ref={searchRef} className="relative p-3 border-b border-border shrink-0">
             <div className="relative">
-              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
               <input
                 type="search"
                 placeholder="Search suppliers…"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="h-8 w-full rounded-md border border-border bg-slate-50 pl-8 pr-3 text-xs placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-emerald"
+                onChange={(e) => { setSearch(e.target.value); setDropdownOpen(true); }}
+                onFocus={() => setDropdownOpen(true)}
+                className="h-8 w-full rounded-md border border-emerald bg-emerald-50 pl-8 pr-3 text-xs placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-emerald transition-all"
               />
             </div>
+            {dropdownOpen && (
+              <div className="absolute left-3 right-0 top-full mt-1 w-72 bg-white rounded-xl border border-border shadow-xl z-50 overflow-hidden">
+                {isLoading ? (
+                  <p className="px-4 py-3 text-xs text-muted">Loading…</p>
+                ) : dropdownSuppliers.length === 0 ? (
+                  <p className="px-4 py-3 text-xs text-muted">No suppliers found.</p>
+                ) : (
+                  <ul className="max-h-56 overflow-y-auto py-1">
+                    {dropdownSuppliers.map((s) => (
+                      <li key={s._id}>
+                        <button
+                          onClick={() => selectSupplier(s._id)}
+                          className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-slate-50 ${
+                            selectedId === s._id ? 'bg-emerald-50' : ''
+                          }`}
+                        >
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
+                            selectedId === s._id ? 'bg-emerald-500' : 'bg-emerald-100'
+                          }`}>
+                            <Building2 size={11} className={selectedId === s._id ? 'text-white' : 'text-emerald-700'} />
+                          </div>
+                          <p className={`text-xs font-semibold truncate ${
+                            selectedId === s._id ? 'text-emerald-800' : 'text-foreground'
+                          }`}>{s.name}</p>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
           </div>
-
-          {/* List */}
           <ul className="flex-1 overflow-y-auto">
             {isLoading && (
               <li className="px-4 py-3 text-xs text-muted">Loading…</li>

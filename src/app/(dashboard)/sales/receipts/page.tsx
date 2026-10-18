@@ -79,7 +79,7 @@ export default function ReceiptsPage() {
         const invoiceId = typeof row.invoice === 'string' ? row.invoice : row.invoice?._id;
         return (
           <span
-            className="font-medium text-emerald-600 cursor-pointer hover:underline"
+            className="font-medium text-blue-600 cursor-pointer hover:underline hover:text-blue-800"
             onClick={() => invoiceId && router.push(`/sales/invoices/${invoiceId}/receipts/${row._id}`)}
           >
             {row.receiptNumber}
@@ -99,7 +99,7 @@ export default function ReceiptsPage() {
       render: (row) => {
         const inv = typeof row.invoice === 'string' ? null : row.invoice as { _id: string; invoiceNumber: string };
         return inv ? (
-          <span className="cursor-pointer hover:underline text-secondary" onClick={() => router.push(`/sales/invoices/${inv._id}`)}>
+          <span className="cursor-pointer hover:underline text-blue-600 hover:text-blue-800" onClick={() => router.push(`/sales/invoices/${inv._id}`)}>
             {inv.invoiceNumber}
           </span>
         ) : '—';

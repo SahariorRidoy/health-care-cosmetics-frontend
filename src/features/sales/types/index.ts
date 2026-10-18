@@ -37,6 +37,8 @@ export interface InvoiceSummary {
   dueDate?: string;
   commissionRate: number;
   commissionAmount: number;
+  itemCount?: number;
+  items?: { qty: number; item: { name: string } | string }[];
   salesOrder?: { orderNumber: string } | string;
   createdAt: string;
 }

@@ -37,7 +37,11 @@ export function PageHeader({ title, description, breadcrumbs, actions, className
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 min-w-0">
         <div className="min-w-0 flex-1">
           <h1 className="text-xl md:text-2xl font-bold text-foreground truncate">{title}</h1>
-          {description && <p className="text-sm text-secondary mt-0.5">{description}</p>}
+          {description && (
+            typeof description === 'string'
+              ? <p className="text-sm text-secondary mt-0.5">{description}</p>
+              : <div className="mt-0.5">{description}</div>
+          )}
         </div>
         {actions && (
           <div className="flex items-center gap-2 flex-wrap shrink-0">

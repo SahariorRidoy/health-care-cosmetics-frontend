@@ -47,7 +47,7 @@ export default function NewSalesOrderPage() {
   const [dealerDialogOpen, setDealerDialogOpen] = useState(false);
   const [extraDealers, setExtraDealers] = useState<Dealer[]>([]);
   const { data: dealersData } = useGetDealersQuery({ page: 1 });
-  const { data: itemsData } = useGetItemsQuery({ page: 1, type: 'FINISHED_GOOD' });
+  const { data: itemsData } = useGetItemsQuery({ page: 1, type: 'FINISHED_GOOD' }, { refetchOnMountOrArgChange: true });
   const { data: warehouseData } = useGetWarehousesQuery();
 
   const { register, control, handleSubmit, setValue, formState: { errors } } = useForm<OrderForm>({

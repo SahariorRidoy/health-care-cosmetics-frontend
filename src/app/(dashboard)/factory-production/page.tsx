@@ -56,67 +56,73 @@ function StatusPill({ status }: { status: string }) {
 
 // ── Left panel: batch list item ───────────────────────────────────────────────
 
-const STATUS_SELECTED_BG: Record<string, string> = {
-  DRAFT:              'bg-slate-700',
-  DISPATCHED:         'bg-slate-700',
-  IN_PRODUCTION:      'bg-slate-700',
-  PARTIALLY_RECEIVED: 'bg-slate-700',
-  COMPLETED:          'bg-slate-700',
-  CANCELLED:          'bg-slate-700',
+const STATUS_SELECTED_BG: Record<string, { bg: string; border: string; bar: string }> = {
+  DRAFT:              { bg: 'bg-amber-50',   border: 'border-amber-300',   bar: 'bg-amber-400' },
+  DISPATCHED:         { bg: 'bg-blue-50',    border: 'border-blue-400',    bar: 'bg-blue-500' },
+  IN_PRODUCTION:      { bg: 'bg-violet-50',  border: 'border-violet-400',  bar: 'bg-violet-500' },
+  PARTIALLY_RECEIVED: { bg: 'bg-orange-50',  border: 'border-orange-400',  bar: 'bg-orange-400' },
+  COMPLETED:          { bg: 'bg-emerald-50', border: 'border-emerald-400', bar: 'bg-emerald-500' },
+  CANCELLED:          { bg: 'bg-slate-100',  border: 'border-slate-400',   bar: 'bg-slate-400' },
 };
 
 function BatchListItem({ batch, selected, index, onClick }: { batch: FactoryBatch; selected: boolean; index: number; onClick: () => void }) {
   const cfg = STATUS_CONFIG[batch.status] ?? STATUS_CONFIG.DRAFT;
-  const bg = STATUS_SELECTED_BG[batch.status] ?? 'bg-slate-50';
+  const sel = STATUS_SELECTED_BG[batch.status] ?? STATUS_SELECTED_BG.DRAFT;
   const batchName = batch.batchName.charAt(0).toUpperCase() + batch.batchName.slice(1);
 
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left border-b border-slate-100 transition-all relative ${
+      className={`w-full text-left border-b border-slate-100 transition-all duration-150 relative pl-3 pr-3 py-3 ${
         selected
-          ? `${bg} border-l-2 pl-3 pr-4 py-3`
-          : 'bg-white hover:bg-slate-50/70 pl-4 pr-4 py-3 border-l-2 border-l-transparent'
+          ? `${sel.bg} border-l-[3px] ${sel.border}`
+          : 'bg-white hover:bg-slate-50 border-l-[3px] border-l-transparent'
       }`}
-      style={selected ? { borderLeftColor: 'transparent' } : undefined}
     >
-      {selected && (
-        <span className={`absolute left-0 top-0 bottom-0 w-1 ${cfg.track}`} />
-      )}
-      <div className="flex items-center gap-2">
-        <span className={`shrink-0 text-[10px] font-bold w-5 text-center ${
-          selected ? 'text-slate-300' : 'text-slate-400'
-        }`}>
-          {index}
-        </span>
+      {selected && <span className={`absolute left-0 top-0 bottom-0 w-[3px] ${sel.bar}`} />}
+      <div className="flex items-start gap-2">
+        {/* Index badge */}
+        <span className={`shrink-0 mt-0.5 text-[10px] font-bold w-4 text-center leading-none ${
+          selected ? 'text-slate-500' : 'text-slate-300'
+        }`}>{index}</span>
+
         <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-1">
-            <p className={`text-[13px] truncate leading-tight ${
-              selected ? 'font-bold text-white' : 'font-medium text-foreground'
-            }`}>
-              {batchName}
-            </p>
-            <span className={`shrink-0 text-[10px] font-medium ${
-              selected ? 'text-slate-300' : 'text-slate-400'
-            }`}>
-              {cfg.label}
-            </span>
-          </div>
-          <p className={`text-[11px] font-mono mt-0.5 ${
-            selected ? 'text-slate-400' : 'text-muted'
+          {/* Batch name */}
+          <p className={`text-[13px] font-semibold leading-snug truncate ${
+            selected ? 'text-slate-900' : 'text-slate-700'
+          }`}>
+            {batchName}
+          </p>
+
+          {/* FB number */}
+          <p className={`text-[11px] font-mono mt-0.5 truncate ${
+            selected ? 'text-slate-500' : 'text-slate-400'
           }`}>
             {batch.fbNumber}
           </p>
-          <p className={`text-[9px] mt-0.5 sm2:hidden ${
-            selected ? 'text-slate-400' : 'text-muted'
-          }`}>Tap to view details</p>
+
+          {/* Date + receipts row */}
+          <div className="flex items-center gap-2 mt-1.5">
+            <span className={`text-[10px] flex items-center gap-0.5 ${
+              selected ? 'text-slate-500' : 'text-slate-400'
+            }`}>
+              <Calendar size={9} className="shrink-0" />{formatDate(batch.createdAt)}
+            </span>
+            {batch.receipts.length > 0 && (
+              <span className={`text-[10px] flex items-center gap-0.5 ${
+                selected ? 'text-slate-500' : 'text-slate-400'
+              }`}>
+                <ReceiptText size={9} className="shrink-0" />{batch.receipts.length}
+              </span>
+            )}
+          </div>
         </div>
-        <ChevronDown
-          size={13}
-          className={`sm2:hidden shrink-0 transition-transform ${
-            selected ? 'text-slate-300 rotate-180' : 'text-slate-400'
-          }`}
-        />
+
+        {/* Status pill */}
+        <span className={`shrink-0 mt-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold ring-1 ${cfg.pill}`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+          {cfg.label}
+        </span>
       </div>
     </button>
   );
@@ -344,23 +350,23 @@ function BatchDetail({ batchId, onEdit, onDeleted, onBack }: {
             <h2 className="text-base font-bold text-foreground truncate mb-1">
               {batch.batchName.charAt(0).toUpperCase() + batch.batchName.slice(1)}
             </h2>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span className="text-[11px] font-mono text-muted">{batch.fbNumber}</span>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+              <span className="text-sm font-mono font-semibold text-foreground">{batch.fbNumber}</span>
               {factoryName && (
-                <span className="text-[11px] text-slate-500 flex items-center gap-1">
-                  <Factory size={10} className="shrink-0" />{factoryName}
+                <span className="text-sm text-slate-600 flex items-center gap-1">
+                  <Factory size={13} className="shrink-0" />{factoryName}
                 </span>
               )}
               {warehouseName && (
-                <span className="text-[11px] text-slate-500 flex items-center gap-1">
-                  <Package size={10} className="shrink-0" />{warehouseName}
+                <span className="text-sm text-slate-600 flex items-center gap-1">
+                  <Package size={13} className="shrink-0" />{warehouseName}
                 </span>
               )}
-              <span className="text-[11px] text-slate-400 flex items-center gap-1">
-                <ReceiptText size={10} className="shrink-0" />{batch.receipts.length} receipt{batch.receipts.length !== 1 ? 's' : ''}
+              <span className="text-sm text-slate-500 flex items-center gap-1">
+                <ReceiptText size={13} className="shrink-0" />{batch.receipts.length} receipt{batch.receipts.length !== 1 ? 's' : ''}
               </span>
-              <span className="text-[11px] text-slate-400 flex items-center gap-1">
-                <Calendar size={10} className="shrink-0" />{formatDate(batch.createdAt)}
+              <span className="text-sm font-semibold text-blue-600 flex items-center gap-1">
+                <Calendar size={13} className="shrink-0" />{formatDate(batch.createdAt)}
               </span>
             </div>
           </div>
@@ -769,14 +775,14 @@ export default function FactoryProductionPage() {
             <button
               onClick={() => setListCollapsed((c) => !c)}
               title={listCollapsed ? 'Expand list' : 'Collapse list'}
-              className={`flex items-center gap-1 rounded-md px-1.5 py-1 transition-colors ${
+              className={`flex items-center gap-1.5 rounded-md h-7 px-2 font-semibold text-[10px] transition-colors ${
                 listCollapsed
-                  ? 'mx-auto bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm'
-                  : 'ml-auto text-slate-500 hover:text-slate-700 hover:bg-slate-200'
+                  ? 'mx-auto bg-emerald-600 hover:bg-emerald-700 text-white'
+                  : 'ml-auto bg-emerald-600 hover:bg-emerald-700 text-white'
               }`}
             >
               <ChevronRight size={12} className={`transition-transform duration-200 ${listCollapsed ? '' : 'rotate-180'}`} />
-              {!listCollapsed && <span className="text-[10px] font-medium">Collapse</span>}
+              {!listCollapsed && <span>Collapse</span>}
             </button>
           </div>
 

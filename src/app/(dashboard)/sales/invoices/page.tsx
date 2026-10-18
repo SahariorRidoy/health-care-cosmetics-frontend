@@ -146,7 +146,7 @@ export default function InvoicesPage() {
   const columns: Column<Invoice>[] = [
     {
       key: 'invoiceNumber', header: 'Invoice #', priority: 'P1',
-      render: (row) => <span className="font-medium text-emerald-600 cursor-pointer hover:underline" onClick={() => router.push(`/sales/invoices/${row._id}`)}>{row.invoiceNumber}</span>,
+      render: (row) => <span className="font-medium text-blue-600 cursor-pointer hover:underline hover:text-blue-800" onClick={() => router.push(`/sales/invoices/${row._id}`)}>{row.invoiceNumber}</span>,
     },
     {
       key: 'dealer', header: 'Dealer', priority: 'P1',

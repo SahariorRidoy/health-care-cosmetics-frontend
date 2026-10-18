@@ -59,6 +59,7 @@ export const salesApi = api.injectEndpoints({
         'Invoice',
         'SalesOrder',
         { type: 'Invoice', id: arg.invoice },
+        { type: 'Dealer', id: arg.dealer },
       ],
     }),
 

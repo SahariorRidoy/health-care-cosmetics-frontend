@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Pencil, Trash2, FileText, FileDown, Printer, Loader2, ClipboardList, CreditCard } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2, FileText, FileDown, Printer, Loader2, ClipboardList, CreditCard, X } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { LoadingSpinner, ErrorState, StatusBadge, ConfirmDialog } from '@/components/feedback';
 import { DataTable, type Column } from '@/components/tables/DataTable';
@@ -13,10 +13,82 @@ import {
   useGetDealerDuesQuery,
   useGetDealerPaymentsQuery,
   useDeleteDealerMutation,
+  useCreateCustomerPaymentMutation,
 } from '@/features/sales/services/salesApi';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { FormField, SelectField } from '@/components/forms/FormField';
 import { useAppSelector } from '@/lib/store/hooks';
 import { DealerFormDialog } from '@/features/sales/components/DealerFormDialog';
 import type { CustomerPayment, InvoiceSummary } from '@/features/sales/types';
+
+const PAYMENT_METHODS = ['CASH', 'BANK_TRANSFER', 'CHEQUE', 'MOBILE_BANKING'];
+const paymentSchema = z.object({
+  amount: z.coerce.number().min(0.01, 'Amount must be > 0'),
+  method: z.string().min(1, 'Required'),
+  reference: z.string().optional(),
+});
+type PaymentForm = z.infer<typeof paymentSchema>;
+
+function QuickPayDialog({ invoice, dealerId, onClose }: { invoice: InvoiceSummary | null; dealerId: string; onClose: () => void }) {
+  const [createPayment, { isLoading }] = useCreateCustomerPaymentMutation();
+  const { register, handleSubmit, watch, formState: { errors } } = useForm<PaymentForm>({
+    resolver: zodResolver(paymentSchema),
+    defaultValues: { amount: invoice?.dueAmount ?? 0, method: 'CASH' },
+  });
+  const watched = watch('amount');
+  const change = Math.max(0, Number(watched) - (invoice?.dueAmount ?? 0));
+  const remaining = Math.max(0, (invoice?.dueAmount ?? 0) - Number(watched));
+
+  async function onSubmit(values: PaymentForm) {
+    if (!invoice) return;
+    try {
+      await createPayment({ dealer: dealerId, invoice: invoice._id, amount: values.amount, method: values.method, reference: values.reference }).unwrap();
+      toast.success('Payment recorded');
+      onClose();
+    } catch (err: unknown) {
+      toast.error((err as { data?: { message?: string } })?.data?.message ?? 'Failed to record payment');
+    }
+  }
+
+  if (!invoice) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+      <div className="fixed inset-0 bg-black/40" onClick={onClose} aria-hidden="true" />
+      <div role="dialog" aria-modal="true" className="relative w-full sm:max-w-md bg-white rounded-none sm:rounded-xl shadow-lg z-10">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <h2 className="text-base font-semibold">Pay Due — {invoice.invoiceNumber}</h2>
+          <button onClick={onClose} className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[36px] min-h-[36px] flex items-center justify-center" aria-label="Close"><X size={18} /></button>
+        </div>
+        <form onSubmit={handleSubmit(onSubmit)} noValidate className="px-6 py-4 flex flex-col gap-4">
+          <div className="flex gap-4 text-sm bg-slate-50 rounded-md px-4 py-3">
+            <span className="text-secondary">Total: <span className="font-medium text-foreground">{formatCurrency(invoice.totalAmount)}</span></span>
+            <span className="text-secondary">Due: <span className="font-semibold text-red-500">{formatCurrency(invoice.dueAmount)}</span></span>
+          </div>
+          <FormField label="Amount (৳)" type="number" min={0.01} step="0.01" required error={errors.amount?.message} onFocus={(e) => e.target.select()} {...register('amount')} />
+          {Number(watched) > 0 && (
+            <div className="flex justify-between text-sm px-1">
+              {change > 0
+                ? <><span className="text-muted">Change</span><span className="font-semibold text-blue-600">{formatCurrency(change)}</span></>
+                : <><span className="text-muted">Remaining Due</span><span className="font-semibold text-amber-600">{formatCurrency(remaining)}</span></>}
+            </div>
+          )}
+          <SelectField label="Payment Method" required error={errors.method?.message} {...register('method')}>
+            {PAYMENT_METHODS.map((m) => <option key={m} value={m}>{m.replace('_', ' ')}</option>)}
+          </SelectField>
+          <FormField label="Reference" placeholder="Cheque no. / transaction ID…" error={errors.reference?.message} {...register('reference')} />
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
+            <button type="button" onClick={onClose} disabled={isLoading} className="h-10 px-4 rounded-md border border-border text-sm hover:bg-slate-50 disabled:opacity-50">Cancel</button>
+            <button type="submit" disabled={isLoading} className="h-10 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium disabled:opacity-60 flex items-center justify-center gap-2">
+              {isLoading && <Loader2 size={14} className="animate-spin" />} Record Payment
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -34,6 +106,7 @@ export default function DealerDetailPage() {
   const [deactivateOpen, setDeactivateOpen] = useState(false);
   const [paymentPage, setPaymentPage] = useState(1);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [payInvoice, setPayInvoice] = useState<InvoiceSummary | null>(null);
   const token = useAppSelector((s) => s.auth.accessToken);
 
   const { data: dealerData, isLoading, isError, refetch } = useGetDealerQuery(id);
@@ -122,9 +195,12 @@ export default function DealerDetailPage() {
     { key: 'dueDate', header: 'Due Date', priority: 'P3', render: (row) => row.dueDate ? formatDate(row.dueDate) : '—' },
     { key: 'status', header: 'Status', priority: 'P1', render: (row) => <StatusBadge status={row.status} /> },
     {
-      key: 'actions', header: '', priority: 'P1', className: 'w-[130px] text-right',
+      key: 'actions', header: '', priority: 'P1', className: 'w-[162px] text-right',
       render: (row) => (
         <div className="flex items-center justify-end gap-1">
+          {row.dueAmount > 0 && row.status !== 'CANCELLED' && (
+            <button onClick={() => setPayInvoice(row)} className="p-1.5 rounded-md text-emerald-600 hover:bg-emerald-50 min-w-[32px] min-h-[32px] flex items-center justify-center" title="Pay Due" aria-label="Pay Due"><CreditCard size={15} /></button>
+          )}
           <button onClick={() => handlePrint(row._id)} className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[32px] min-h-[32px] flex items-center justify-center" title="Print" aria-label="Print invoice"><Printer size={15} /></button>
           <button onClick={() => handleDownload(row._id, row.invoiceNumber)} disabled={downloadingId === row._id} className="p-1.5 rounded-md text-secondary hover:bg-slate-100 min-w-[32px] min-h-[32px] flex items-center justify-center disabled:opacity-50" title="Download PDF" aria-label="Download invoice PDF">
             {downloadingId === row._id ? <Loader2 size={15} className="animate-spin" /> : <FileDown size={15} />}
@@ -179,6 +255,14 @@ export default function DealerDetailPage() {
             <button onClick={() => router.push(`/sales/invoices?dealer=${id}`)} className="h-9 px-3 rounded-md border border-border text-sm text-foreground hover:bg-slate-50 flex items-center gap-2 transition-colors">
               <FileText size={15} aria-hidden="true" /> Invoices
             </button>
+            {dealer.isActive && dealer.balance > 0 && dues?.invoices?.find(inv => inv.dueAmount > 0 && inv.status !== 'CANCELLED') && (
+              <button
+                onClick={() => setPayInvoice(dues.invoices.find(inv => inv.dueAmount > 0 && inv.status !== 'CANCELLED')!)}
+                className="h-9 px-3 rounded-md border border-emerald-300 text-sm text-emerald-700 hover:bg-emerald-50 flex items-center gap-2 transition-colors"
+              >
+                <CreditCard size={15} aria-hidden="true" /> Pay Due
+              </button>
+            )}
             {dealer.isActive && (
               <button onClick={() => setDeactivateOpen(true)} className="h-9 px-3 rounded-md border border-red-200 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors">
                 <Trash2 size={15} aria-hidden="true" /> Deactivate
@@ -288,6 +372,8 @@ export default function DealerDetailPage() {
           />
         </div>
       </div>
+
+      <QuickPayDialog invoice={payInvoice} dealerId={id} onClose={() => setPayInvoice(null)} />
 
       <DealerFormDialog open={editOpen} dealer={dealer} onClose={() => setEditOpen(false)} />
 

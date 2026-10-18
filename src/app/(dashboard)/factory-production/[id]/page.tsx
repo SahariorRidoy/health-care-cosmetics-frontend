@@ -113,7 +113,6 @@ export default function FactoryBatchDetailPage() {
   if (isError || !data?.data?.factoryBatch) return <ErrorState onRetry={refetch} />;
 
   const batch = data.data.factoryBatch;
-  const factoryName = typeof batch.factory === 'object' ? batch.factory.name : batch.factory;
   const warehouseName = typeof batch.warehouse === 'object' ? batch.warehouse.name : batch.warehouse;
 
   const canEdit = batch.status === 'DRAFT';
@@ -175,7 +174,24 @@ export default function FactoryBatchDetailPage() {
     <>
       <PageHeader
         title={batch.batchName}
-        description={`${batch.fbNumber} · ${factoryName} · ${warehouseName}`}
+        description={
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1">
+            <span className="text-base font-semibold text-foreground font-mono">{batch.fbNumber}</span>
+            <span className="text-base text-secondary">{warehouseName}</span>
+            <span className="text-base text-secondary">{batch.receipts.length} receipt{batch.receipts.length !== 1 ? 's' : ''}</span>
+            <span className="text-base text-secondary">{formatDate(batch.createdAt ?? batch.dispatch.dispatchedDate ?? '')}</span>
+            <span className={`text-base font-semibold ${
+              batch.status === 'DRAFT' ? 'text-slate-500'
+              : batch.status === 'DISPATCHED' ? 'text-blue-600'
+              : batch.status === 'IN_PRODUCTION' ? 'text-amber-600'
+              : batch.status === 'COMPLETED' ? 'text-emerald-600'
+              : 'text-red-500'
+            }`}>{batch.status.replace(/_/g, ' ')}</span>
+            {batch.dispatch.dispatchedDate && (
+              <span className="text-base text-secondary">Dispatched {formatDate(batch.dispatch.dispatchedDate)}</span>
+            )}
+          </div>
+        }
         breadcrumbs={[{ label: 'Factory Production', href: '/factory-production' }, { label: batch.fbNumber }]}
         actions={
           <div className="flex items-center gap-2 flex-wrap">

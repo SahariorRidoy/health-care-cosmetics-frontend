@@ -55,7 +55,7 @@ export default function SupplierPaymentsPage() {
       render: (row) => (
         <button
           onClick={() => router.push(`/procurement/payments/${row._id}`)}
-          className="font-medium text-emerald hover:underline"
+          className="font-medium text-blue-600 hover:underline"
         >
           {row.paymentNumber}
         </button>
@@ -66,7 +66,7 @@ export default function SupplierPaymentsPage() {
       render: (row) => {
         const s = typeof row.supplier === 'string' ? null : row.supplier as Supplier;
         return s ? (
-          <button onClick={() => router.push(`/procurement/suppliers/${s._id}`)} className="text-foreground hover:text-emerald hover:underline">
+          <button onClick={() => router.push(`/procurement/suppliers/${s._id}`)} className="text-blue-600 hover:underline">
             {s.name}
           </button>
         ) : '—';
@@ -78,7 +78,7 @@ export default function SupplierPaymentsPage() {
     },
     {
       key: 'amount', header: 'Amount', priority: 'P1',
-      render: (row) => <span className="font-semibold text-emerald-700">{formatCurrency(row.amount)}</span>,
+      render: (row) => formatCurrency(row.amount),
     },
     {
       key: 'method', header: 'Method', priority: 'P2',
@@ -96,7 +96,7 @@ export default function SupplierPaymentsPage() {
           const [first, ...rest] = pos;
           return (
             <div className="flex items-center gap-1">
-              <button onClick={() => router.push(`/procurement/orders/${first._id}`)} className="text-emerald hover:underline text-xs">
+              <button onClick={() => router.push(`/procurement/orders/${first._id}`)} className="text-blue-600 hover:underline text-xs">
                 {first.poNumber}
               </button>
               {rest.length > 0 && (
@@ -113,7 +113,7 @@ export default function SupplierPaymentsPage() {
         const po = row.purchaseOrder as { _id?: string; poNumber?: string } | string | undefined;
         if (!po || typeof po === 'string') return '\u2014';
         return po.poNumber ? (
-          <button onClick={() => router.push(`/procurement/orders/${po._id}`)} className="text-emerald hover:underline text-xs">
+          <button onClick={() => router.push(`/procurement/orders/${po._id}`)} className="text-blue-600 hover:underline text-xs">
             {po.poNumber}
           </button>
         ) : '\u2014';

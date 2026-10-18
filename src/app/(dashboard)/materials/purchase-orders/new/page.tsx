@@ -372,107 +372,108 @@ export default function NewPurchaseOrderPage() {
           </div>
 
           {/* Right — sticky summary */}
-          <div className="flex flex-col gap-4 sm2:sticky sm2:top-6">
+          <div className="flex flex-col gap-3 sm2:sticky sm2:top-6">
             <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
-              <div className="flex items-center gap-2.5 px-4 py-3 border-b border-border bg-slate-50/60">
+              <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-slate-50/60">
                 <ShoppingCart size={13} className="text-emerald shrink-0" />
                 <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Order Summary</p>
               </div>
-              <div className="p-4 flex flex-col gap-4">
+              <div className="p-3 flex flex-col gap-3">
 
                 {/* Supplier + Warehouse */}
-                <div className="flex flex-col gap-3">
-                  <div className="flex flex-col gap-1.5 flex-1">
-                    <label className="text-sm font-bold text-foreground">Supplier <span className="text-red-500">*</span></label>
-                    <div className="flex gap-1.5">
+                <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-bold text-foreground">Supplier <span className="text-red-500">*</span></label>
+                    <div className="flex gap-1">
                       <select
                         value={supplierId}
                         onChange={(e) => setSupplierId(e.target.value)}
-                        className={`flex-1 h-9 rounded-md border px-2 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-emerald ${supplierId ? 'border-emerald-300 bg-emerald-50' : 'border-border bg-white'}`}
+                        className={`flex-1 h-8 rounded-md border px-2 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-emerald min-w-0 ${supplierId ? 'border-emerald-300 bg-emerald-50' : 'border-border bg-white'}`}
                       >
-                        <option value="">Select supplier…</option>
+                        <option value="">Select Supplier</option>
                         {suppliers.map((s) => <option key={s._id} value={s._id}>{s.name}</option>)}
                       </select>
-                      <button type="button" onClick={() => setSupplierDialogOpen(true)} className="h-9 w-9 rounded-md bg-emerald hover:bg-emerald-600 text-white flex items-center justify-center shrink-0 transition-colors" title="Add new supplier">
-                        <Plus size={14} />
+                      <button type="button" onClick={() => setSupplierDialogOpen(true)} className="h-8 w-8 rounded-md bg-emerald hover:bg-emerald-600 text-white flex items-center justify-center shrink-0 transition-colors" title="Add new supplier">
+                        <Plus size={13} />
                       </button>
                     </div>
                     {supplierId && supplierDue > 0 && (
-                      <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-amber-50 border border-amber-200 text-[11px] text-amber-700">
-                        <AlertCircle size={11} className="shrink-0" />
+                      <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 text-[10px] text-amber-700">
+                        <AlertCircle size={10} className="shrink-0" />
                         Due: <span className="font-semibold">{formatCurrency(supplierDue)}</span>
                       </div>
                     )}
                   </div>
 
-                  <div className="flex flex-col gap-1.5 flex-1">
-                    <label className="text-sm font-bold text-foreground">Warehouse <span className="text-red-500">*</span></label>
-                    <select
-                      value={warehouseId}
-                      onChange={(e) => setWarehouseId(e.target.value)}
-                      className={`h-9 rounded-md border px-2 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-emerald ${warehouseId ? 'border-emerald-300 bg-emerald-50' : 'border-border bg-white'}`}
-                    >
-                      <option value="">Select warehouse…</option>
-                      {warehouses.map((w) => <option key={w._id} value={w._id}>{w.name}</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Notes */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-bold text-foreground">Notes</label>
-                  <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes…" rows={2} className="w-full rounded-md border border-border bg-white px-2 py-1.5 text-sm text-foreground placeholder:text-muted resize-none focus:outline-none focus:ring-2 focus:ring-emerald" />
-                </div>
-
-                <div className="border-t border-border pt-3 flex flex-col gap-3">
-                  <div className="flex flex-col gap-3">
-                    <div className="flex flex-col gap-1.5 flex-1">
-                      <label className="text-sm font-bold text-foreground">Paid Now (৳)</label>
-                      <input
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={paidAmount || ''}
-                        onChange={(e) => setPaidAmount(Number(e.target.value))}
-                        placeholder="0.00"
-                        className={`h-9 rounded-md border px-2 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-emerald ${paidAmount > 0 ? 'border-emerald-300 bg-emerald-50' : 'border-border bg-white'}`}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1.5 flex-1">
-                      <label className="text-sm font-bold text-foreground">Payment Method</label>
+                  {/* Warehouse + Notes side by side at sm2 (800px) */}
+                  <div className="flex flex-col sm2:flex-row sm2:items-start gap-2">
+                    <div className="flex flex-col gap-1 sm2:flex-1">
+                      <label className="text-xs font-bold text-foreground">Warehouse <span className="text-red-500">*</span></label>
                       <select
-                        value={paymentMethod}
-                        onChange={(e) => setPaymentMethod(e.target.value)}
-                        className="h-9 rounded-md border border-emerald-300 bg-emerald-50 px-2 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-emerald"
+                        value={warehouseId}
+                        onChange={(e) => setWarehouseId(e.target.value)}
+                        className={`h-8 rounded-md border px-2 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-emerald ${warehouseId ? 'border-emerald-300 bg-emerald-50' : 'border-border bg-white'}`}
                       >
-                        {PAYMENT_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
+                        <option value="">Select…</option>
+                        {warehouses.map((w) => <option key={w._id} value={w._id}>{w.name}</option>)}
                       </select>
                     </div>
+                    <div className="flex flex-col gap-1 sm2:flex-1">
+                      <label className="text-xs font-bold text-foreground">Notes</label>
+                      <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes…" rows={2} className="w-full rounded-md border border-border bg-white px-2 py-1 text-xs text-foreground placeholder:text-muted resize-none focus:outline-none focus:ring-2 focus:ring-emerald" />
+                    </div>
                   </div>
                 </div>
 
-                <div className="border-t border-border pt-3 flex flex-col gap-2">
+                {/* Paid Now + Payment Method — side by side */}
+                <div className="border-t border-border pt-2.5 grid grid-cols-1 min-[480px]:grid-cols-2 sm2:grid-cols-1 lg:grid-cols-2 gap-2">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-bold text-foreground">Method</label>
+                    <select
+                      value={paymentMethod}
+                      onChange={(e) => setPaymentMethod(e.target.value)}
+                      className="h-8 rounded-md border border-emerald-300 bg-emerald-50 px-2 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-emerald"
+                    >
+                      {PAYMENT_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-bold text-foreground">Paid Now (৳)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={paidAmount || ''}
+                      onChange={(e) => setPaidAmount(Number(e.target.value))}
+                      placeholder="0.00"
+                      className={`h-8 rounded-md border px-2 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-emerald ${paidAmount > 0 ? 'border-emerald-300 bg-emerald-50' : 'border-border bg-white'}`}
+                    />
+                  </div>
+                </div>
+
+                {/* Line totals + grand total */}
+                <div className="border-t border-border pt-2 flex flex-col gap-1.5">
                   {lines.filter((l) => l.mode === 'existing' ? (l.item && l.quantity > 0 && l.unitPrice > 0) : (l.name && l.quantity > 0 && l.unitPrice > 0)).map((l) => (
-                    <div key={l.id} className="flex items-center justify-between text-xs text-secondary">
+                    <div key={l.id} className="flex items-center justify-between text-[11px] text-secondary">
                       <span className="truncate max-w-[140px]">{l.mode === 'existing' ? l.item!.name : l.name}</span>
                       <span>{formatCurrency(l.quantity * l.unitPrice)}</span>
                     </div>
                   ))}
-                  <div className="flex items-center justify-between pt-2 border-t border-border">
+                  <div className="flex items-center justify-between pt-1.5 border-t border-border">
                     <span className="text-sm font-semibold text-foreground">Total</span>
-                    <span className="text-lg font-bold text-foreground">{formatCurrency(subtotal)}</span>
+                    <span className="text-base font-bold text-foreground">{formatCurrency(subtotal)}</span>
                   </div>
                   {subtotal > 0 && (
                     <>
-                      <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center justify-between text-xs">
                         <span className="text-secondary">Paid Now</span>
                         <span className="font-medium text-emerald-600">{formatCurrency(paidAmount || 0)}</span>
                       </div>
-                      <div className={`flex items-center justify-between px-3 py-2.5 rounded-lg border ${isFullyPaid ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
-                        <span className={`text-sm font-medium ${isFullyPaid ? 'text-emerald-700' : 'text-amber-700'}`}>
+                      <div className={`flex items-center justify-between px-2.5 py-2 rounded-lg border ${isFullyPaid ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
+                        <span className={`text-xs font-medium ${isFullyPaid ? 'text-emerald-700' : 'text-amber-700'}`}>
                           {isFullyPaid ? 'Fully Paid' : 'Remaining Due'}
                         </span>
-                        <span className={`text-base font-bold ${isFullyPaid ? 'text-emerald-700' : 'text-amber-700'}`}>
+                        <span className={`text-sm font-bold ${isFullyPaid ? 'text-emerald-700' : 'text-amber-700'}`}>
                           {isFullyPaid ? '✓ Paid' : formatCurrency(remaining)}
                         </span>
                       </div>
@@ -482,11 +483,11 @@ export default function NewPurchaseOrderPage() {
               </div>
             </div>
 
-            <div className="flex flex-col gap-2">
+            <div className="flex gap-2">
               <button
                 type="submit"
                 disabled={isLoading || hasError}
-                className="h-11 px-6 rounded-lg bg-emerald hover:bg-emerald-600 text-white text-sm font-semibold disabled:opacity-60 transition-colors flex items-center justify-center gap-2 shadow-sm"
+                className="flex-1 h-10 px-4 rounded-lg bg-emerald hover:bg-emerald-600 text-white text-sm font-semibold disabled:opacity-60 transition-colors flex items-center justify-center gap-2 shadow-sm"
               >
                 {isLoading && <Loader2 size={15} className="animate-spin" />}
                 {isLoading ? 'Recording…' : 'Record Purchase'}

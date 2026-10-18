@@ -11,8 +11,8 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: 'HCC ERP',
-    template: '%s | HCC ERP',
+    default: 'Health Care Cosmetics - ERP',
+    template: '%s | Health Care Cosmetics- ERP',
   },
   description: 'Health Care Cosmetics Ltd. — Enterprise Resource Planning',
 };

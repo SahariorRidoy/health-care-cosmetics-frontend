@@ -145,7 +145,7 @@ export default function PurchaseOrdersPage() {
         <button
           type="button"
           onClick={() => router.push(`/procurement/orders/${row._id}`)}
-          className="font-medium text-emerald-800 hover:underline"
+          className="font-medium text-blue-600 hover:underline"
         >
           {row.poNumber}
         </button>
@@ -155,7 +155,16 @@ export default function PurchaseOrdersPage() {
       key: 'supplier', header: 'Supplier', priority: 'P1',
       render: (row) => {
         const s = typeof row.supplier === 'string' ? null : row.supplier as Supplier;
-        return s?.name ?? '—';
+        if (!s) return '—';
+        return (
+          <button
+            type="button"
+            onClick={() => router.push(`/procurement/suppliers/${s._id}`)}
+            className="font-medium text-blue-600 hover:underline"
+          >
+            {s.name}
+          </button>
+        );
       },
     },
     { key: 'createdAt', header: 'Date & Time', priority: 'P2', render: (row) => formatDate(row.createdAt, 'dd/MM/yy, hh:mm a') },

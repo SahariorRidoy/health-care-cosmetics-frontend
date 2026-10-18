@@ -61,7 +61,7 @@ export default function StockPage() {
             )}
             <button
               onClick={() => item && router.push(`/materials/${item._id}`)}
-              className={`text-xs sm:text-base font-bold hover:underline cursor-pointer leading-tight break-words text-left ${isLow ? 'text-red-600' : 'text-foreground'}`}
+              className={`text-xs sm:text-base font-bold hover:underline cursor-pointer leading-tight break-words text-left ${isLow ? 'text-red-600' : 'text-blue-600'}`}
             >
               {item?.name ?? '—'}
             </button>

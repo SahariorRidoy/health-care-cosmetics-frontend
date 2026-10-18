@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Search, Pencil, Trash2, Eye, SlidersHorizontal, X, ChevronDown, Package, TrendingDown, DollarSign, Layers } from 'lucide-react';
+import Link from 'next/link';
+import { Plus, Search, Pencil, Trash2, Eye, SlidersHorizontal, X, ChevronDown, FlaskConical, TrendingDown, DollarSign, Layers } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DataTable, type Column } from '@/components/tables/DataTable';
@@ -72,11 +73,11 @@ export default function ProductionPage() {
         const isLow = row.currentStock <= row.reorderLevel;
         return (
           <div className="flex items-center gap-3">
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isLow ? 'bg-red-100' : 'bg-emerald-50'}`}>
-              <Package size={14} className={isLow ? 'text-red-500' : 'text-emerald-600'} />
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isLow ? 'bg-red-100' : 'bg-blue-50'}`}>
+              <FlaskConical size={14} className={isLow ? 'text-red-500' : 'text-blue-600'} />
             </div>
             <div className="min-w-0">
-              <p className={`font-semibold text-sm truncate ${isLow ? 'text-red-600' : 'text-foreground'}`}>{row.name}</p>
+              <Link href={`/production/${row._id}`} className={`font-semibold text-sm truncate hover:underline underline-offset-2 ${isLow ? 'text-red-600 hover:text-red-700' : 'text-blue-600 hover:text-blue-700'}`}>{row.name}</Link>
               <p className="text-xs text-muted font-mono">{row.sku}</p>
             </div>
           </div>
@@ -200,7 +201,7 @@ export default function ProductionPage() {
       {/* Stats row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
         {[
-          { label: 'Total Products', value: totalProducts, icon: Package, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: 'Total Products', value: totalProducts, icon: FlaskConical, color: 'text-blue-600', bg: 'bg-blue-50' },
           { label: 'Active', value: activeCount, icon: Layers, color: 'text-emerald-600', bg: 'bg-emerald-50' },
           { label: 'Low Stock', value: lowStockCount, icon: TrendingDown, color: 'text-red-500', bg: 'bg-red-50' },
           { label: 'Stock Value', value: formatCurrency(totalStockValue), icon: DollarSign, color: 'text-violet-600', bg: 'bg-violet-50' },
