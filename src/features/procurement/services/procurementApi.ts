@@ -27,7 +27,7 @@ export const procurementApi = api.injectEndpoints({
       query: (id) => ({ url: `/suppliers/${id}`, method: 'DELETE' }),
       invalidatesTags: ['Supplier'],
     }),
-    getSupplierPayments: build.query<SupplierPaymentsResponse, { supplierId: string; page?: number }>({
+    getSupplierPayments: build.query<SupplierPaymentsResponse, { supplierId: string; page?: number; limit?: number }>({
       query: ({ supplierId, ...params }) => ({ url: `/procurement/suppliers/${supplierId}/payments`, params }),
       providesTags: ['SupplierPayment'],
     }),
@@ -135,6 +135,8 @@ export const {
   useCreateSupplierPaymentMutation,
   useCreateSupplierPaymentFifoMutation,
   useGetPurchaseOrdersQuery,
+  useLazyGetPurchaseOrdersQuery,
+  useLazyGetSupplierPaymentsQuery,
   useGetPurchaseOrderQuery,
   useCreatePurchaseOrderMutation,
   useUpdatePOPaymentMutation,

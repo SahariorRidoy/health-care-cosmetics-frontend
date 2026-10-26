@@ -1,52 +1,174 @@
 'use client';
 
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { createPortal } from 'react-dom';
 import {
-  Plus, Search, Pencil, Trash2, Eye, CreditCard, ShoppingCart,
-  MoreVertical, Building2, Phone, Mail, MapPin, TrendingDown, TrendingUp, Printer, ChevronDown,
+  Plus, Search, Pencil, Trash2, Eye, CreditCard, ShoppingCart, MoreVertical, Building2,
+  Phone, Mail, MapPin, Printer, ChevronLeft, ChevronRight, ArrowLeft, Wallet, Receipt, Scale, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { EmptyState, ConfirmDialog } from '@/components/feedback';
+import { EmptyState, ErrorState, ConfirmDialog } from '@/components/feedback';
 import { formatCurrency, formatDate } from '@/lib/formatters';
 import {
   useGetSuppliersQuery, useDeleteSupplierMutation,
   useGetSupplierDuesQuery, useGetSupplierPaymentsQuery, useGetPurchaseOrdersQuery,
+  useLazyGetPurchaseOrdersQuery, useLazyGetSupplierPaymentsQuery,
 } from '@/features/procurement/services/procurementApi';
 import { SupplierFormDialog } from '@/features/procurement/components/SupplierFormDialog';
 import { SupplierFIFOPaymentDialog } from '@/features/procurement/components/SupplierFIFOPaymentDialog';
-import type { Supplier, PurchaseOrder, SupplierPayment } from '@/features/procurement/types';
+import type { Supplier, PurchaseOrder, SupplierPayment, POItem } from '@/features/procurement/types';
 
-type LedgerEntry =
-  | { kind: 'purchase'; date: string; ref: string; id: string; amount: number }
-  | { kind: 'payment'; date: string; ref: string; id: string; amount: number };
+interface LedgerPayment { id: string; ref: string; amount: number }
+interface LedgerEntry {
+  kind: 'purchase' | 'payment';
+  date: string;
+  ref: string;
+  id: string;
+  purchaseAmount: number;
+  paidAmount: number;
+  items: POItem[];
+  payments: LedgerPayment[];
+}
+
+function poItemName(line: POItem): string {
+  return typeof line.item === 'string' ? '—' : line.item?.name ?? '—';
+}
+
+function poItemUom(line: POItem): string {
+  return typeof line.uom === 'string' ? '' : line.uom?.symbol ?? '';
+}
+
+function refId(value: unknown): string {
+  if (typeof value === 'string') return value;
+  return (value as { _id?: string } | null | undefined)?._id ?? '';
+}
 
 function buildLedger(pos: PurchaseOrder[], payments: SupplierPayment[]): (LedgerEntry & { balance: number })[] {
+  const byPo = new Map<string, LedgerPayment[]>();
+  const standalone: LedgerEntry[] = [];
+
+  for (const pay of payments) {
+    const allocations = pay.purchaseOrders?.length
+      ? pay.purchaseOrders.map((a) => ({ poId: refId(a.purchaseOrder), applied: a.appliedAmount }))
+      : pay.purchaseOrder
+        ? [{ poId: refId(pay.purchaseOrder), applied: pay.amount }]
+        : [];
+
+    let attached = 0;
+    for (const a of allocations) {
+      if (!pos.some((po) => po._id === a.poId)) continue;
+      attached += a.applied;
+      byPo.set(a.poId, [...(byPo.get(a.poId) ?? []), { id: pay._id, ref: pay.paymentNumber, amount: a.applied }]);
+    }
+
+    const remainder = pay.amount - attached;
+    if (remainder > 0.005) {
+      standalone.push({
+        kind: 'payment', date: pay.paymentDate, ref: pay.paymentNumber, id: pay._id,
+        purchaseAmount: 0, paidAmount: remainder, items: [],
+        payments: [{ id: pay._id, ref: pay.paymentNumber, amount: remainder }],
+      });
+    }
+  }
+
   const entries: LedgerEntry[] = [
-    ...pos.map((po) => ({
-      kind: 'purchase' as const,
-      date: po.createdAt,
-      ref: po.poNumber,
-      id: po._id,
-      amount: po.totalAmount,
-    })),
-    ...payments.map((p) => ({
-      kind: 'payment' as const,
-      date: p.paymentDate,
-      ref: p.paymentNumber,
-      id: p._id,
-      amount: p.amount,
-    })),
+    ...pos.map((po) => {
+      const linked = byPo.get(po._id) ?? [];
+      return {
+        kind: 'purchase' as const,
+        date: po.createdAt,
+        ref: po.poNumber,
+        id: po._id,
+        purchaseAmount: po.totalAmount,
+        paidAmount: linked.reduce((sum, l) => sum + l.amount, 0),
+        items: po.items ?? [],
+        payments: linked,
+      };
+    }),
+    ...standalone,
   ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   let balance = 0;
-  const withBalance = entries.map((e) => {
-    balance = e.kind === 'purchase' ? balance + e.amount : balance - e.amount;
+  return entries.map((e) => {
+    balance += e.purchaseAmount - e.paidAmount;
     return { ...e, balance };
   });
-  return withBalance;
 }
+
+
+/* ───────────────────────── UI primitives ───────────────────────── */
+
+const btnBase =
+  'inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 h-11 sm2:h-9 text-sm font-medium whitespace-nowrap transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald focus-visible:ring-offset-1 print:hidden';
+const btnSecondary = `${btnBase} border border-slate-300 bg-white text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-900`;
+const btnPrimary = `${btnBase} bg-emerald text-white shadow-sm hover:bg-emerald-600`;
+const btnWarn = `${btnBase} bg-amber-500 text-white shadow-sm hover:bg-amber-600`;
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || '?';
+}
+
+function SupplierAvatar({ name, due, active, large }: { name: string; due: boolean; active?: boolean; large?: boolean }) {
+  const tone = active
+    ? 'bg-emerald text-white'
+    : due
+      ? 'bg-amber-100 text-amber-700'
+      : 'bg-slate-100 text-slate-600';
+  return (
+    <span
+      aria-hidden="true"
+      className={`inline-flex shrink-0 items-center justify-center rounded-full font-semibold ${tone} ${
+        large ? 'h-12 w-12 text-base' : 'h-9 w-9 text-xs'
+      }`}
+    >
+      {initials(name)}
+    </span>
+  );
+}
+
+function Badge({ tone, children }: { tone: 'green' | 'amber' | 'red' | 'blue'; children: React.ReactNode }) {
+  const styles = {
+    green: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+    amber: 'bg-amber-50 text-amber-700 ring-amber-600/20',
+    red: 'bg-red-50 text-red-700 ring-red-600/20',
+    blue: 'bg-blue-50 text-blue-700 ring-blue-600/20',
+  }[tone];
+  const dot = { green: 'bg-emerald-500', amber: 'bg-amber-500', red: 'bg-red-500', blue: 'bg-blue-500' }[tone];
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${styles}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${dot}`} aria-hidden="true" />
+      {children}
+    </span>
+  );
+}
+
+function SettlementBadge({ entry }: { entry: LedgerEntry }) {
+  if (entry.kind === 'payment') return <Badge tone="blue">On account</Badge>;
+  if (entry.purchaseAmount > 0 && entry.paidAmount >= entry.purchaseAmount - 0.005) return <Badge tone="green">Paid</Badge>;
+  if (entry.paidAmount > 0) return <Badge tone="amber">Partial</Badge>;
+  return <Badge tone="red">Unpaid</Badge>;
+}
+
+function SkeletonRows({ rows, cols }: { rows: number; cols: number }) {
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, r) => (
+        <tr key={r} className="border-b border-slate-100">
+          {Array.from({ length: cols }).map((__, c) => (
+            <td key={c} className="px-4 py-4">
+              <div className="h-3 animate-pulse rounded bg-slate-100" style={{ width: `${55 + ((r + c) % 4) * 12}%` }} />
+            </td>
+          ))}
+        </tr>
+      ))}
+    </>
+  );
+}
+
+/* ───────────────────────── Row action menu ───────────────────────── */
 
 function ThreeDotMenu({ supplier, onEdit, onDelete, onPay, router }: {
   supplier: Supplier;
@@ -55,227 +177,365 @@ function ThreeDotMenu({ supplier, onEdit, onDelete, onPay, router }: {
   onPay: () => void;
   router: ReturnType<typeof useRouter>;
 }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setPos(null), []);
 
   useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    if (!pos) return;
+    function onDown(e: MouseEvent) {
+      const t = e.target as Node;
+      if (!menuRef.current?.contains(t) && !btnRef.current?.contains(t)) close();
     }
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') close(); }
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    window.addEventListener('resize', close);
+    window.addEventListener('scroll', close, true);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', close);
+      window.removeEventListener('scroll', close, true);
+    };
+  }, [pos, close]);
+
+  function toggle() {
+    if (pos) return close();
+    const r = btnRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const menuHeight = 240;
+    const top = r.bottom + 6 + menuHeight > window.innerHeight ? Math.max(8, r.top - menuHeight - 6) : r.bottom + 6;
+    setPos({ top, left: Math.max(8, r.right - 208) });
+  }
+
+  const item = 'flex w-full items-center gap-2.5 px-3.5 py-2.5 text-sm text-slate-700 hover:bg-slate-50 focus:bg-slate-50 focus:outline-none';
 
   return (
-    <div ref={ref} className="relative" onClick={(e) => e.stopPropagation()}>
+    <>
       <button
-        onClick={() => setOpen((o) => !o)}
-        className="p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-        aria-label="More actions"
+        ref={btnRef}
+        onClick={toggle}
+        aria-label={`Actions for ${supplier.name}`}
+        aria-haspopup="menu"
+        aria-expanded={!!pos}
+        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald"
       >
-        <MoreVertical size={15} />
+        <MoreVertical size={16} aria-hidden="true" />
       </button>
-      {open && (
-        <div className="absolute right-0 top-7 z-50 w-44 bg-white rounded-lg border border-border shadow-lg py-1">
-          <button onClick={() => { router.push(`/procurement/suppliers/${supplier._id}`); setOpen(false); }}
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-slate-50">
-            <Eye size={14} className="text-blue-500" /> View Details
+      {pos && createPortal(
+        <div
+          ref={menuRef}
+          role="menu"
+          style={{ top: pos.top, left: pos.left }}
+          className="fixed z-[100] w-52 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
+        >
+          <button role="menuitem" className={item} onClick={() => { close(); router.push(`/procurement/suppliers/${supplier._id}`); }}>
+            <Eye size={15} className="text-slate-400" aria-hidden="true" /> View details
           </button>
-          <button onClick={() => { onEdit(); setOpen(false); }}
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-slate-50">
-            <Pencil size={14} className="text-emerald-500" /> Edit
+          <button role="menuitem" className={item} onClick={() => { close(); onEdit(); }}>
+            <Pencil size={15} className="text-slate-400" aria-hidden="true" /> Edit supplier
           </button>
-          <button onClick={() => { router.push(`/materials/purchase-orders/new?supplier=${supplier._id}`); setOpen(false); }}
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-slate-50">
-            <ShoppingCart size={14} className="text-violet-500" /> Create Purchase
+          <button role="menuitem" className={item} onClick={() => { close(); router.push(`/materials/purchase-orders/new?supplier=${supplier._id}`); }}>
+            <ShoppingCart size={15} className="text-slate-400" aria-hidden="true" /> Create purchase
           </button>
           {supplier.balance > 0 && (
-            <button onClick={() => { onPay(); setOpen(false); }}
-              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-slate-50">
-              <CreditCard size={14} className="text-amber-500" /> Pay Due
+            <button role="menuitem" className={item} onClick={() => { close(); onPay(); }}>
+              <CreditCard size={15} className="text-amber-500" aria-hidden="true" /> Pay due
             </button>
           )}
-          <div className="border-t border-border my-1" />
-          <button onClick={() => { onDelete(); setOpen(false); }}
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 hover:bg-red-50">
-            <Trash2 size={14} /> Delete
+          <div className="my-1 border-t border-slate-100" />
+          <button role="menuitem" className={`${item} !text-red-600 hover:!bg-red-50`} onClick={() => { close(); onDelete(); }}>
+            <Trash2 size={15} aria-hidden="true" /> Deactivate
           </button>
-        </div>
+        </div>,
+        document.body,
       )}
-    </div>
+    </>
   );
 }
 
+/* ───────────────────────── Ledger (right side) ───────────────────────── */
+
+const PAGE_SIZE = 100;
+
+function useRemainingPages<T>(pages: number | undefined, source: unknown, load: (page: number) => Promise<T[]>) {
+  const [items, setItems] = useState<T[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    if (!pages || pages < 2) { setItems([]); return; }
+    let cancelled = false;
+    setLoading(true);
+    setFailed(false);
+    (async () => {
+      try {
+        const out: T[] = [];
+        for (let page = 2; page <= pages; page++) {
+          out.push(...(await load(page)));
+          if (cancelled) return;
+        }
+        setItems(out);
+      } catch {
+        if (!cancelled) setFailed(true);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [pages, source, load, attempt]);
+
+  return { items, loading, failed, retry: () => setAttempt((n) => n + 1) };
+}
+
+const TH = 'border-b border-slate-200 bg-slate-50 px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500';
+
 function SupplierLedger({ supplier, onPay, onEdit }: { supplier: Supplier; onPay: () => void; onEdit: () => void }) {
   const router = useRouter();
-  const { data: duesData, isLoading: duesLoading } = useGetSupplierDuesQuery(supplier._id);
-  const { data: paymentsData, isLoading: paymentsLoading } = useGetSupplierPaymentsQuery({ supplierId: supplier._id });
-  const { data: posData, isLoading: posLoading } = useGetPurchaseOrdersQuery({ supplier: supplier._id, limit: 200 });
+  const duesQ = useGetSupplierDuesQuery(supplier._id);
+  const paymentsQ = useGetSupplierPaymentsQuery({ supplierId: supplier._id, limit: PAGE_SIZE, page: 1 });
+  const posQ = useGetPurchaseOrdersQuery({ supplier: supplier._id, limit: PAGE_SIZE, page: 1 });
+  const [fetchPosPage] = useLazyGetPurchaseOrdersQuery();
+  const [fetchPaymentsPage] = useLazyGetSupplierPaymentsQuery();
 
-  const pos = posData?.data?.purchaseOrders ?? [];
-  const payments = paymentsData?.data?.payments ?? [];
-  const dues = duesData?.data;
-  const ledger = buildLedger(pos, payments);
-  const isLoading = duesLoading || paymentsLoading || posLoading;
+  const loadPoPage = useCallback(
+    async (page: number) => (await fetchPosPage({ supplier: supplier._id, limit: PAGE_SIZE, page }, false).unwrap()).data.purchaseOrders,
+    [fetchPosPage, supplier._id],
+  );
+  const loadPaymentPage = useCallback(
+    async (page: number) => (await fetchPaymentsPage({ supplierId: supplier._id, limit: PAGE_SIZE, page }, false).unwrap()).data.payments,
+    [fetchPaymentsPage, supplier._id],
+  );
+  const morePos = useRemainingPages<PurchaseOrder>(posQ.data?.pagination?.pages, posQ.data, loadPoPage);
+  const morePayments = useRemainingPages<SupplierPayment>(paymentsQ.data?.pagination?.pages, paymentsQ.data, loadPaymentPage);
+
+  const pos = useMemo(() => [...(posQ.data?.data?.purchaseOrders ?? []), ...morePos.items], [posQ.data, morePos.items]);
+  const payments = useMemo(() => [...(paymentsQ.data?.data?.payments ?? []), ...morePayments.items], [paymentsQ.data, morePayments.items]);
+  const dues = duesQ.data?.data;
+  const ledger = useMemo(() => buildLedger(pos, payments), [pos, payments]);
+  const isLoading = duesQ.isLoading || paymentsQ.isLoading || posQ.isLoading;
+  const isError = duesQ.isError || paymentsQ.isError || posQ.isError;
+  const loadingOlder = morePos.loading || morePayments.loading;
+  const olderFailed = morePos.failed || morePayments.failed;
+
+  const endRef = useRef<HTMLDivElement>(null);
+
+  function retry() {
+    duesQ.refetch(); paymentsQ.refetch(); posQ.refetch();
+    morePos.retry(); morePayments.retry();
+  }
+
+  function jumpToLatest() {
+    endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }
+
+  const totalCost = ledger.reduce((s, e) => s + e.purchaseAmount, 0);
+  const totalPaid = ledger.reduce((s, e) => s + e.paidAmount, 0);
+  const closing = ledger[ledger.length - 1]?.balance ?? 0;
+  const hasDue = supplier.balance > 0;
+
+  const stats = dues
+    ? [
+        { label: 'Total cost', value: dues.totalOrdered, icon: Receipt, hint: 'All purchases', valueTone: 'text-slate-900', chip: 'bg-slate-100 text-slate-600' },
+        { label: 'Total paid', value: dues.totalPaid, icon: Wallet, hint: 'Payments received by supplier', valueTone: 'text-emerald-700', chip: 'bg-emerald-50 text-emerald-600' },
+        {
+          label: 'Outstanding', value: dues.outstandingBalance, icon: Scale,
+          hint: dues.outstandingBalance > 0 ? 'Payment pending' : 'All settled',
+          valueTone: dues.outstandingBalance > 0 ? 'text-amber-700' : 'text-emerald-700',
+          chip: dues.outstandingBalance > 0 ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600',
+        },
+      ]
+    : [];
 
   return (
-    <div className="flex flex-col sm2:h-full">
+    <div className="flex min-h-0 flex-1 flex-col">
       {/* Supplier header */}
-      <div className="px-3 py-3 border-b border-border shrink-0 print:hidden">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-2">
-            <div>
-              <h2 className="text-base font-bold text-foreground">{supplier.name}</h2>
-              {supplier.contactPerson && <p className="text-xs text-muted mt-0.5">{supplier.contactPerson}</p>}
-            </div>
-            <button
-              onClick={onEdit}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border text-xs font-medium text-slate-500 hover:text-amber-600 hover:bg-amber-50 hover:border-amber-200 transition-colors shrink-0 mt-0.5"
-              title="Edit Supplier"
-            >
-              <Pencil size={13} /> Edit
-            </button>
-          </div>
-          <div className="flex items-center gap-1.5 flex-wrap justify-end">
-            <button
-              onClick={() => router.push(`/procurement/suppliers/${supplier._id}`)}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border text-xs font-medium text-foreground hover:bg-slate-50 transition-colors"
-              title="View Details"
-            >
-              <Eye size={12} /><span className="hidden lg:inline">View Details</span>
-            </button>
-            <button
-              onClick={() => router.push(`/materials/purchase-orders/new?supplier=${supplier._id}`)}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-emerald hover:bg-emerald-600 text-white text-xs font-semibold transition-colors"
-              title="Repurchase"
-            >
-              <ShoppingCart size={12} /><span className="hidden lg:inline">Repurchase</span>
-            </button>
-            {supplier.balance > 0 && (
-              <button
-                onClick={onPay}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold transition-colors"
-                title="Pay Due"
-              >
-                <CreditCard size={12} /><span className="hidden lg:inline">Pay Due</span>
-              </button>
-            )}
-            <button
-              onClick={() => window.print()}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border text-xs font-medium text-foreground hover:bg-slate-50 transition-colors print:hidden"
-              title="Print"
-            >
-              <Printer size={12} /><span className="hidden xl:inline">Print</span>
-            </button>
-            <span className={`text-xs font-semibold px-2.5 py-1.5 rounded-full ${supplier.balance > 0 ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>
-              {supplier.balance > 0 ? `Due: ${formatCurrency(supplier.balance)}` : 'Cleared'}
-            </span>
-          </div>
-        </div>
-
-        {/* Info row */}
-        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3">
-          {supplier.phone && <span className="flex items-center gap-1 text-xs text-muted"><Phone size={11} />{supplier.phone}</span>}
-          {supplier.email && <span className="flex items-center gap-1 text-xs text-muted"><Mail size={11} />{supplier.email}</span>}
-          {supplier.address && <span className="flex items-center gap-1 text-xs text-muted"><MapPin size={11} />{supplier.address}</span>}
-        </div>
-
-        {/* Summary stats */}
-        {dues && (
-          <div className="grid grid-cols-3 gap-2 mt-3">
-            {[
-              { label: 'Total Purchased', value: formatCurrency(dues.totalOrdered), color: 'text-foreground' },
-              { label: 'Total Paid', value: formatCurrency(dues.totalPaid), color: 'text-emerald-600' },
-              { label: 'Outstanding Balance', value: formatCurrency(dues.outstandingBalance), color: dues.outstandingBalance > 0 ? 'text-amber-600' : 'text-emerald-600' },
-            ].map((s) => (
-              <div key={s.label} className="bg-slate-50 rounded-lg px-2 py-1.5 border border-border">
-                <p className="text-[9px] font-medium text-muted uppercase tracking-wide">{s.label}</p>
-                <p className={`text-xs font-bold mt-0.5 ${s.color}`}>{s.value}</p>
+      <header className="shrink-0 border-b border-slate-200 bg-slate-50 px-4 py-4 sm2:px-6 print:hidden">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="flex min-w-0 items-start gap-3.5">
+            <SupplierAvatar name={supplier.name} due={hasDue} large />
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <h2 className="truncate text-xl font-bold tracking-tight text-slate-900">{supplier.name}</h2>
+                {hasDue ? <Badge tone="amber">Due {formatCurrency(supplier.balance)}</Badge> : <Badge tone="green">Settled</Badge>}
               </div>
-            ))}
+              {supplier.contactPerson && <p className="mt-0.5 text-sm font-medium text-slate-600">{supplier.contactPerson}</p>}
+              <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-slate-600">
+                {supplier.phone && <span className="inline-flex items-center gap-1.5"><Phone size={14} className="text-slate-400" aria-hidden="true" />{supplier.phone}</span>}
+                {supplier.email && <span className="inline-flex items-center gap-1.5"><Mail size={14} className="text-slate-400" aria-hidden="true" />{supplier.email}</span>}
+                {supplier.address && <span className="inline-flex items-center gap-1.5"><MapPin size={14} className="text-slate-400" aria-hidden="true" />{supplier.address}</span>}
+              </div>
+            </div>
           </div>
-        )}
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button onClick={onEdit} className={btnSecondary}><Pencil size={15} aria-hidden="true" /> Edit</button>
+            <button onClick={() => router.push(`/procurement/suppliers/${supplier._id}`)} className={btnSecondary}><Eye size={15} aria-hidden="true" /> View details</button>
+            <button onClick={() => window.print()} className={btnSecondary}><Printer size={15} aria-hidden="true" /> Print</button>
+            <button onClick={() => router.push(`/materials/purchase-orders/new?supplier=${supplier._id}`)} className={btnPrimary}><ShoppingCart size={15} aria-hidden="true" /> Repurchase</button>
+            {hasDue && <button onClick={onPay} className={btnWarn}><CreditCard size={15} aria-hidden="true" /> Pay due</button>}
+          </div>
+        </div>
+
+        {/* KPI cards */}
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {duesQ.isLoading
+            ? [0, 1, 2].map((i) => <div key={i} className="h-[76px] animate-pulse rounded-xl border border-slate-200 bg-white" />)
+            : stats.map((s) => (
+                <div key={s.label} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                  <span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${s.chip}`}>
+                    <s.icon size={18} aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{s.label}</p>
+                    <p className={`truncate text-lg font-bold tabular-nums ${s.valueTone}`}>{formatCurrency(s.value)}</p>
+                    <p className="truncate text-xs text-slate-500">{s.hint}</p>
+                  </div>
+                </div>
+              ))}
+        </div>
+      </header>
+
+      {/* Ledger toolbar */}
+      <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 py-2.5 sm2:px-6 print:hidden">
+        <h3 className="text-sm font-semibold text-slate-900">
+          Transactions
+          {!isLoading && !isError && <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{ledger.length}</span>}
+        </h3>
+        <div className="flex items-center gap-3 text-xs text-slate-500">
+          {loadingOlder && (
+            <span className="inline-flex items-center gap-2" role="status">
+              <span className="h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-emerald" aria-hidden="true" />
+              Loading older transactions…
+            </span>
+          )}
+          {olderFailed && !loadingOlder && (
+            <button onClick={retry} className="font-semibold text-red-600 hover:underline">Some transactions failed to load · Retry</button>
+          )}
+          {!loadingOlder && !olderFailed && <span className="hidden sm:inline">Oldest to latest · latest at the bottom</span>}
+          {ledger.length > 8 && (
+            <button onClick={jumpToLatest} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
+              Jump to latest ↓
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Ledger table — screen only */}
-      <div className="sm2:flex-1 sm2:min-h-0 overflow-auto print:hidden px-3 sm2:px-5">
-        <table className="w-full min-w-[480px] text-sm">
-          <thead className="sticky top-0 bg-slate-50 border-b border-border z-10">
-            <tr>
-              <th className="text-left px-1.5 py-2 text-[10px] font-semibold text-muted uppercase tracking-wide">Date</th>
-              <th className="text-left px-1.5 py-2 text-[10px] font-semibold text-muted uppercase tracking-wide">Ref</th>
-              <th className="text-left px-1.5 py-2 text-[10px] font-semibold text-muted uppercase tracking-wide">Type</th>
-              <th className="text-right px-1.5 py-2 text-[10px] font-semibold text-red-500 uppercase tracking-wide">Purchase (৳)</th>
-              <th className="text-right px-1.5 py-2 text-[10px] font-semibold text-emerald-600 uppercase tracking-wide">Payment (৳)</th>
-              <th className="text-right px-1.5 py-2 text-[10px] font-semibold text-muted uppercase tracking-wide">Balance</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? (
-              <tr><td colSpan={6} className="text-center py-10 text-sm text-muted">Loading…</td></tr>
-            ) : ledger.length === 0 ? (
-              <tr><td colSpan={6} className="text-center py-10 text-sm text-muted">No transactions yet.</td></tr>
-            ) : (
-              ledger.map((entry, i) => (
-                <tr key={i} className="border-b border-border/60 hover:bg-slate-50/60 transition-colors">
-                  <td className="px-1.5 py-2 text-[10px] text-muted whitespace-nowrap">{formatDate(entry.date, 'dd MMM yy')}</td>
-                  <td className="px-1.5 py-2">
-                    {entry.kind === 'purchase' ? (
-                      <button onClick={() => router.push(`/procurement/orders/${entry.id}`)}
-                        className="text-[10px] font-medium text-red-600 underline">
-                        {entry.ref}
-                      </button>
-                    ) : (
-                      <button onClick={() => router.push(`/procurement/payments/${entry.id}`)}
-                        className="text-[10px] font-medium text-emerald-600 underline">
-                        {entry.ref}
-                      </button>
-                    )}
-                  </td>
-                  <td className="px-1.5 py-2">
-                    <span className={`inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
-                      entry.kind === 'purchase'
-                        ? 'bg-red-50 text-red-600'
-                        : 'bg-emerald-50 text-emerald-700'
-                    }`}>
-                      {entry.kind === 'purchase'
-                        ? <><TrendingDown size={9} /> Buy</>
-                        : <><TrendingUp size={9} /> Pay</>}
-                    </span>
-                  </td>
-                  <td className="px-1.5 py-2 text-right text-[10px] font-medium text-red-600">
-                    {entry.kind === 'purchase' ? formatCurrency(entry.amount) : '—'}
-                  </td>
-                  <td className="px-1.5 py-2 text-right text-[10px] font-medium text-emerald-600">
-                    {entry.kind === 'payment' ? formatCurrency(entry.amount) : '—'}
-                  </td>
-                  <td className={`px-1.5 py-2 text-right text-[10px] font-semibold ${entry.balance > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                    {formatCurrency(entry.balance)}
+      <div className="overflow-x-auto bg-white print:hidden">
+        {isError ? (
+          <div className="py-12"><ErrorState onRetry={retry} /></div>
+        ) : (
+          <>
+          <table className="w-full min-w-[920px] border-separate border-spacing-0 text-sm">
+            <thead>
+              <tr>
+                <th className={`${TH} w-[1%] whitespace-nowrap pl-6 text-left`}>SL</th>
+                <th className={`${TH} w-[1%] whitespace-nowrap text-left`}>Date</th>
+                <th className={`${TH} w-[1%] whitespace-nowrap text-left`}>Reference</th>
+                <th className={`${TH} text-left`}>Products</th>
+                <th className={`${TH} w-[1%] whitespace-nowrap text-right`}>Quantity</th>
+                <th className={`${TH} w-[1%] whitespace-nowrap text-right`}>Total cost</th>
+                <th className={`${TH} min-w-[150px] text-left`}>Payment receipts</th>
+                <th className={`${TH} w-[1%] whitespace-nowrap text-right`}>Payment</th>
+                <th className={`${TH} w-[1%] whitespace-nowrap pr-6 text-right`}>Balance</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <SkeletonRows rows={6} cols={9} />
+              ) : ledger.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="py-14">
+                    <EmptyState title="No transactions yet" description="Purchases and payments for this supplier will appear here." />
                   </td>
                 </tr>
-              ))
+              ) : (
+                ledger.map((entry, i) => (
+                  <tr key={`${entry.kind}-${entry.id}-${i}`} className="group transition-colors hover:bg-slate-50/80">
+                    <td className="border-b border-slate-100 py-3.5 pl-6 pr-4 align-top text-xs font-medium tabular-nums text-slate-400">{i + 1}</td>
+                    <td className="whitespace-nowrap border-b border-slate-100 px-4 py-3.5 align-top">
+                      <span className="block text-sm font-semibold text-slate-800">{formatDate(entry.date, 'dd MMM yyyy')}</span>
+                      <span className="block text-xs text-slate-400">{formatDate(entry.date, 'hh:mm a')}</span>
+                    </td>
+                    <td className="whitespace-nowrap border-b border-slate-100 px-4 py-3.5 align-top">
+                      <button
+                        onClick={() => router.push(entry.kind === 'purchase' ? `/procurement/orders/${entry.id}` : `/procurement/payments/${entry.id}`)}
+                        className={`text-sm font-semibold underline-offset-2 hover:underline ${entry.kind === 'purchase' ? 'text-slate-900 hover:text-emerald-700' : 'text-emerald-700'}`}
+                      >
+                        {entry.ref}
+                      </button>
+                      <div className="mt-1.5"><SettlementBadge entry={entry} /></div>
+                    </td>
+                    <td className="border-b border-slate-100 px-4 py-3.5 align-top">
+                      {entry.kind === 'purchase' && entry.items.length > 0 ? (
+                        entry.items.map((line, li) => (
+                          <p key={li} className="flex items-baseline gap-2 text-sm leading-6">
+                            <span className="font-medium text-slate-800">{poItemName(line)}</span>
+                            <span className="text-xs font-semibold tabular-nums text-violet-600">{formatCurrency(line.unitPrice)}</span>
+                          </p>
+                        ))
+                      ) : <span className="text-slate-300">—</span>}
+                    </td>
+                    <td className="whitespace-nowrap border-b border-slate-100 px-4 py-3.5 text-right align-top">
+                      {entry.kind === 'purchase' && entry.items.length > 0 ? (
+                        entry.items.map((line, li) => (
+                          <p key={li} className="text-sm font-medium leading-6 tabular-nums text-blue-600">
+                            {line.orderedQty} <span className="text-xs font-normal text-blue-400">{poItemUom(line)}</span>
+                          </p>
+                        ))
+                      ) : <span className="text-slate-300">—</span>}
+                    </td>
+                    <td className="whitespace-nowrap border-b border-slate-100 px-4 py-3.5 text-right align-top text-sm font-semibold tabular-nums text-slate-900">
+                      {entry.kind === 'purchase' ? formatCurrency(entry.purchaseAmount) : <span className="font-normal text-slate-300">—</span>}
+                    </td>
+                    <td className="border-b border-slate-100 px-4 py-3.5 align-top">
+                      {entry.kind === 'purchase' && entry.payments.length > 0 ? (
+                        entry.payments.map((pay, pi) => (
+                          <p key={`${pay.id}-${pi}`} className="flex flex-wrap items-baseline gap-x-2 text-sm leading-6">
+                            <button
+                              onClick={() => router.push(`/procurement/payments/${pay.id}`)}
+                              className="break-all text-left font-medium text-emerald-700 underline-offset-2 hover:underline"
+                            >
+                              {pay.ref}
+                            </button>
+                            <span className="text-xs font-semibold tabular-nums text-slate-600">{formatCurrency(pay.amount)}</span>
+                          </p>
+                        ))
+                      ) : <span className="text-slate-300">—</span>}
+                    </td>
+                    <td className="whitespace-nowrap border-b border-slate-100 px-4 py-3.5 text-right align-top text-sm font-bold tabular-nums text-emerald-700">
+                      {entry.paidAmount > 0 ? formatCurrency(entry.paidAmount) : <span className="font-normal text-slate-300">—</span>}
+                    </td>
+                    <td className={`whitespace-nowrap border-b border-slate-100 py-3.5 pl-4 pr-6 text-right align-top text-sm font-bold tabular-nums ${entry.balance > 0.005 ? 'text-amber-700' : 'text-emerald-700'}`}>
+                      {formatCurrency(entry.balance)}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+            {!isLoading && ledger.length > 0 && (
+              <tfoot>
+                <tr>
+                  <td colSpan={5} className="bg-slate-900 py-3.5 pl-6 pr-4 text-[11px] font-semibold uppercase tracking-wider text-slate-300">
+                    Totals · {ledger.length} {ledger.length === 1 ? 'entry' : 'entries'}
+                  </td>
+                  <td className="whitespace-nowrap bg-slate-900 px-4 py-3.5 text-right text-sm font-bold tabular-nums text-white">{formatCurrency(totalCost)}</td>
+                  <td className="bg-slate-900" />
+                  <td className="whitespace-nowrap bg-slate-900 px-4 py-3.5 text-right text-sm font-bold tabular-nums text-emerald-300">{formatCurrency(totalPaid)}</td>
+                  <td className={`whitespace-nowrap bg-slate-900 py-3.5 pl-4 pr-6 text-right text-sm font-bold tabular-nums ${closing > 0.005 ? 'text-amber-300' : 'text-emerald-300'}`}>{formatCurrency(closing)}</td>
+                </tr>
+              </tfoot>
             )}
-          </tbody>
-          {!isLoading && ledger.length > 0 && (
-            <tfoot className="sticky bottom-0 bg-white border-t-2 border-border">
-              <tr>
-                <td colSpan={3} className="px-1.5 py-2 text-[10px] font-bold text-foreground uppercase tracking-wide">Total</td>
-                <td className="px-1.5 py-2 text-right">
-                  <span className="text-[10px] font-bold text-red-600">{formatCurrency(ledger.reduce((s, e) => e.kind === 'purchase' ? s + e.amount : s, 0))}</span>
-                </td>
-                <td className="px-1.5 py-2 text-right">
-                  <span className="text-[10px] font-bold text-emerald-600">{formatCurrency(ledger.reduce((s, e) => e.kind === 'payment' ? s + e.amount : s, 0))}</span>
-                </td>
-                <td className="px-1.5 py-2 text-right">
-                  <span className={`text-xs font-bold ${(ledger[ledger.length - 1]?.balance ?? 0) > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                    {formatCurrency(ledger[ledger.length - 1]?.balance ?? 0)}
-                  </span>
-                </td>
-              </tr>
-            </tfoot>
-          )}
-        </table>
+          </table>
+          </>
+        )}
       </div>
+      <div ref={endRef} className="print:hidden" />
+
       {/* Print-only document */}
       <div className="hidden print:block text-[12px] text-gray-900 p-8">
         <div className="flex items-start justify-between pb-4 border-b-2 border-gray-800 mb-4">
@@ -307,7 +567,7 @@ function SupplierLedger({ supplier, onPay, onEdit }: { supplier: Supplier; onPay
         <table className="w-full border-collapse text-[11px]">
           <thead>
             <tr className="border-b-2 border-gray-800">
-              {['Date', 'Reference', 'Type', 'Purchase (৳)', 'Payment (৳)', 'Balance'].map((h, i) => (
+              {['Date', 'Reference', 'Type', 'Total Cost (৳)', 'Payment (৳)', 'Balance'].map((h, i) => (
                 <th key={h} className={`py-1.5 pr-3 font-semibold text-gray-700 uppercase tracking-wide ${i >= 3 ? 'text-right' : 'text-left'}`}>{h}</th>
               ))}
             </tr>
@@ -316,10 +576,17 @@ function SupplierLedger({ supplier, onPay, onEdit }: { supplier: Supplier; onPay
             {ledger.map((entry, i) => (
               <tr key={i} className="border-b border-gray-100">
                 <td className="py-1.5 pr-3 text-gray-500">{formatDate(entry.date, 'dd MMM yyyy, hh:mm a')}</td>
-                <td className="py-1.5 pr-3 font-medium">{entry.ref}</td>
+                <td className="py-1.5 pr-3 font-medium">
+                  {entry.ref}
+                  {entry.kind === 'purchase' && entry.payments.length > 0 && (
+                    <span className="block text-[10px] font-normal text-gray-500">
+                      {entry.payments.map((pay) => `${pay.ref} (${formatCurrency(pay.amount)})`).join(', ')}
+                    </span>
+                  )}
+                </td>
                 <td className="py-1.5 pr-3">{entry.kind === 'purchase' ? 'Purchase' : 'Payment'}</td>
-                <td className="py-1.5 pr-3 text-right">{entry.kind === 'purchase' ? formatCurrency(entry.amount) : '—'}</td>
-                <td className="py-1.5 pr-3 text-right">{entry.kind === 'payment' ? formatCurrency(entry.amount) : '—'}</td>
+                <td className="py-1.5 pr-3 text-right">{entry.kind === 'purchase' ? formatCurrency(entry.purchaseAmount) : '—'}</td>
+                <td className="py-1.5 pr-3 text-right">{entry.paidAmount > 0 ? formatCurrency(entry.paidAmount) : '—'}</td>
                 <td className="py-1.5 text-right font-semibold">{formatCurrency(entry.balance)}</td>
               </tr>
             ))}
@@ -327,8 +594,8 @@ function SupplierLedger({ supplier, onPay, onEdit }: { supplier: Supplier; onPay
           <tfoot>
             <tr className="border-t-2 border-gray-800">
               <td colSpan={3} className="py-2 font-bold text-gray-900 uppercase">Outstanding Balance</td>
-              <td className="py-2 text-right font-bold">{formatCurrency(ledger.reduce((s, e) => e.kind === 'purchase' ? s + e.amount : s, 0))}</td>
-              <td className="py-2 text-right font-bold">{formatCurrency(ledger.reduce((s, e) => e.kind === 'payment' ? s + e.amount : s, 0))}</td>
+              <td className="py-2 text-right font-bold">{formatCurrency(ledger.reduce((s, e) => s + e.purchaseAmount, 0))}</td>
+              <td className="py-2 text-right font-bold">{formatCurrency(ledger.reduce((s, e) => s + e.paidAmount, 0))}</td>
               <td className="py-2 text-right font-bold">{formatCurrency(ledger[ledger.length - 1]?.balance ?? 0)}</td>
             </tr>
           </tfoot>
@@ -339,52 +606,42 @@ function SupplierLedger({ supplier, onPay, onEdit }: { supplier: Supplier; onPay
   );
 }
 
+/* ───────────────────────── Page ───────────────────────── */
+
 export default function SuppliersPage() {
   const router = useRouter();
   const [search, setSearch] = useState('');
-  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [dueOnly, setDueOnly] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showLedger, setShowLedger] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editSupplier, setEditSupplier] = useState<Supplier | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [paySupplier, setPaySupplier] = useState<Supplier | null>(null);
-  const searchRef = useRef<HTMLDivElement>(null);
 
   const { data, isLoading, isError, refetch } = useGetSuppliersQuery({ limit: 200 });
-  const { data: searchData } = useGetSuppliersQuery({ limit: 200, search: search || undefined }, { skip: !search });
   const [deleteSupplier, { isLoading: deleting }] = useDeleteSupplierMutation();
 
   const suppliers = useMemo(() => data?.data?.suppliers ?? [], [data]);
-  const dropdownSuppliers = useMemo(() => {
-    if (!search) return suppliers;
-    return (searchData?.data?.suppliers ?? suppliers).filter((s) =>
-      s.name.toLowerCase().includes(search.toLowerCase())
-    );
-  }, [search, suppliers, searchData]);
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return suppliers.filter((s) => {
+      if (dueOnly && s.balance <= 0) return false;
+      if (!q) return true;
+      return [s.name, s.contactPerson, s.phone].some((v) => v?.toLowerCase().includes(q));
+    });
+  }, [suppliers, search, dueOnly]);
+  const dueCount = useMemo(() => suppliers.filter((s) => s.balance > 0).length, [suppliers]);
   const selected = suppliers.find((s) => s._id === selectedId) ?? null;
 
   useEffect(() => {
     if (!selectedId && suppliers.length > 0) setSelectedId(suppliers[0]._id);
   }, [suppliers, selectedId]);
 
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) setDropdownOpen(false);
-    }
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
   function openCreate() { setEditSupplier(null); setDialogOpen(true); }
   function openEdit(s: Supplier) { setEditSupplier(s); setDialogOpen(true); }
-
-  function selectSupplier(id: string) {
-    setSelectedId(id);
-    setShowLedger(true);
-    setDropdownOpen(false);
-    setSearch('');
-  }
+  function selectSupplier(id: string) { setSelectedId(id); setShowLedger(true); }
 
   async function handleDelete() {
     if (!deleteId) return;
@@ -393,156 +650,200 @@ export default function SuppliersPage() {
       toast.success('Supplier deactivated');
       if (selectedId === deleteId) { setSelectedId(null); setShowLedger(false); }
     } catch {
-      toast.error('Failed to delete supplier');
+      toast.error('Failed to deactivate supplier');
     } finally {
       setDeleteId(null);
     }
   }
 
+  const tab = (active: boolean) =>
+    `flex-1 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+      active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+    }`;
+
   return (
-    <div className="flex flex-col sm2:h-[calc(100vh-120px)]">
+    <div className="flex flex-col">
       <div className="shrink-0">
         <PageHeader
+          className="!mb-4"
           title="Suppliers"
+          description="Supplier ledger, purchases and payment history"
           breadcrumbs={[{ label: 'Procurement' }, { label: 'Suppliers' }]}
           actions={
-            <button onClick={openCreate} className="h-9 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium flex items-center gap-2 transition-colors">
-              <Plus size={16} /> New Supplier
+            <button onClick={openCreate} className={btnPrimary}>
+              <Plus size={16} aria-hidden="true" /> New supplier
             </button>
           }
         />
       </div>
-      <div className="flex-1 sm2:min-h-0">
-      <div className="flex sm2:h-full rounded-xl border border-border bg-white shadow-sm overflow-hidden">
 
-        {/* Left — supplier list */}
-        <div className={`flex flex-col border-r border-border print:hidden w-full sm2:w-48 sm2:shrink-0 ${
-          showLedger ? 'hidden sm2:flex' : 'flex'
-        }`}>
-          {/* Search with dropdown */}
-          <div ref={searchRef} className="relative p-3 border-b border-border shrink-0">
-            <div className="relative">
-              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
-              <input
-                type="search"
-                placeholder="Search suppliers…"
-                value={search}
-                onChange={(e) => { setSearch(e.target.value); setDropdownOpen(true); }}
-                onFocus={() => setDropdownOpen(true)}
-                className="h-8 w-full rounded-md border border-emerald bg-emerald-50 pl-8 pr-3 text-xs placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-emerald transition-all"
-              />
-            </div>
-            {dropdownOpen && (
-              <div className="absolute left-3 right-0 top-full mt-1 w-72 bg-white rounded-xl border border-border shadow-xl z-50 overflow-hidden">
-                {isLoading ? (
-                  <p className="px-4 py-3 text-xs text-muted">Loading…</p>
-                ) : dropdownSuppliers.length === 0 ? (
-                  <p className="px-4 py-3 text-xs text-muted">No suppliers found.</p>
-                ) : (
-                  <ul className="max-h-56 overflow-y-auto py-1">
-                    {dropdownSuppliers.map((s) => (
-                      <li key={s._id}>
+      <div>
+        <div className="flex rounded-xl border border-slate-200 bg-white shadow-sm">
+
+          {/* Left — supplier list */}
+          <aside
+            className={`flex-col border-r border-slate-200 bg-white transition-[width] duration-200 print:hidden sm2:shrink-0 ${
+              showLedger ? 'hidden sm2:flex' : 'flex'
+            } w-full ${collapsed ? 'sm2:w-[76px]' : 'sm2:w-80'}`}
+          >
+            <div className="flex min-h-0 flex-1 flex-col sm2:sticky sm2:top-20 sm2:max-h-[calc(100vh-6rem)]">
+            {collapsed ? (
+              <div className="flex min-h-0 flex-1 flex-col items-center gap-2 py-3">
+                <button
+                  onClick={() => setCollapsed(false)}
+                  aria-label="Expand supplier list"
+                  aria-expanded={false}
+                  title="Expand supplier list"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50 hover:text-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald"
+                >
+                  <ChevronRight size={18} strokeWidth={2.5} aria-hidden="true" />
+                </button>
+                <div className="h-px w-8 bg-slate-200" />
+                <ul className="flex min-h-0 w-full flex-1 flex-col items-center gap-2 overflow-y-auto py-1">
+                  {filtered.map((s) => {
+                    const active = selectedId === s._id;
+                    return (
+                      <li key={s._id} className="relative">
                         <button
                           onClick={() => selectSupplier(s._id)}
-                          className={`w-full flex items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-slate-50 ${
-                            selectedId === s._id ? 'bg-emerald-50' : ''
-                          }`}
+                          title={`${s.name}${s.balance > 0 ? ` · Due ${formatCurrency(s.balance)}` : ''}`}
+                          aria-label={s.name}
+                          aria-current={active ? 'true' : undefined}
+                          className={`rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald focus-visible:ring-offset-2 ${active ? 'ring-2 ring-emerald ring-offset-2' : ''}`}
                         >
-                          <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
-                            selectedId === s._id ? 'bg-emerald-500' : 'bg-emerald-100'
-                          }`}>
-                            <Building2 size={11} className={selectedId === s._id ? 'text-white' : 'text-emerald-700'} />
-                          </div>
-                          <p className={`text-xs font-semibold truncate ${
-                            selectedId === s._id ? 'text-emerald-800' : 'text-foreground'
-                          }`}>{s.name}</p>
+                          <SupplierAvatar name={s.name} due={s.balance > 0} active={active} />
                         </button>
+                        {s.balance > 0 && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-amber-500" aria-hidden="true" />}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ) : (
+              <>
+                <div className="shrink-0 space-y-3 border-b border-slate-200 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <h2 className="text-sm font-semibold text-slate-900">
+                      All suppliers
+                      <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">{suppliers.length}</span>
+                    </h2>
+                    <button
+                      onClick={() => setCollapsed(true)}
+                      aria-label="Collapse supplier list"
+                      aria-expanded
+                      title="Collapse supplier list"
+                      className="hidden h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50 hover:text-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald sm2:inline-flex"
+                    >
+                      <ChevronLeft size={18} strokeWidth={2.5} aria-hidden="true" />
+                    </button>
+                  </div>
+
+                  <div className="relative">
+                    <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+                    <input
+                      type="text"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Search suppliers…"
+                      aria-label="Search suppliers"
+                      className="h-11 w-full rounded-lg border border-slate-300 bg-white pl-9 pr-9 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald focus:outline-none focus:ring-2 focus:ring-emerald/25 sm2:h-9"
+                    />
+                    {search && (
+                      <button onClick={() => setSearch('')} aria-label="Clear search" className="absolute right-2 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+                        <X size={14} aria-hidden="true" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex gap-1 rounded-lg bg-slate-100 p-1" role="tablist" aria-label="Filter suppliers">
+                    <button role="tab" aria-selected={!dueOnly} onClick={() => setDueOnly(false)} className={tab(!dueOnly)}>All</button>
+                    <button role="tab" aria-selected={dueOnly} onClick={() => setDueOnly(true)} className={tab(dueOnly)}>
+                      With due{dueCount > 0 && <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 text-[11px] text-amber-700">{dueCount}</span>}
+                    </button>
+                  </div>
+                </div>
+
+                <ul className="min-h-0 flex-1 overflow-y-auto">
+                  {isLoading &&
+                    [0, 1, 2, 3, 4, 5].map((i) => (
+                      <li key={i} className="flex items-center gap-3 border-b border-slate-100 px-4 py-3.5">
+                        <div className="h-9 w-9 animate-pulse rounded-full bg-slate-100" />
+                        <div className="flex-1 space-y-2">
+                          <div className="h-3 w-3/4 animate-pulse rounded bg-slate-100" />
+                          <div className="h-2.5 w-1/3 animate-pulse rounded bg-slate-100" />
+                        </div>
                       </li>
                     ))}
-                  </ul>
-                )}
+                  {isError && <li className="py-8"><ErrorState onRetry={refetch} /></li>}
+                  {!isLoading && !isError && suppliers.length === 0 && (
+                    <li className="px-4 py-8"><EmptyState title="No suppliers yet" description="Add your first supplier to start tracking purchases." /></li>
+                  )}
+                  {!isLoading && !isError && suppliers.length > 0 && filtered.length === 0 && (
+                    <li className="px-4 py-10 text-center text-sm text-slate-500">No suppliers match your search.</li>
+                  )}
+                  {filtered.map((s) => {
+                    const active = selectedId === s._id;
+                    const due = s.balance > 0;
+                    return (
+                      <li key={s._id} className="relative border-b border-slate-100">
+                        <button
+                          onClick={() => selectSupplier(s._id)}
+                          aria-current={active ? 'true' : undefined}
+                          className={`flex min-h-[64px] w-full items-center gap-3 border-l-[3px] py-3 pl-4 pr-14 text-left transition-colors focus:outline-none focus-visible:bg-slate-50 ${
+                            active ? 'border-l-emerald bg-emerald-50/70' : 'border-l-transparent hover:bg-slate-50'
+                          }`}
+                        >
+                          <SupplierAvatar name={s.name} due={due} active={active} />
+                          <span className="min-w-0 flex-1">
+                            <span className={`block truncate text-sm font-semibold ${active ? 'text-emerald-900' : 'text-slate-900'}`}>{s.name}</span>
+                            <span className={`block truncate text-xs ${due ? 'font-semibold text-amber-700' : 'text-slate-500'}`}>
+                              {due ? `Due ${formatCurrency(s.balance)}` : 'Settled'}
+                            </span>
+                          </span>
+                        </button>
+                        <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                          <ThreeDotMenu
+                            supplier={s}
+                            onEdit={() => openEdit(s)}
+                            onDelete={() => setDeleteId(s._id)}
+                            onPay={() => setPaySupplier(s)}
+                            router={router}
+                          />
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            )}
+            </div>
+          </aside>
+
+          {/* Right — ledger */}
+          <section className={`min-w-0 flex-1 flex-col overflow-hidden rounded-r-xl ${showLedger ? 'flex' : 'hidden sm2:flex'}`}>
+            {showLedger && (
+              <button
+                onClick={() => setShowLedger(false)}
+                className="flex h-12 shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 sm2:hidden print:hidden"
+              >
+                <ArrowLeft size={16} aria-hidden="true" /> All suppliers
+              </button>
+            )}
+            {selected ? (
+              <SupplierLedger key={selected._id} supplier={selected} onPay={() => setPaySupplier(selected)} onEdit={() => openEdit(selected)} />
+            ) : (
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+                <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+                  <Building2 size={26} aria-hidden="true" />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">Select a supplier</p>
+                  <p className="mt-0.5 text-sm text-slate-500">Choose a supplier on the left to view their ledger.</p>
+                </div>
               </div>
             )}
-          </div>
-          <ul className="flex-1 overflow-y-auto">
-            {isLoading && (
-              <li className="px-4 py-3 text-xs text-muted">Loading…</li>
-            )}
-            {isError && (
-              <li className="px-4 py-3">
-                <button onClick={refetch} className="text-xs text-red-500 hover:underline">Retry</button>
-              </li>
-            )}
-            {!isLoading && suppliers.length === 0 && (
-              <li className="px-4 py-6">
-                <EmptyState title="No suppliers" description="Add your first supplier." />
-              </li>
-            )}
-            {suppliers.map((s) => (
-              <li
-                key={s._id}
-                onClick={() => selectSupplier(s._id)}
-                className={`flex items-center justify-between gap-2 px-3 py-2.5 cursor-pointer border-b border-border/50 transition-colors ${
-                  selectedId === s._id ? 'bg-emerald-50 border-l-2 border-l-emerald' : 'hover:bg-slate-50'
-                }`}
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
-                    selectedId === s._id ? 'bg-emerald-500' : 'bg-emerald-100'
-                  }`}>
-                    <Building2 size={13} className={selectedId === s._id ? 'text-white' : 'text-emerald-700'} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className={`text-xs font-semibold truncate ${selectedId === s._id ? 'text-emerald-800' : 'text-foreground'}`}>{s.name}</p>
-                    <p className={`text-[10px] font-medium ${s.balance > 0 ? 'text-amber-600' : 'text-muted'}`}>
-                      {s.balance > 0 ? formatCurrency(s.balance) : 'No due'}
-                    </p>
-                    <p className="text-[9px] text-muted sm2:hidden mt-0.5">Tap to view ledger</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <ChevronDown
-                    size={14}
-                    className={`sm2:hidden transition-transform ${
-                      selectedId === s._id ? 'text-emerald-500 rotate-180' : 'text-muted'
-                    }`}
-                  />
-                  <ThreeDotMenu
-                    supplier={s}
-                    onEdit={() => openEdit(s)}
-                    onDelete={() => setDeleteId(s._id)}
-                    onPay={() => setPaySupplier(s)}
-                    router={router}
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
+          </section>
         </div>
-
-        {/* Right — ledger (full screen on mobile when open) */}
-        <div className={`flex-1 min-w-0 ${
-          showLedger ? 'flex flex-col' : 'hidden sm2:flex sm2:flex-col'
-        }`}>
-          {/* Mobile back button */}
-          {showLedger && (
-            <button
-              onClick={() => setShowLedger(false)}
-              className="sm2:hidden flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium text-secondary border-b border-border hover:bg-slate-50 shrink-0"
-            >
-              ← Back to Suppliers
-            </button>
-          )}
-          {selected ? (
-            <SupplierLedger key={selected._id} supplier={selected} onPay={() => setPaySupplier(selected)} onEdit={() => openEdit(selected)} />
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full text-muted gap-2">
-              <Building2 size={32} className="text-slate-300" />
-              <p className="text-sm">Select a supplier to view ledger</p>
-            </div>
-          )}
-        </div>
-      </div>
       </div>
 
       <SupplierFormDialog open={dialogOpen} supplier={editSupplier} onClose={() => setDialogOpen(false)} />
@@ -558,7 +859,7 @@ export default function SuppliersPage() {
       )}
       <ConfirmDialog
         open={!!deleteId}
-        title="Deactivate Supplier"
+        title="Deactivate supplier"
         description="This will deactivate the supplier. Existing records will not be affected."
         confirmLabel="Deactivate"
         variant="danger"
