@@ -12,7 +12,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { EmptyState, ErrorState, ConfirmDialog } from '@/components/feedback';
 import { formatCurrency, formatDate } from '@/lib/formatters';
 import {
-  useGetSuppliersQuery, useDeleteSupplierMutation,
+  useGetSuppliersQuery, useGetSupplierSummaryQuery, useDeleteSupplierMutation,
   useGetSupplierDuesQuery, useGetSupplierPaymentsQuery, useGetPurchaseOrdersQuery,
   useLazyGetPurchaseOrdersQuery, useLazyGetSupplierPaymentsQuery,
 } from '@/features/procurement/services/procurementApi';
@@ -165,6 +165,74 @@ function SkeletonRows({ rows, cols }: { rows: number; cols: number }) {
         </tr>
       ))}
     </>
+  );
+}
+
+/* ───────────────────────── Header summary ───────────────────────── */
+
+function SuppliersSummary() {
+  const { data, isLoading, isError, refetch } = useGetSupplierSummaryQuery();
+  const summary = data?.data;
+
+  if (isError) {
+    return (
+      <div className="flex h-full items-center justify-center rounded-xl border border-slate-700 bg-slate-700 px-4 py-3 text-sm text-slate-200" role="alert">
+        Couldn&apos;t load supplier totals.
+        <button onClick={() => refetch()} className="ml-2 font-semibold text-red-400 hover:underline">Retry</button>
+      </div>
+    );
+  }
+
+  const stats = summary
+    ? [
+        {
+          label: 'Total suppliers', value: summary.totalSuppliers.toLocaleString('en-BD'), icon: Building2,
+          hint: summary.suppliersWithDue > 0 ? `${summary.suppliersWithDue} with due` : 'None with due',
+          valueTone: 'text-white', chip: 'bg-white/10 text-slate-100',
+        },
+        {
+          label: 'Total paid', value: formatCurrency(summary.totalPaid), icon: Wallet,
+          hint: `of ${formatCurrency(summary.totalPurchased)} purchased`,
+          valueTone: 'text-emerald-300', chip: 'bg-emerald-500/20 text-emerald-300',
+        },
+        {
+          label: 'Total due', value: formatCurrency(summary.totalDue), icon: Scale,
+          hint: summary.totalDue > 0 ? 'Payment pending' : 'All settled',
+          valueTone: summary.totalDue > 0 ? 'text-amber-300' : 'text-emerald-300',
+          chip: summary.totalDue > 0 ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300',
+        },
+      ]
+    : [];
+
+  return (
+    <div
+      aria-label="Supplier totals"
+      aria-busy={isLoading}
+      className="grid grid-cols-1 divide-y divide-slate-600/70 overflow-hidden rounded-xl border border-slate-700 bg-slate-700 shadow-sm sm2:grid-cols-3 sm2:divide-x sm2:divide-y-0"
+    >
+      {isLoading || !summary
+        ? [0, 1, 2].map((i) => (
+            <div key={i} className="flex items-center gap-3 px-4 py-2.5 sm2:py-3">
+              <div className="hidden h-9 w-9 shrink-0 animate-pulse rounded-lg bg-slate-600/60 sm2:block" />
+              <div className="flex-1 space-y-2">
+                <div className="h-2.5 w-1/2 animate-pulse rounded bg-slate-600/60" />
+                <div className="h-3.5 w-3/4 animate-pulse rounded bg-slate-600/60" />
+              </div>
+            </div>
+          ))
+        : stats.map((s) => (
+            <div key={s.label} className="flex min-w-0 items-center gap-3 px-4 py-2.5 sm2:py-3">
+              <span className={`hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg sm2:inline-flex ${s.chip}`}>
+                <s.icon size={17} aria-hidden="true" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-slate-300">{s.label}</p>
+                <p className={`truncate text-base font-bold tabular-nums ${s.valueTone}`} title={s.value}>{s.value}</p>
+                <p className="truncate text-xs text-slate-300" title={s.hint}>{s.hint}</p>
+              </div>
+            </div>
+          ))}
+    </div>
   );
 }
 
@@ -381,17 +449,14 @@ function SupplierLedger({ supplier, onPay, onEdit }: { supplier: Supplier; onPay
         </div>
 
         {/* KPI cards */}
-        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-3">
           {duesQ.isLoading
-            ? [0, 1, 2].map((i) => <div key={i} className="h-[76px] animate-pulse rounded-xl border border-slate-200 bg-white" />)
+            ? [0, 1, 2].map((i) => <div key={i} className="h-[68px] animate-pulse rounded-xl border border-slate-200 bg-white" />)
             : stats.map((s) => (
-                <div key={s.label} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                  <span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${s.chip}`}>
-                    <s.icon size={18} aria-hidden="true" />
-                  </span>
+                <div key={s.label} className="min-w-0 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
                   <div className="min-w-0">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{s.label}</p>
-                    <p className={`truncate text-lg font-bold tabular-nums ${s.valueTone}`}>{formatCurrency(s.value)}</p>
+                    <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-slate-500">{s.label}</p>
+                    <p className={`truncate text-base font-bold tabular-nums sm2:text-lg ${s.valueTone}`}>{formatCurrency(s.value)}</p>
                     <p className="truncate text-xs text-slate-500">{s.hint}</p>
                   </div>
                 </div>
@@ -666,9 +731,10 @@ export default function SuppliersPage() {
       <div className="shrink-0">
         <PageHeader
           className="!mb-4"
-          title="Suppliers"
-          description="Supplier ledger, purchases and payment history"
+          title="Suppliers List"
+          // description="Supplier ledger and purchase history"
           breadcrumbs={[{ label: 'Procurement' }, { label: 'Suppliers' }]}
+          summary={<SuppliersSummary />}
           actions={
             <button onClick={openCreate} className={btnPrimary}>
               <Plus size={16} aria-hidden="true" /> New supplier

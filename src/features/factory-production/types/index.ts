@@ -103,9 +103,18 @@ export interface FactoryBatch {
 
 // ── Response types ────────────────────────────────────────────────────────────
 
+export interface FactoryBatchStats {
+  active: number;
+  drafts: number;
+  completed: number;
+  sentValue: number;
+  atFactoryValue: number;
+  receivedValue: number;
+}
+
 export interface FactoryBatchesResponse {
   success: boolean;
-  data: { factoryBatches: FactoryBatch[] };
+  data: { factoryBatches: FactoryBatch[]; stats?: FactoryBatchStats };
   pagination: { page: number; pages: number; total: number; limit: number };
 }
 

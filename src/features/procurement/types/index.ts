@@ -45,6 +45,19 @@ export interface SupplierResponse {
   data: { supplier: Supplier };
 }
 
+export interface SupplierSummary {
+  totalSuppliers: number;
+  suppliersWithDue: number;
+  totalPurchased: number;
+  totalPaid: number;
+  totalDue: number;
+}
+
+export interface SupplierSummaryResponse {
+  success: boolean;
+  data: SupplierSummary;
+}
+
 export interface SupplierPaymentsResponse {
   success: boolean;
   data: { payments: SupplierPayment[] };
@@ -56,9 +69,18 @@ export interface SupplierPaymentResponse {
   data: { payment: SupplierPayment };
 }
 
+export interface SupplierPaymentStats {
+  totalPayments: number;
+  totalAmount: number;
+  averageAmount: number;
+  largestAmount: number;
+  suppliersPaid: number;
+  byMethod: { method: string; amount: number; count: number }[];
+}
+
 export interface SupplierPaymentsAllResponse {
   success: boolean;
-  data: { payments: SupplierPayment[] };
+  data: { payments: SupplierPayment[]; stats?: SupplierPaymentStats };
   pagination: { page: number; pages: number; total: number; limit: number };
 }
 
@@ -121,9 +143,19 @@ export interface GoodsReceipt {
   createdAt: string;
 }
 
+export interface POStats {
+  totalOrders: number;
+  totalAmount: number;
+  totalPaid: number;
+  totalDue: number;
+  paidCount: number;
+  partialCount: number;
+  unpaidCount: number;
+}
+
 export interface POsResponse {
   success: boolean;
-  data: { purchaseOrders: PurchaseOrder[]; unpaidCount: number };
+  data: { purchaseOrders: PurchaseOrder[]; unpaidCount: number; stats?: POStats };
   pagination: { page: number; pages: number; total: number; limit: number };
 }
 

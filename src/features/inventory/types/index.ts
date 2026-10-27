@@ -38,9 +38,16 @@ export interface Item {
   updatedAt: string;
 }
 
+export interface ItemStats {
+  totalItems: number;
+  stockValue: number;
+  lowStock: number;
+  outOfStock: number;
+}
+
 export interface ItemsResponse {
   success: boolean;
-  data: { items: Item[] };
+  data: { items: Item[]; stats?: ItemStats };
   pagination: { page: number; pages: number; total: number; limit: number };
 }
 
@@ -74,8 +81,9 @@ export interface StockBalance {
 
 export type MovementType =
   | 'PURCHASE_RECEIPT' | 'PRODUCTION_ISSUE' | 'PRODUCTION_OUTPUT'
-  | 'SALES_DISPATCH' | 'ADJUSTMENT' | 'TRANSFER'
-  | 'RETURN_SUPPLIER' | 'RETURN_CUSTOMER' | 'ITEM_DELETED';
+  | 'SALES_DISPATCH' | 'GIFT_DISPATCH' | 'ADJUSTMENT' | 'TRANSFER'
+  | 'RETURN_SUPPLIER' | 'RETURN_CUSTOMER'
+  | 'FACTORY_DISPATCH' | 'FACTORY_RECEIPT' | 'FACTORY_RETURN' | 'ITEM_DELETED';
 
 export interface StockMovement {
   _id: string;
@@ -85,9 +93,12 @@ export interface StockMovement {
   quantity: number;
   balanceAfter: number;
   reference?: string;
+  referenceModel?: string;
+  referenceId?: string;
   usageQty?: number;
   usageUom?: { _id: string; symbol: string } | string;
   notes?: string;
+  createdBy?: { _id: string; name: string } | string;
   createdAt: string;
 }
 
@@ -100,15 +111,32 @@ export interface PopulatedMovementItem {
   baseUom?: { _id: string; symbol: string } | string;
 }
 
+export interface StockBalanceStats {
+  totalItems: number;
+  lowStock: number;
+  materialsValue: number;
+  productionValue: number;
+  productionSaleValue: number;
+}
+
 export interface StockBalancesResponse {
   success: boolean;
-  data: { balances: StockBalance[] };
+  data: { balances: StockBalance[]; stats?: StockBalanceStats };
   pagination: { page: number; pages: number; total: number; limit: number };
+}
+
+export interface StockMovementStats {
+  totalMovements: number;
+  itemsAffected: number;
+  inCount: number;
+  outCount: number;
+  inValue: number;
+  outValue: number;
 }
 
 export interface StockMovementsResponse {
   success: boolean;
-  data: { movements: StockMovement[] };
+  data: { movements: StockMovement[]; stats?: StockMovementStats };
   pagination: { page: number; pages: number; total: number; limit: number };
 }
 

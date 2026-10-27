@@ -2,14 +2,16 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Eye, Trash2, CreditCard, ChevronDown, X } from 'lucide-react';
+import { Search, Eye, Trash2, CreditCard, ChevronDown, X, ShoppingCart, Receipt, Wallet, Scale } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DataTable, type Column } from '@/components/tables/DataTable';
 import { EmptyState, ErrorState, ConfirmDialog } from '@/components/feedback';
 import { formatCurrency, formatDate } from '@/lib/formatters';
 import { useGetPurchaseOrdersQuery, useDeletePurchaseOrderMutation, useGetSuppliersQuery } from '@/features/procurement/services/procurementApi';
 import { SupplierPaymentDialog } from '@/features/procurement/components/SupplierPaymentDialog';
-import type { PaymentStatus, PurchaseOrder, Supplier } from '@/features/procurement/types';
+import { DateRangeFilter, useDateRangeFilter } from '@/features/procurement/components/DateRangeFilter';
+import { StatCards, type StatCardItem } from '@/features/procurement/components/StatCards';
+import type { PaymentStatus, PurchaseOrder, Supplier, POStats } from '@/features/procurement/types';
 
 function SupplierDropdown({ value, onChange }: { value: string; onChange: (id: string) => void }) {
   const [open, setOpen] = useState(false);
@@ -87,6 +89,31 @@ function SupplierDropdown({ value, onChange }: { value: string; onChange: (id: s
   );
 }
 
+function ordersStatItems(stats: POStats, rangeLabel: string): StatCardItem[] {
+  return [
+    {
+      label: 'Purchase orders', value: stats.totalOrders.toLocaleString('en-BD'), icon: ShoppingCart,
+      hint: `${stats.unpaidCount} unpaid · ${stats.partialCount} partial · ${stats.paidCount} paid`,
+      valueTone: 'text-slate-900', chip: 'bg-slate-100 text-slate-600',
+    },
+    {
+      label: 'Total purchase', value: formatCurrency(stats.totalAmount), icon: Receipt,
+      hint: rangeLabel, valueTone: 'text-slate-900', chip: 'bg-blue-50 text-blue-600',
+    },
+    {
+      label: 'Total paid', value: formatCurrency(stats.totalPaid), icon: Wallet,
+      hint: stats.totalAmount > 0 ? `${Math.round((stats.totalPaid / stats.totalAmount) * 100)}% of purchase` : 'No purchases',
+      valueTone: 'text-emerald-700', chip: 'bg-emerald-50 text-emerald-600',
+    },
+    {
+      label: 'Total due', value: formatCurrency(stats.totalDue), icon: Scale,
+      hint: stats.totalDue > 0 ? `${stats.unpaidCount + stats.partialCount} orders pending` : 'All settled',
+      valueTone: stats.totalDue > 0 ? 'text-amber-700' : 'text-emerald-700',
+      chip: stats.totalDue > 0 ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600',
+    },
+  ];
+}
+
 function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
   const styles = {
     PAID: 'bg-emerald-100 text-emerald-700',
@@ -109,14 +136,18 @@ export default function PurchaseOrdersPage() {
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<PaymentStatus | ''>('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [payOrder, setPayOrder] = useState<PurchaseOrder | null>(null);
+  const dateRange = useDateRangeFilter(() => setPage(1));
 
-  const { data, isLoading, isError, refetch } = useGetPurchaseOrdersQuery({
+  const { data, isLoading, isFetching, isError, refetch } = useGetPurchaseOrdersQuery({
     page,
     limit: 10,
     search: search || undefined,
     paymentStatus: paymentStatusFilter || undefined,
     supplier: supplierFilter || undefined,
+    from: dateRange.from,
+    to: dateRange.to,
   });
+  const stats = data?.data?.stats;
   const [deletePO, { isLoading: deleteLoading }] = useDeletePurchaseOrderMutation();
 
   async function handleDelete() {
@@ -164,6 +195,26 @@ export default function PurchaseOrdersPage() {
           >
             {s.name}
           </button>
+        );
+      },
+    },
+    {
+      key: 'products', header: 'Products', priority: 'P2', className: 'min-w-[200px]',
+      render: (row) => {
+        if (!row.items?.length) return <span className="text-muted">—</span>;
+        return (
+          <div className="space-y-0.5">
+            {row.items.map((line, i) => (
+              <p key={i} className="flex items-baseline gap-2 leading-6">
+                <span className="font-medium text-foreground">
+                  {typeof line.item === 'string' ? '—' : line.item?.name ?? '—'}
+                </span>
+                <span className="whitespace-nowrap text-xs font-semibold tabular-nums text-violet-600">
+                  {formatCurrency(line.unitPrice)}
+                </span>
+              </p>
+            ))}
+          </div>
         );
       },
     },
@@ -221,43 +272,53 @@ export default function PurchaseOrdersPage() {
     <>
       <PageHeader
         title="Purchase Orders"
-        description="Manage purchase orders and goods receipts"
         breadcrumbs={[{ label: 'Procurement' }, { label: 'Orders' }]}
+        className="!mb-4"
+        actions={
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+            <div className="relative w-full sm:w-80">
+              <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
+              <input
+                type="search"
+                placeholder="Search by PO number or supplier…"
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                className="h-11 w-full rounded-md border border-border bg-white pl-10 pr-3 text-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-emerald"
+              />
+            </div>
+            <DateRangeFilter {...dateRange.filterProps} />
+            <SupplierDropdown value={supplierFilter} onChange={(id) => { setSupplierFilter(id); setPage(1); }} />
+            <select
+              value={paymentStatusFilter}
+              onChange={(e) => { setPaymentStatusFilter(e.target.value as PaymentStatus | ''); setPage(1); }}
+              className="h-9 w-full rounded-md border border-border bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald sm:w-auto"
+              aria-label="Filter by payment status"
+            >
+              <option value="">All Payment Statuses</option>
+              <option value="PARTIAL">Partial</option>
+              <option value="PAID">Paid</option>
+              <option value="UNPAID">Unpaid</option>
+            </select>
+          </div>
+        }
       />
 
-      <div className="flex flex-col sm:flex-row gap-3 mb-4">
-        <div className="relative flex-1 min-w-0">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
-          <input type="search" placeholder="Search PO number…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} className="h-9 w-full rounded-md border border-border bg-white pl-9 pr-3 text-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-emerald" />
-        </div>
-        <SupplierDropdown value={supplierFilter} onChange={(id) => { setSupplierFilter(id); setPage(1); }} />
-        <select value={paymentStatusFilter} onChange={(e) => { setPaymentStatusFilter(e.target.value as PaymentStatus | ''); setPage(1); }} className="h-9 w-full sm:w-auto rounded-md border border-border bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald" aria-label="Filter by payment status">
-          <option value="">All Payment Statuses</option>
-          <option value="PARTIAL">Partial</option>
-          <option value="PAID">Paid</option>
-          <option value="UNPAID">Unpaid</option>
-        </select>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-4 text-sm text-secondary">
-        <div className="flex items-center gap-2">
-          <span>Total Purchase Orders:</span>
-          <span className="text-lg font-bold text-foreground">
-            {data?.pagination?.total ?? 0}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span>Unpaid Orders:</span>
-          <span className="text-lg font-bold text-amber-600">
-            {data?.data?.unpaidCount ?? 0}
-          </span>
-        </div>
-      </div>
+      <StatCards
+        label="Purchase order totals"
+        items={stats ? ordersStatItems(stats, dateRange.label) : null}
+        isLoading={isLoading}
+        isFetching={isFetching}
+      />
 
       {isError ? (
         <ErrorState onRetry={refetch} />
       ) : data?.data?.purchaseOrders?.length === 0 && !isLoading ? (
-        <EmptyState title="No purchase orders" description="Purchase orders will appear here once created from materials." />
+        <EmptyState
+          title="No purchase orders"
+          description={search || supplierFilter || paymentStatusFilter || dateRange.isActive
+            ? 'No purchase orders match the selected filters.'
+            : 'Purchase orders will appear here once created from materials.'}
+        />
       ) : (
         <DataTable
           columns={columns}

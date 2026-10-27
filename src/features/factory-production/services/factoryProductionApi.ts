@@ -32,7 +32,7 @@ export const factoryProductionApi = api.injectEndpoints({
       query: (id) => ({ url: `/factory-batches/${id}/dispatch`, method: 'POST' }),
       invalidatesTags: (_r, _e, id) => ['FactoryBatch', { type: 'FactoryBatch', id }, 'Stock', 'Item'],
     }),
-    updateFactoryBatchStatus: build.mutation<FactoryBatchResponse, { id: string; status: 'IN_PRODUCTION' }>({
+    updateFactoryBatchStatus: build.mutation<FactoryBatchResponse, { id: string; status: 'IN_PRODUCTION' | 'COMPLETED' }>({
       query: ({ id, status }) => ({ url: `/factory-batches/${id}/status`, method: 'PATCH', body: { status } }),
       invalidatesTags: (_r, _e, { id }) => ['FactoryBatch', { type: 'FactoryBatch', id }],
     }),
@@ -54,7 +54,7 @@ export const factoryProductionApi = api.injectEndpoints({
     }),
     deleteFactoryBatch: build.mutation<{ success: boolean; message: string }, string>({
       query: (id) => ({ url: `/factory-batches/${id}`, method: 'DELETE' }),
-      invalidatesTags: ['FactoryBatch'],
+      invalidatesTags: ['FactoryBatch', 'Stock', 'Item'],
     }),
   }),
 });

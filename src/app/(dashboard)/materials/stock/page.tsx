@@ -5,13 +5,55 @@ import { Search, AlertTriangle, FlaskConical, Box, Layers, Package, X } from 'lu
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DataTable, type Column } from '@/components/tables/DataTable';
 import { ErrorState, StatusBadge } from '@/components/feedback';
-import { formatDate } from '@/lib/formatters';
+import { formatCurrency, formatDate } from '@/lib/formatters';
 import { useRouter } from 'next/navigation';
 import { useGetStockBalancesQuery } from '@/features/inventory/services/inventoryApi';
-import type { StockBalance, Item, Warehouse } from '@/features/inventory/types';
+import type { StockBalance, StockBalanceStats, Item, Warehouse } from '@/features/inventory/types';
 
 const MATERIAL_TYPES = new Set(['RAW_MATERIAL', 'PACKAGING', 'SEMI_FINISHED']);
 const PRODUCTION_TYPES = new Set(['FINISHED_GOOD']);
+
+function StockSummary({ stats, isLoading, isFetching }: { stats?: StockBalanceStats; isLoading: boolean; isFetching: boolean }) {
+  const cards = stats
+    ? [
+        {
+          label: 'Items in stock', value: stats.totalItems.toLocaleString('en-BD'),
+          hint: stats.lowStock > 0 ? `${stats.lowStock} low stock` : 'None low on stock',
+          tone: 'text-slate-900', hintTone: stats.lowStock > 0 ? 'text-red-600 font-semibold' : 'text-slate-500',
+        },
+        {
+          label: 'Total stock value', value: formatCurrency(stats.materialsValue + stats.productionValue),
+          hint: 'At cost price', tone: 'text-emerald-700', hintTone: 'text-slate-500',
+        },
+        {
+          label: 'Materials value', value: formatCurrency(stats.materialsValue),
+          hint: 'Raw, packaging, semi-finished', tone: 'text-blue-700', hintTone: 'text-slate-500',
+        },
+        {
+          label: 'Production value', value: formatCurrency(stats.productionValue),
+          hint: `Sale value ${formatCurrency(stats.productionSaleValue)}`, tone: 'text-violet-700', hintTone: 'text-slate-500',
+        },
+      ]
+    : null;
+
+  return (
+    <div
+      aria-label="Stock totals"
+      aria-busy={isLoading || isFetching}
+      className={`grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3 transition-opacity ${isFetching && !isLoading ? 'opacity-60' : ''}`}
+    >
+      {!cards
+        ? [0, 1, 2, 3].map((i) => <div key={i} className="h-[68px] animate-pulse rounded-xl border border-slate-200 bg-white" />)
+        : cards.map((c) => (
+            <div key={c.label} className="min-w-0 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+              <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-slate-500">{c.label}</p>
+              <p className={`truncate text-base font-bold tabular-nums ${c.tone}`} title={c.value}>{c.value}</p>
+              <p className={`truncate text-xs ${c.hintTone}`} title={c.hint}>{c.hint}</p>
+            </div>
+          ))}
+    </div>
+  );
+}
 
 export default function StockPage() {
   const router = useRouter();
@@ -20,7 +62,7 @@ export default function StockPage() {
   const [typeFilter, setTypeFilter] = useState<'all' | 'materials' | 'production'>('all');
   const [statusFilter, setStatusFilter] = useState(false);
 
-  const { data, isLoading, isError, refetch } = useGetStockBalancesQuery({ page, search: search || undefined });
+  const { data, isLoading, isFetching, isError, refetch } = useGetStockBalancesQuery({ page, search: search || undefined });
 
   const filtered = useMemo(() => {
     return (data?.data?.balances ?? []).filter((b) => {
@@ -40,7 +82,7 @@ export default function StockPage() {
       render: (_row, index) => <span className="text-secondary text-sm">{(index ?? 0) + 1}</span>,
     },
     {
-      key: 'item', header: 'Item', priority: 'P1', className: 'max-w-[120px] sm:max-w-none',
+      key: 'item', header: 'Item Name', priority: 'P1', className: 'max-w-[120px] sm:max-w-none',
       render: (row) => {
         const item = typeof row.item === 'string' ? null : row.item as Item;
         const isLow = item?.reorderLevel != null && row.quantity <= item.reorderLevel;
@@ -61,7 +103,7 @@ export default function StockPage() {
             )}
             <button
               onClick={() => item && router.push(`/materials/${item._id}`)}
-              className={`text-xs sm:text-base font-bold hover:underline cursor-pointer leading-tight break-words text-left ${isLow ? 'text-red-600' : 'text-blue-600'}`}
+              className={`text-xs sm:text-sm font-semibold hover:underline cursor-pointer leading-tight break-words text-left ${isLow ? 'text-red-600' : 'text-blue-600'}`}
             >
               {item?.name ?? '—'}
             </button>
@@ -120,6 +162,19 @@ export default function StockPage() {
       },
     },
     {
+      key: 'stockValue', header: 'Stock Value', priority: 'P2',
+      render: (row) => {
+        const item = typeof row.item === 'string' ? null : row.item as Item;
+        const cost = item?.costPrice ?? 0;
+        return (
+          <div className="whitespace-nowrap">
+            <span className="block font-semibold tabular-nums text-emerald-700">{formatCurrency(Math.max(0, row.quantity) * cost)}</span>
+            <span className="block text-xs text-muted">@ {formatCurrency(cost)}</span>
+          </div>
+        );
+      },
+    },
+    {
       key: 'status', header: 'Status', priority: 'P2',
       render: (row) => {
         const item = typeof row.item === 'string' ? null : row.item as Item;
@@ -138,24 +193,28 @@ export default function StockPage() {
       <PageHeader
         title="Stock Balance"
         breadcrumbs={[{ label: 'Materials', href: '/materials' }, { label: 'Stock Balance' }]}
+        className="!mb-4"
+        summary={<StockSummary stats={data?.data?.stats} isLoading={isLoading} isFetching={isFetching} />}
       />
 
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        <div className="relative sm:w-1/2">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+      <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div className="relative w-full md:max-w-md md:flex-1">
+          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
           <input
             type="search"
             placeholder="Search item name or SKU…"
+            aria-label="Search stock"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="h-9 w-full rounded-md border-2 border-emerald bg-white pl-9 pr-3 text-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-emerald focus:border-emerald"
+            className="h-10 w-full rounded-md border border-border bg-white pl-9 pr-3 text-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-emerald"
           />
         </div>
+        <div className="flex flex-wrap items-center gap-2">
         {(['all', 'materials', 'production'] as const).map((t) => (
           <button
             key={t}
             onClick={() => { setTypeFilter(t); setPage(1); }}
-            className={`h-9 px-3 rounded-md border text-sm font-medium transition-colors ${
+            className={`h-10 px-3 rounded-md border text-sm font-medium transition-colors ${
               t === 'all'
                 ? typeFilter === 'all' ? 'bg-slate-700 border-slate-700 text-white' : 'bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200'
                 : t === 'materials'
@@ -168,7 +227,7 @@ export default function StockPage() {
         ))}
         <button
           onClick={() => { setStatusFilter((v) => !v); setPage(1); }}
-          className={`h-9 px-3 rounded-md border text-sm font-medium flex items-center gap-1.5 transition-colors ${
+          className={`h-10 px-3 rounded-md border text-sm font-medium flex items-center gap-1.5 transition-colors ${
             statusFilter ? 'bg-red-600 border-red-600 text-white' : 'bg-red-50 border-red-200 text-red-400 hover:bg-red-100'
           }`}
         >
@@ -178,11 +237,12 @@ export default function StockPage() {
         {(typeFilter !== 'all' || statusFilter || search) && (
           <button
             onClick={() => { setTypeFilter('all'); setStatusFilter(false); setSearch(''); setPage(1); }}
-            className="h-9 px-3 rounded-md border border-slate-300 bg-white text-sm font-medium text-slate-500 hover:bg-slate-100 flex items-center gap-1.5 transition-colors"
+            className="h-10 px-3 rounded-md border border-slate-300 bg-white text-sm font-medium text-slate-500 hover:bg-slate-100 flex items-center gap-1.5 transition-colors"
           >
             <X size={13} /> Clear
           </button>
         )}
+        </div>
       </div>
 
       {isError ? (
@@ -196,6 +256,7 @@ export default function StockPage() {
           pagination={data?.pagination}
           onPageChange={setPage}
           emptyMessage="No stock found."
+          headerClassName="font-bold text-slate-700"
         />
       )}
     </>

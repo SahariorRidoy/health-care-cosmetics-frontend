@@ -65,7 +65,10 @@ export const inventoryApi = api.injectEndpoints({
       query: (params) => ({ url: '/stock/balance', params }),
       providesTags: ['Stock'],
     }),
-    getStockMovements: build.query<StockMovementsResponse, { page?: number; limit?: number; item?: string; warehouse?: string; type?: string; reference?: string; archived?: boolean }>({
+    getStockMovements: build.query<StockMovementsResponse, {
+      page?: number; limit?: number; item?: string; warehouse?: string; type?: string; reference?: string; archived?: boolean;
+      search?: string; category?: 'materials' | 'production'; direction?: 'in' | 'out'; from?: string; to?: string;
+    }>({
       query: (params) => ({ url: '/stock/movements', params }),
       providesTags: ['Stock'],
     }),

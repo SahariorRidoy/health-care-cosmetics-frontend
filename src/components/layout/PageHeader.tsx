@@ -12,10 +12,12 @@ interface PageHeaderProps {
   description?: React.ReactNode;
   breadcrumbs?: Breadcrumb[];
   actions?: React.ReactNode;
+  /** Optional content placed between the title and the actions (wraps below the title on smaller screens). */
+  summary?: React.ReactNode;
   className?: string;
 }
 
-export function PageHeader({ title, description, breadcrumbs, actions, className }: PageHeaderProps) {
+export function PageHeader({ title, description, breadcrumbs, actions, summary, className }: PageHeaderProps) {
   return (
     <div className={cn('flex flex-col gap-1 mb-6 page-header', className)}>
       {breadcrumbs && breadcrumbs.length > 0 && (
@@ -34,8 +36,11 @@ export function PageHeader({ title, description, breadcrumbs, actions, className
           ))}
         </nav>
       )}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 min-w-0">
-        <div className="min-w-0 flex-1">
+      <div className={cn(
+        'flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 min-w-0',
+        summary && 'sm:flex-wrap xl:flex-nowrap xl:items-center',
+      )}>
+        <div className={cn('min-w-0 flex-1', summary && 'xl:flex-none xl:max-w-xs')}>
           <h1 className="text-xl md:text-2xl font-bold text-foreground truncate">{title}</h1>
           {description && (
             typeof description === 'string'
@@ -46,6 +51,11 @@ export function PageHeader({ title, description, breadcrumbs, actions, className
         {actions && (
           <div className="flex items-center gap-2 flex-wrap shrink-0">
             {actions}
+          </div>
+        )}
+        {summary && (
+          <div className="order-last w-full min-w-0 xl:order-none xl:w-auto xl:flex-1">
+            {summary}
           </div>
         )}
       </div>

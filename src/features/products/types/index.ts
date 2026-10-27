@@ -30,9 +30,18 @@ export interface Product {
   updatedAt: string;
 }
 
+export interface ProductStats {
+  totalItems: number;
+  activeItems: number;
+  stockValue: number;
+  saleValue: number;
+  lowStock: number;
+  outOfStock: number;
+}
+
 export interface ProductsResponse {
   success: boolean;
-  data: { items: Product[] };
+  data: { items: Product[]; stats?: ProductStats };
   pagination: { page: number; pages: number; total: number; limit: number };
 }
 

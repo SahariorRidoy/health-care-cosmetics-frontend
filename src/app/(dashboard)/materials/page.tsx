@@ -12,7 +12,44 @@ import { useGetItemsQuery, useDeleteItemMutation } from '@/features/inventory/se
 import { ItemFormDialog } from '@/features/inventory/components/ItemFormDialog';
 import { BulkPurchaseDialog } from '@/features/inventory/components/BulkPurchaseDialog';
 import { RepurchaseDialog } from '@/features/inventory/components/RepurchaseDialog';
-import type { Item, Supplier } from '@/features/inventory/types';
+import type { Item, ItemStats, Supplier } from '@/features/inventory/types';
+
+function MaterialsSummary({ stats, isLoading, isFetching }: { stats?: ItemStats; isLoading: boolean; isFetching: boolean }) {
+  const cards = stats
+    ? [
+        { label: 'Total materials', value: stats.totalItems.toLocaleString('en-BD'), hint: 'Active items', tone: 'text-slate-900' },
+        { label: 'Stock value', value: formatCurrency(stats.stockValue), hint: 'Stock × unit cost', tone: 'text-emerald-700' },
+        {
+          label: 'Low stock', value: stats.lowStock.toLocaleString('en-BD'),
+          hint: stats.lowStock > 0 ? 'At or below reorder level' : 'All above reorder level',
+          tone: stats.lowStock > 0 ? 'text-red-600' : 'text-emerald-700',
+        },
+        {
+          label: 'Out of stock', value: stats.outOfStock.toLocaleString('en-BD'),
+          hint: stats.outOfStock > 0 ? 'Zero quantity left' : 'Everything in stock',
+          tone: stats.outOfStock > 0 ? 'text-amber-700' : 'text-emerald-700',
+        },
+      ]
+    : null;
+
+  return (
+    <div
+      aria-label="Material totals"
+      aria-busy={isLoading || isFetching}
+      className={`grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3 transition-opacity ${isFetching && !isLoading ? 'opacity-60' : ''}`}
+    >
+      {!cards
+        ? [0, 1, 2, 3].map((i) => <div key={i} className="h-[68px] animate-pulse rounded-xl border border-slate-200 bg-white" />)
+        : cards.map((c) => (
+            <div key={c.label} className="min-w-0 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+              <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-slate-500">{c.label}</p>
+              <p className={`truncate text-base font-bold tabular-nums ${c.tone}`} title={c.value}>{c.value}</p>
+              <p className="truncate text-xs text-slate-500" title={c.hint}>{c.hint}</p>
+            </div>
+          ))}
+    </div>
+  );
+}
 
 export default function ItemsPage() {
   const router = useRouter();
@@ -40,7 +77,7 @@ export default function ItemsPage() {
     setPage(1);
   }
 
-  const { data, isLoading, isError, refetch } = useGetItemsQuery({
+  const { data, isLoading, isFetching, isError, refetch } = useGetItemsQuery({
     page,
     search: search || undefined,
     type: typeFilter || undefined,
@@ -49,6 +86,7 @@ export default function ItemsPage() {
   });
 
   const allItems = data?.data.items ?? [];
+  const stats = data?.data.stats;
   const lowStockItems = allItems.filter(
     (it) => (it.reorderLevel ?? 0) > 0 && it.currentStock <= it.reorderLevel!,
   );
@@ -155,6 +193,14 @@ export default function ItemsPage() {
       key: 'costPrice', header: 'Unit Cost', priority: 'P3', sortable: true,
       render: (row) => formatCurrency(row.costPrice),
     },
+    {
+      key: 'stockValue', header: 'Stock Value', priority: 'P2',
+      render: (row) => (
+        <span className="font-semibold tabular-nums text-emerald-700">
+          {formatCurrency(Math.max(0, row.currentStock) * (row.costPrice ?? 0))}
+        </span>
+      ),
+    },
     // {
     //   key: 'isActive', header: 'Status', priority: 'P2',
     //   render: (row) => <StatusBadge status={row.isActive ? 'ACTIVE' : 'INACTIVE'} />,
@@ -175,19 +221,15 @@ export default function ItemsPage() {
   return (
     <>
       <PageHeader
-        title="Materials"
-        description="Manage raw materials and packaging stock"
+        title="Materials List"
         breadcrumbs={[{ label: 'Materials' }]}
-        actions={
-          <div className="flex items-center gap-2">
-            <button onClick={() => setBulkPurchaseOpen(true)} className="h-9 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium flex items-center gap-2 transition-colors">
-              <ShoppingCart size={16} aria-hidden="true" /> Purchase New or Existing Materials
-            </button>
-            {/* <button onClick={openCreate} className="h-9 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium flex items-center gap-2 transition-colors">
-              <Plus size={16} aria-hidden="true" /> New Material
-            </button> */}
-          </div>
+        className="!mb-4"
+        description={
+          <button onClick={() => setBulkPurchaseOpen(true)} className="mt-1.5 h-9 px-4 rounded-md bg-emerald hover:bg-emerald-600 text-white text-sm font-medium inline-flex items-center gap-2 whitespace-nowrap transition-colors">
+            <ShoppingCart size={16} aria-hidden="true" /> Purchase New or Existing Materials
+          </button>
         }
+        summary={<MaterialsSummary stats={stats} isLoading={isLoading} isFetching={isFetching} />}
       />
 
 <div className="flex flex-col sm:flex-row gap-3 mb-4">

@@ -1,6 +1,6 @@
 import { api } from '@/lib/store/api';
 import type {
-  SuppliersResponse, SupplierResponse, CreateSupplierPayload,
+  SuppliersResponse, SupplierResponse, SupplierSummaryResponse, CreateSupplierPayload,
   SupplierPaymentsResponse, SupplierPaymentResponse, SupplierPaymentsAllResponse, SupplierDuesResponse,
   POsResponse, POResponse, GRsResponse, GRResponse, PaymentStatus,
 } from '../types';
@@ -10,6 +10,10 @@ export const procurementApi = api.injectEndpoints({
     getSuppliers: build.query<SuppliersResponse, { page?: number; limit?: number; search?: string; isActive?: string }>({
       query: (params) => ({ url: '/suppliers', params }),
       providesTags: ['Supplier'],
+    }),
+    getSupplierSummary: build.query<SupplierSummaryResponse, void>({
+      query: () => '/suppliers/summary',
+      providesTags: ['Supplier', 'SupplierPayment', 'PurchaseOrder'],
     }),
     getSupplier: build.query<SupplierResponse, string>({
       query: (id) => `/suppliers/${id}`,
@@ -31,7 +35,7 @@ export const procurementApi = api.injectEndpoints({
       query: ({ supplierId, ...params }) => ({ url: `/procurement/suppliers/${supplierId}/payments`, params }),
       providesTags: ['SupplierPayment'],
     }),
-    getAllSupplierPayments: build.query<SupplierPaymentsAllResponse, { page?: number; limit?: number; search?: string; supplier?: string; method?: string }>({
+    getAllSupplierPayments: build.query<SupplierPaymentsAllResponse, { page?: number; limit?: number; search?: string; supplier?: string; method?: string; from?: string; to?: string }>({
       query: (params) => ({ url: '/procurement/payments', params }),
       providesTags: ['SupplierPayment'],
     }),
@@ -63,7 +67,7 @@ export const procurementApi = api.injectEndpoints({
         'GoodsReceipt',
       ],
     }),
-    getPurchaseOrders: build.query<POsResponse, { page?: number; limit?: number; search?: string; status?: string; paymentStatus?: PaymentStatus; supplier?: string }>({
+    getPurchaseOrders: build.query<POsResponse, { page?: number; limit?: number; search?: string; status?: string; paymentStatus?: PaymentStatus; supplier?: string; from?: string; to?: string }>({
       query: (params) => ({ url: '/purchase-orders', params }),
       providesTags: ['PurchaseOrder'],
     }),
@@ -124,6 +128,7 @@ export const procurementApi = api.injectEndpoints({
 
 export const {
   useGetSuppliersQuery,
+  useGetSupplierSummaryQuery,
   useGetSupplierQuery,
   useCreateSupplierMutation,
   useUpdateSupplierMutation,

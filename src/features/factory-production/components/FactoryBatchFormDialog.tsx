@@ -59,7 +59,7 @@ function MaterialSelect({ value, items, stockMap, selectedIds, onChange }: Mater
         <ChevronDown size={14} className="shrink-0 text-secondary" />
       </button>
       {open && (
-        <div className="absolute top-full left-0 z-50 mt-1 w-max min-w-full rounded-md border border-border bg-white shadow-lg">
+        <div className="absolute top-full left-0 right-0 z-50 mt-1 rounded-md border border-border bg-white shadow-lg sm:right-auto sm:w-max sm:min-w-full sm:max-w-[32rem]">
           <div className="max-h-64 overflow-y-auto">
             <div className="px-3 py-2 text-sm text-muted hover:bg-slate-50 cursor-pointer" onMouseDown={() => { onChange(''); setOpen(false); }}>
               Select material…
@@ -244,12 +244,12 @@ export function FactoryBatchFormDialog({ open, onClose, batch }: Props) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-stretch justify-center sm:items-center sm:p-4">
       <div className="fixed inset-0 bg-black/40" onClick={handleClose} aria-hidden="true" />
       <div
         role="dialog" aria-modal="true"
         aria-label={isEdit ? 'Edit Factory Batch' : 'New Factory Batch'}
-        className="relative w-full sm:max-w-3xl bg-white rounded-none sm:rounded-xl shadow-lg z-10 max-h-[92vh] flex flex-col"
+        className="relative z-10 flex h-full w-full flex-col bg-white shadow-lg sm:h-auto sm:max-h-[92vh] sm:max-w-3xl sm:rounded-xl"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
@@ -294,8 +294,10 @@ export function FactoryBatchFormDialog({ open, onClose, batch }: Props) {
                 const cost = qty * m.costPrice;
                 return (
                   <div key={idx} className="bg-white rounded-lg p-2">
-                    <div className="grid gap-2" style={{ gridTemplateColumns: '1fr 160px 80px 36px', width: '100%' }}>
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto_36px] gap-2 sm:grid-cols-[minmax(0,1fr)_160px_80px_36px]">
+                      <div className="col-span-3 sm:col-span-1">
                       <MaterialSelect value={m.itemId} items={allItems} stockMap={stockMap} selectedIds={materials.map((ml) => ml.itemId).filter(Boolean)} onChange={(id) => pickItem(idx, id)} />
+                      </div>
 
                       <div className="flex items-center rounded-md border border-border overflow-hidden">
                         <input
@@ -316,7 +318,7 @@ export function FactoryBatchFormDialog({ open, onClose, batch }: Props) {
                         </select>
                       </div>
 
-                      <span className="h-9 flex items-center text-sm font-medium text-emerald w-20 justify-end">
+                      <span className="h-9 flex items-center text-sm font-medium text-emerald justify-end sm:w-20">
                         {cost > 0 ? formatCurrency(cost) : ''}
                       </span>
 
@@ -347,7 +349,7 @@ export function FactoryBatchFormDialog({ open, onClose, batch }: Props) {
               <Plus size={13} /> Add Another Material
             </button>
 
-            <div className="mt-3 flex items-stretch gap-4">
+            <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-stretch">
               <div className="flex-1">
                 <TextareaField label="Dispatch Notes" placeholder="Any notes for this dispatch…" value={dispatchNotes} onChange={(e) => setDispatchNotes(e.target.value)} />
               </div>
